@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>회원가입 · 주간실적 보고 시스템</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/css/style.css?v=__V__">
+</head>
+<body class="login-page">
+
+  <form class="login-card wide" id="signup-form" autocomplete="on">
+    <h1>회원가입</h1>
+    <p class="sub">AI 인허가 사업단 · 주간실적 보고 시스템</p>
+
+    <div class="alert info" id="signup-notice">
+      가입 후 바로 로그인하실 수 있습니다.
+    </div>
+
+    <div class="alert error hidden" id="err"></div>
+    <div class="alert success hidden" id="done"></div>
+
+    <div id="form-body">
+      <label class="field">
+        <span>아이디 <em class="req">*</em></span>
+        <input type="text" id="username" autocomplete="username" placeholder="영문/숫자 4자 이상" required>
+      </label>
+
+      <div class="row">
+        <label class="field">
+          <span>비밀번호 <em class="req">*</em></span>
+          <input type="password" id="password" autocomplete="new-password" placeholder="8자 이상" required>
+        </label>
+        <label class="field">
+          <span>비밀번호 확인 <em class="req">*</em></span>
+          <input type="password" id="password2" autocomplete="new-password" required>
+        </label>
+      </div>
+
+      <div class="row">
+        <label class="field">
+          <span>이름 <em class="req">*</em></span>
+          <input type="text" id="name" autocomplete="name" required>
+        </label>
+        <label class="field">
+          <span>연락처</span>
+          <input type="text" id="phone" autocomplete="tel" placeholder="010-0000-0000">
+        </label>
+      </div>
+
+      <label class="field">
+        <span>이메일 <em class="req">*</em></span>
+        <input type="email" id="email" autocomplete="email" placeholder="아이디·비밀번호 찾기에 사용됩니다" required>
+      </label>
+
+      <label class="field">
+        <span>소속 기관 <em class="req">*</em></span>
+        <select id="org_id" required></select>
+      </label>
+
+      <label class="field">
+        <span>담당 업무</span>
+        <textarea id="signup_note" rows="2" placeholder="관리자가 승인 시 참고합니다."></textarea>
+      </label>
+
+      <button type="submit" class="btn primary" id="submit">가입 신청</button>
+    </div>
+
+    <div class="login-links">
+      <a href="/login">로그인 화면으로</a>
+    </div>
+  </form>
+
+  <div id="toast"></div>
+
+  <script src="/js/api.js?v=__V__"></script>
+  <script src="/js/signup.js?v=__V__"></script>
+</body>
+</html>

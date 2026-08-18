@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>비밀번호 재설정 · 주간실적 보고 시스템</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/css/style.css?v=__V__">
+</head>
+<body class="login-page">
+
+  <form class="login-card" id="reset-form" autocomplete="off">
+    <h1>비밀번호 재설정</h1>
+    <p class="sub">AI 인허가 사업단</p>
+
+    <div class="alert error hidden" id="err"></div>
+    <div class="alert success hidden" id="done"></div>
+
+    <div id="form-body" class="hidden">
+      <p class="small muted" id="who"></p>
+
+      <label class="field hidden" id="temp-field">
+        <span>임시 비밀번호</span>
+        <input type="password" id="temp" autocomplete="off" data-lpignore="true"
+               placeholder="안내받은 임시 비밀번호">
+      </label>
+
+      <label class="field">
+        <span>새 비밀번호 (8자 이상)</span>
+        <input type="password" id="pw" autocomplete="new-password" required>
+      </label>
+      <label class="field">
+        <span>새 비밀번호 확인</span>
+        <input type="password" id="pw2" autocomplete="new-password" required>
+      </label>
+      <label class="check"><input type="checkbox" id="pw-show"> 입력한 비밀번호 표시</label>
+
+      <button type="submit" class="btn primary" id="submit">비밀번호 변경</button>
+    </div>
+
+    <div class="login-links">
+      <a href="/login">로그인 화면으로</a>
+    </div>
+  </form>
+
+  <div id="toast"></div>
+
+  <script src="/js/api.js?v=__V__"></script>
+  <script src="/js/reset.js?v=__V__"></script>
+</body>
+</html>

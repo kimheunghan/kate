@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>로그인 · 주간실적 보고 시스템</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/css/style.css?v=__V__">
+</head>
+<body class="login-page">
+
+  <form class="login-card" id="login-form" autocomplete="on">
+    <h1>주간실적 보고 시스템</h1>
+    <p class="sub">AI 인허가 사업단</p>
+
+    <div class="alert error hidden" id="err"></div>
+    <div class="alert success hidden" id="msg"></div>
+
+    <label class="field">
+      <span>아이디</span>
+      <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+    </label>
+
+    <label class="field">
+      <span>비밀번호</span>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+    </label>
+
+    <button type="submit" class="btn primary" id="submit">로그인</button>
+
+    <div class="login-links">
+      <a href="/signup">회원가입</a>
+      <span class="bar"></span>
+      <a href="#" id="link-find-id">아이디 찾기</a>
+      <span class="bar"></span>
+      <a href="#" id="link-find-pw">비밀번호 찾기</a>
+    </div>
+  </form>
+
+  <div id="toast"></div>
+
+  <script src="/js/api.js?v=__V__"></script>
+  <script src="/js/login.js?v=__V__"></script>
+</body>
+</html>

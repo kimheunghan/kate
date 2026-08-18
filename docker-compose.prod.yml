@@ -1,0 +1,79 @@
+# =====================================================================
+#  주간보고 시스템 - 운영 구성
+#
+#    APP : 192.168.200.115 (Ubuntu 22.04 LTS, podman 4.9.3, 8 Core)  ← 이 파일로 기동
+#    DB  : 192.168.200.116 (Rocky Linux,    podman 5.8.2, 16 Core)  ← docker-compose.db.yml 로 별도 기동
+#    외부 : http://183.101.26.137:<APP_PORT>
+#
+#    podman-compose -f docker-compose.prod.yml up -d
+#
+#  ※ APP 서버에는 DB 컨테이너를 띄우지 않고, 원격 DB(.116) 에 접속합니다.
+# =====================================================================
+services:
+
+  app:
+    init: true
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/weekly-report:1.0
+    container_name: wr-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      APP_PORT: 8080
+
+      # ---- 원격 DB (192.168.200.116) ----
+      DB_HOST: "${DB_HOST:?DB_HOST 를 .env 에 설정하세요 (예: 192.168.200.116)}"
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-weekly_report}
+      DB_USER: ${DB_USER:-wruser}
+      DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD 를 .env 에 설정하세요}"
+      DB_SCHEMA: wr
+
+      SESSION_SECRET: "${SESSION_SECRET:?SESSION_SECRET 을 .env 에 설정하세요}"
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-43200}
+      # HTTPS 로 서비스할 경우 true 로 변경
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-주간실적 보고 시스템}
+      SMTP_TLS_REJECT_UNAUTHORIZED: ${SMTP_TLS_REJECT_UNAUTHORIZED:-true}
+      RESET_TOKEN_MINUTES: ${RESET_TOKEN_MINUTES:-30}
+      RESET_FALLBACK: ${RESET_FALLBACK:-direct}
+      RESET_DIRECT_MINUTES: ${RESET_DIRECT_MINUTES:-15}
+      APP_BASE_URL: ${APP_BASE_URL:-}
+      SIGNUP_AUTO_APPROVE: ${SIGNUP_AUTO_APPROVE:-true}
+      SIGNUP_ALLOWED_EMAIL_DOMAINS: ${SIGNUP_ALLOWED_EMAIL_DOMAINS:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-관리자}
+      TZ: Asia/Seoul
+
+    volumes:
+      # 증적자료는 호스트 디렉터리에 보관해 백업이 쉽도록 한다
+      # (:z = SELinux 라벨 재지정. Ubuntu 에서는 무시되므로 그대로 두어도 됨)
+      - ${UPLOAD_HOST_DIR:-./data/uploads}:/app/uploads:z
+
+    ports:
+      # 외부 공개 포트. 확정되면 .env 의 APP_PORT 만 바꾸면 됩니다.
+      - "${APP_PORT:-8080}:8080"
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    stop_grace_period: 15s
+
+    extra_hosts:
+      - "wr-db:${DB_HOST:-192.168.200.116}"

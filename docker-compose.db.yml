@@ -1,0 +1,51 @@
+# =====================================================================
+#  주간보고 시스템 - DB 전용 구성
+#    대상 서버: 192.168.200.116 (Rocky Linux 최신, podman 5.8.2, 16 Core)
+#
+#    podman-compose -f docker-compose.db.yml up -d
+#
+#  ※ 최초 기동 시에만 db/init/*.sql 이 자동 실행됩니다.
+#     이미 데이터가 있는 볼륨에는 적용되지 않으니,
+#     기존 DB 에 반영할 때는 scripts/apply-schema.sh 를 사용하세요.
+# =====================================================================
+services:
+
+  db:
+    image: docker.io/library/postgres:16-alpine
+    container_name: wr-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-weekly_report}
+      POSTGRES_USER: ${DB_USER:-wruser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 를 .env 에 설정하세요}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      TZ: Asia/Seoul
+    volumes:
+      - ${PGDATA_HOST_DIR:-./data/pgdata}:/var/lib/postgresql/data:z
+      - ./db/init:/docker-entrypoint-initdb.d:ro,z
+    ports:
+      # APP 서버(192.168.200.115) 에서 접속. 방화벽 개방 필요.
+      - "${DB_BIND:-0.0.0.0}:${DB_PORT:-5432}:5432"
+    shm_size: 512mb
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=2GB          # 16 Core 서버 기준. 메모리에 맞춰 조정하세요
+      - -c
+      - effective_cache_size=6GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=512MB
+      - -c
+      - log_timezone=Asia/Seoul
+      - -c
+      - timezone=Asia/Seoul
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-wruser} -d ${DB_NAME:-weekly_report}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    stop_grace_period: 60s

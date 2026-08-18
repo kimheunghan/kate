@@ -1,0 +1,10 @@
+.env
+node_modules/
+data/
+dist/
+backup/
+uploads/*
+!uploads/.gitkeep
+*.log
+*.tar
+*.tar.gz

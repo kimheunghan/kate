@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>주간보고 · 주간실적 보고 시스템</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/css/style.css?v=__V__">
+</head>
+<body>
+
+  <header class="topbar" id="topbar"></header>
+
+  <div class="wrap">
+
+    <!-- ============================================================ 탭 -->
+    <div class="panel">
+      <div class="tabs">
+        <button data-tab="write" class="active">보고서 작성 / 수정</button>
+        <button data-tab="list">등록 내역 조회</button>
+      </div>
+
+      <!-- ------------------------------------------------- 작성 탭 -->
+      <div class="body" id="tab-write">
+        <div class="row">
+          <label class="field" style="flex:2 1 320px">
+            <span>보고 주차</span>
+            <select id="sel-week"></select>
+          </label>
+          <label class="field" id="org-field" style="flex:1 1 220px">
+            <span>기관</span>
+            <select id="sel-org"></select>
+          </label>
+          <div class="field narrow" style="flex:0 0 auto">
+            <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
+            <button class="btn" id="btn-load">불러오기</button>
+          </div>
+        </div>
+        <div id="write-status"></div>
+      </div>
+    </div>
+
+    <!-- ============================================ 보고서 편집 영역 -->
+    <div class="panel" id="editor-panel">
+      <header>
+        <h2 id="editor-title">주간 추진실적</h2>
+        <span id="editor-badge"></span>
+        <div class="spacer"></div>
+        <button class="btn sm" id="btn-copy-prev" title="직전 주차 보고서의 업무명과 계획을 그대로 가져옵니다">직전 주차 불러오기</button>
+        <button class="btn sm" id="btn-add-row">＋ 업무 추가</button>
+      </header>
+
+      <!-- 공용 편집 툴바: 현재 편집 중인 칸에 적용됩니다 -->
+      <div id="shared-toolbar"></div>
+      <div class="toolbar-hint" id="toolbar-hint">계획 또는 실적 칸을 클릭하면 위 편집 도구를 사용할 수 있습니다.</div>
+
+      <div class="body">
+        <div class="table-scroll">
+          <table class="report-table">
+            <colgroup>
+              <col class="c-no"><col class="c-title"><col class="c-cell"><col class="c-cell"><col class="c-act">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>순번</th>
+                <th>업무명</th>
+                <th>① 당초 계획</th>
+                <th>② 추진 실적</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="items-body"></tbody>
+          </table>
+        </div>
+
+        <label class="field mt16">
+          <span>특이사항 / 비고 (선택)</span>
+          <textarea id="note" rows="2" placeholder="이슈, 협조 요청사항 등을 입력하세요."></textarea>
+        </label>
+      </div>
+    </div>
+
+    <!-- ================================================ 증적자료 첨부 -->
+    <div class="panel" id="files-panel">
+      <header>
+        <h2>증적자료 첨부</h2>
+        <span class="muted small">문서, 소스파일, 캡처 등 (실행파일은 zip 으로 압축해서 올려주세요)</span>
+      </header>
+      <div class="body">
+        <div class="dropzone" id="dropzone">
+          파일을 여기에 끌어다 놓거나 클릭해서 선택하세요
+          <div class="small mt8" id="dz-hint"></div>
+        </div>
+        <input type="file" id="file-input" multiple class="hidden">
+        <ul class="file-list" id="file-list"></ul>
+        <p class="small muted mt8" id="files-note"></p>
+      </div>
+    </div>
+
+    <!-- ==================================================== 저장 버튼 -->
+    <div class="panel no-print" id="save-panel">
+      <div class="body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn primary" id="btn-save">임시저장</button>
+          <button class="btn primary" id="btn-submit">제출하기</button>
+          <button class="btn" id="btn-print">인쇄 / PDF</button>
+          <button class="btn" id="btn-export"
+                  title="한글문서(HWP) 변환은 현재 [Word 다운로드] 하신 후 한글에서 Word문서를 열어서 다른 이름(확장자 .hwp)으로 저장하시기 바랍니다.">
+            Word 다운로드 <span class="mark">※</span>
+          </button>
+          <div class="spacer" style="flex:1"></div>
+          <button class="btn danger" id="btn-delete">보고서 삭제</button>
+        </div>
+        <p class="hint-note">
+          <span class="mark">※</span>
+          한글문서(HWP) 변환은 현재 [Word 다운로드] 하신 후 한글에서 Word문서를 열어서 다른 이름(확장자 .hwp)으로 저장하시기 바랍니다.
+        </p>
+      </div>
+    </div>
+
+    <!-- ================================================= 조회 탭 내용 -->
+    <div class="panel hidden" id="tab-list">
+      <header>
+        <h2>등록 내역</h2>
+        <div class="spacer"></div>
+      </header>
+      <div class="body">
+        <div class="row">
+          <label class="field"><span>주차</span><select id="f-week"><option value="">전체</option></select></label>
+          <label class="field"><span>기관</span><select id="f-org"><option value="">전체</option></select></label>
+          <label class="field"><span>상태</span>
+            <select id="f-status">
+              <option value="">전체</option>
+              <option value="SUBMITTED">제출완료</option>
+              <option value="DRAFT">임시저장</option>
+            </select>
+          </label>
+          <label class="field" style="flex:2 1 240px"><span>검색어 (업무명·내용)</span><input type="text" id="f-q" placeholder="예: 온톨로지"></label>
+          <div class="field narrow">
+            <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
+            <button class="btn primary" id="btn-search">검색</button>
+          </div>
+        </div>
+
+        <div class="table-scroll mt8">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th style="width:230px">주차</th>
+                <th style="width:170px">기관</th>
+                <th class="center" style="width:90px">상태</th>
+                <th class="center" style="width:70px">업무</th>
+                <th class="center" style="width:70px">첨부</th>
+                <th style="width:100px">작성자</th>
+                <th style="width:140px">최종수정</th>
+                <th class="center" style="width:210px">관리</th>
+              </tr>
+            </thead>
+            <tbody id="list-body"></tbody>
+          </table>
+        </div>
+        <div id="list-pager" class="mt8" style="display:flex;gap:6px;justify-content:center;align-items:center"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="/js/api.js?v=__V__"></script>
+  <script src="/js/editor.js?v=__V__"></script>
+  <script src="/js/app.js?v=__V__"></script>
+</body>
+</html>
