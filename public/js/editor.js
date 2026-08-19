@@ -23,6 +23,18 @@
     ['Consolas', 'Consolas'],
   ];
 
+  // 글머리표 종류. value 는 CSS list-style-type 값.
+  //  - 'dash' 는 CSS 문자열 카운터( '- ' )로 처리한다.
+  const BULLETS = [
+    ['',        '글머리표'],
+    ['disc',    '•  점'],
+    ['square',  '■  사각'],
+    ['circle',  '○  원'],
+    ['dash',    '−  대시'],
+    ['decimal', '1.  번호'],
+    ['off',     '해제'],
+  ];
+
   const SIZES = [
     ['', '크기'], ['1', '8pt'], ['2', '10pt'], ['3', '12pt'],
     ['4', '14pt'], ['5', '18pt'], ['6', '24pt'], ['7', '36pt'],
@@ -326,8 +338,7 @@
       this._btn('오른쪽 정렬', '⯈', () => this._exec('justifyRight'), 'justifyRight');
       this._sep();
 
-      this._btn('글머리 기호', '• 목록', () => this._exec('insertUnorderedList'), 'insertUnorderedList');
-      this._btn('번호 매기기', '1. 목록', () => this._exec('insertOrderedList'), 'insertOrderedList');
+      this._select(BULLETS, '글머리표 / 번호 매기기', (v) => v && this._applyBullet(v));
       this._btn('내어쓰기', '◀', () => this._exec('outdent'));
       this._btn('들여쓰기', '▶', () => this._exec('indent'));
       this._sep();
@@ -405,6 +416,54 @@
         fr.readAsDataURL(f);
       };
       input.click();
+    }
+
+    /** 선택 영역이 들어 있는 목록(UL/OL) 노드를 찾는다 */
+    _currentList(ed) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return null;
+      let n = sel.getRangeAt(0).startContainer;
+      if (n.nodeType === 3) n = n.parentElement;
+      while (n && n !== ed.area) {
+        if (n.tagName === 'UL' || n.tagName === 'OL') return n;
+        n = n.parentElement;
+      }
+      return null;
+    }
+
+    /** 글머리표 종류를 적용한다 (없으면 목록으로 만들고, 이미 목록이면 모양만 바꾼다) */
+    _applyBullet(kind) {
+      const ed = this.getActive();
+      if (!ed) return;
+      ed.area.focus();
+      ed.restoreRange();
+
+      let list = this._currentList(ed);
+
+      if (kind === 'off') {
+        if (list) document.execCommand(list.tagName === 'OL' ? 'insertOrderedList' : 'insertUnorderedList');
+        ed.touch();
+        this.syncState();
+        return;
+      }
+
+      const wantOrdered = kind === 'decimal';
+      const cmd = wantOrdered ? 'insertOrderedList' : 'insertUnorderedList';
+
+      // 목록이 아니거나 종류(순서/기호)가 다르면 해당 명령으로 만든다
+      if (!list || (list.tagName === 'OL') !== wantOrdered) {
+        try { document.execCommand('styleWithCSS', false, true); } catch (e) { /* noop */ }
+        document.execCommand(cmd);
+        list = this._currentList(ed);
+      }
+
+      if (list) {
+        // 대시는 CSS 문자열 카운터로 표현한다
+        list.style.listStyleType = kind === 'dash' ? "'−  '" : kind;
+        list.style.paddingLeft = '24px';
+      }
+      ed.touch();
+      this.syncState();
     }
 
     // ---------------- 서식 복사 (Word 의 서식 붓과 동일한 사용감) ----------------
