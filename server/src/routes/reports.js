@@ -490,7 +490,11 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
      아래 공통 규칙보다 뒤에 오도록 !important 로 고정한다. */
   th { font-size: 8.5pt !important; }
   td, td.org, td.who, td table, ol.files, .fitem { font-size: 7pt !important; }
-  .note { font-size: 8.5pt !important; }`
+  .note { font-size: 8.5pt !important; }
+  /* 글꼴도 한글 문서와 같이 휴먼명조 */
+  body, h1, table, th, td, p, div, li, ol, ul, span {
+    font-family: "휴먼명조", "HY명조", "HYMyeongJo", "Batang", "바탕", serif !important;
+  }`
     : `@page { size: A4 portrait; margin: 0; }
   body { padding: 10mm; }`;
 
@@ -646,8 +650,8 @@ async function fixHwpxLayout(buf, ratios) {
   head = head.replace(/<hh:charPr id="3" height="\d+"/, '<hh:charPr id="3" height="850"');
   head = head.replace(/<hh:charPr id="5" height="\d+"/, '<hh:charPr id="5" height="1500"');
 
-  // 글꼴을 전부 맑은 고딕으로. (기본은 함초롬바탕/바탕/Times New Roman 이 섞여 나온다)
-  head = head.replace(/(<hh:font\b[^>]*\bface=")[^"]*/g, '$1맑은 고딕');
+  // 글꼴을 전부 휴먼명조로. (기본은 함초롬바탕/바탕/Times New Roman 이 섞여 나온다)
+  head = head.replace(/(<hh:font\b[^>]*\bface=")[^"]*/g, '$1휴먼명조');
 
   // 양쪽 정렬이면 글자 사이가 벌어진다. 왼쪽 정렬로.
   head = head.replace(/horizontal="JUSTIFY"/g, 'horizontal="LEFT"');
