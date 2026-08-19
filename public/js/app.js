@@ -138,8 +138,12 @@
             ? `${state.me.org_name || '소속 기관'} 소속 전체 보고서가 표시됩니다.`
             : '전체 기관의 보고서가 표시됩니다.');
     }
-    document.querySelectorAll('.col-org, .col-author').forEach((el) => {
+    // 작성자 열은 항상 표시한다 (본인 확인용). 기관 열만 작성자에게 숨긴다.
+    document.querySelectorAll('.col-org').forEach((el) => {
       el.classList.toggle('hidden', onlyMine);
+    });
+    document.querySelectorAll('.col-author').forEach((el) => {
+      el.classList.remove('hidden');
     });
   }
 
