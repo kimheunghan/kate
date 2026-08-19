@@ -559,15 +559,8 @@ body.brush-armed .editor-area { cursor: cell; }
 /* 조회 목록의 내용 요약 (두 줄까지만) */
 table.grid td.summary {
   color: var(--text-dim);
-}
-.summary-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.6;
-  max-height: 3.2em;
-  overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; max-height: 3.2em; line-height: 1.6;
 }
 
 /* 기관별 제출 추이 매트릭스 */

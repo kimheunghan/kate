@@ -43,7 +43,6 @@
 
     fillWeekSelects();
     fillOrgSelects();
-    applyListScopeUi();
     initToolbar();
     bindTabs();
     bindEditorPanel();
@@ -114,33 +113,6 @@
       state.toolbar.setEnabled(false);
       $('#toolbar-hint').classList.remove('hidden');
     }
-  }
-
-  /**
-   * 조회 탭은 권한에 따라 보이는 범위가 다르다.
-   *   작성자      : 본인 보고서만 → 기관·작성자 열이 의미 없으므로 숨긴다
-   *   기관 관리자 : 자기 기관 전체
-   *   전체 관리자 : 전부
-   */
-  function applyListScopeUi() {
-    const role = state.me.role;
-    const onlyMine = role !== 'ADMIN' && role !== 'ORG_ADMIN';
-
-    const orgFilter = $('#f-org');
-    if (orgFilter && orgFilter.closest('label')) {
-      orgFilter.closest('label').classList.toggle('hidden', role !== 'ADMIN');
-    }
-    const note = $('#list-scope-note');
-    if (note) {
-      note.textContent = onlyMine
-        ? '본인이 작성한 보고서만 표시됩니다.'
-        : (role === 'ORG_ADMIN'
-            ? `${state.me.org_name || '소속 기관'} 소속 전체 보고서가 표시됩니다.`
-            : '전체 기관의 보고서가 표시됩니다.');
-    }
-    document.querySelectorAll('.col-org, .col-author').forEach((el) => {
-      el.classList.toggle('hidden', onlyMine);
-    });
   }
 
   function bindTabs() {
@@ -639,9 +611,9 @@
     tbody.innerHTML = res.reports.map((r) => `
       <tr>
         <td>${esc(r.week_label)}${r.is_open ? '' : ' <span class="badge closed">마감</span>'}</td>
-        <td class="col-org">${esc(r.org_name)}</td>
-        <td class="col-author">${esc(r.author_name || '-')}</td>
-        <td class="small summary"><div class="summary-text">${esc(r.summary || '')}</div></td>
+        <td>${esc(r.org_name)}</td>
+        <td>${esc(r.author_name || '-')}</td>
+        <td class="small summary">${esc(r.summary || '')}</td>
         <td class="center">${statusBadge(r.status)}</td>
         <td class="center">${r.item_count}</td>
         <td class="center">${r.file_count}</td>

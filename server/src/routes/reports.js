@@ -19,9 +19,28 @@ function canEditReport(user, report) {
   return report.author_id != null && Number(report.author_id) === Number(user.id);
 }
 
-/** 조회 범위: 작성자·기관관리자는 자기 기관, 전체 관리자는 전부 */
-function viewScopeOrg(user) {
-  return user.role === 'ADMIN' ? null : (user.org_id || -1);
+/**
+ * 조회 범위
+ *   USER      : 본인이 작성한 보고서만
+ *   ORG_ADMIN : 자기 기관 소속 전체
+ *   ADMIN     : 전부
+ */
+function addViewScope(user, where, params) {
+  if (user.role === 'ADMIN') return;
+  if (user.role === 'ORG_ADMIN') {
+    params.push(user.org_id || -1);
+    where.push(`r.org_id = $${params.length}`);
+  } else {
+    params.push(user.id);
+    where.push(`r.author_id = $${params.length}`);
+  }
+}
+
+/** 이 보고서를 열람할 수 있는가 */
+function canViewReport(user, report) {
+  if (user.role === 'ADMIN') return true;
+  if (user.role === 'ORG_ADMIN') return Number(report.org_id) === Number(user.org_id);
+  return report.author_id != null && Number(report.author_id) === Number(user.id);
 }
 
 async function loadReport(id) {
@@ -149,10 +168,11 @@ router.get('/', async (req, res, next) => {
       params.push(req.user.id); where.push(`r.author_id = $${params.length}`);
     }
 
-    // 전체 관리자가 아니면 자기 기관 보고서만 볼 수 있다
-    const scope = viewScopeOrg(req.user);
-    if (scope) { params.push(scope); where.push(`r.org_id = $${params.length}`); }
-    else if (req.query.org_id) { params.push(Number(req.query.org_id)); where.push(`r.org_id = $${params.length}`); }
+    // 권한별 조회 범위 (작성자는 본인 것만)
+    addViewScope(req.user, where, params);
+    if (req.user.role === 'ADMIN' && req.query.org_id) {
+      params.push(Number(req.query.org_id)); where.push(`r.org_id = $${params.length}`);
+    }
     if (req.query.q) {
       params.push(`%${String(req.query.q).trim()}%`);
       const i = params.length;
@@ -229,9 +249,7 @@ router.get('/:id(\\d+)', async (req, res, next) => {
     const report = await loadReport(Number(req.params.id));
     if (!report) return res.status(404).json({ error: '보고서를 찾을 수 없습니다.' });
 
-    // 전체 관리자가 아니면 자기 기관 보고서만 열람할 수 있다
-    const scope = viewScopeOrg(req.user);
-    if (scope && Number(report.org_id) !== Number(scope)) {
+    if (!canViewReport(req.user, report)) {
       return res.status(403).json({ error: '열람 권한이 없습니다.' });
     }
 
@@ -505,6 +523,7 @@ router.get('/:id(\\d+)/print', async (req, res, next) => {
   try {
     const report = await loadReport(Number(req.params.id));
     if (!report) return res.status(404).send('보고서를 찾을 수 없습니다.');
+    if (!canViewReport(req.user, report)) return res.status(403).send('열람 권한이 없습니다.');
     const items = await loadItems(report.id);
     const files = await loadAttachments(report.id);
     res.type('html').send(buildReportHtml(report, items, files, { forWord: false }));
@@ -518,6 +537,7 @@ router.get('/:id(\\d+)/export', async (req, res, next) => {
   try {
     const report = await loadReport(Number(req.params.id));
     if (!report) return res.status(404).send('보고서를 찾을 수 없습니다.');
+    if (!canViewReport(req.user, report)) return res.status(403).send('열람 권한이 없습니다.');
     const items = await loadItems(report.id);
     const files = await loadAttachments(report.id);
 
@@ -534,3 +554,4 @@ router.get('/:id(\\d+)/export', async (req, res, next) => {
 });
 
 module.exports = router;
+module.exports.canViewReport = canViewReport;

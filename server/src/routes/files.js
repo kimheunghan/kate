@@ -68,7 +68,14 @@ async function loadReportForFiles(reportId) {
   return rows[0] || null;
 }
 
-/** 첨부는 보고서 소유자 본인만 (전체 관리자는 예외) */
+/** 열람: USER=본인 보고서, ORG_ADMIN=자기 기관, ADMIN=전부 */
+function canView(user, report) {
+  if (user.role === 'ADMIN') return true;
+  if (user.role === 'ORG_ADMIN') return Number(report.org_id) === Number(user.org_id);
+  return report.author_id != null && Number(report.author_id) === Number(user.id);
+}
+
+/** 첨부 등록·삭제는 보고서 소유자 본인만 (전체 관리자는 예외) */
 function canEdit(user, report) {
   if (user.role === 'ADMIN') return true;
   if (!report.is_open) return false;
@@ -129,6 +136,12 @@ router.get('/attachments/:id(\\d+)/download', auth.requireAuth, async (req, res,
     );
     const att = rows[0];
     if (!att) return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
+
+    // 보고서 열람 권한이 있어야 첨부도 받을 수 있다
+    //   USER=본인 것, ORG_ADMIN=자기 기관, ADMIN=전부
+    if (!canView(req.user, att)) {
+      return res.status(403).json({ error: '열람 권한이 없습니다.' });
+    }
 
     // 저장 경로가 uploads 밖을 가리키지 않는지 확인
     const abs = path.resolve(config.upload.dir, att.stored_path);
