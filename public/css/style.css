@@ -254,56 +254,62 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .toolbar-hint .row-ctl {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   margin-left: auto;
   white-space: nowrap;
   /* 노란 안내줄과 확실히 구분되도록 옅은 파랑으로 채운다 */
-  background: linear-gradient(#eef4fb, #dfeaf6);
-  border: 1px solid #a9c6e4;
-  border-radius: 13px;
-  padding: 0 4px 0 10px;
+  background: linear-gradient(#fbfcfe, #eef2f7);
+  border: 1px solid #c9d4e0;
+  border-radius: 15px;
+  padding: 3px 7px 3px 12px;
   box-shadow: 0 1px 2px rgba(20, 34, 51, .10);
 }
 .toolbar-hint .row-ctl b {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--primary-dk);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: -.2px;
+  margin-right: 1px;
+  color: var(--text);
 }
-/* 색이 채워진 작은 버튼. 글리프가 아래로 처지지 않도록 flex 로 정확히 가운데 정렬 */
+/* 두 버튼의 크기를 완전히 같게 고정한다.
+   .btn.icon 의 min-width(30px) 가 남아 있으면 폭이 들쑥날쑥해지므로 함께 덮어쓴다. */
 .toolbar-hint .row-ctl .btn.icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 20px;
+  box-sizing: border-box;
+  width: 28px;
+  min-width: 28px;
+  height: 21px;
+  margin: 0;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: 5px;
   font-size: 14px;
   font-weight: 700;
   line-height: 1;
-  color: #fff;
-  box-shadow: 0 1px 0 rgba(20, 34, 51, .18);
+  box-shadow: 0 1px 0 rgba(20, 34, 51, .12);
   transition: background .12s, box-shadow .12s, transform .05s;
 }
-/* 추가 = 파랑 */
+/* 강한 원색 대신 흰 버튼에 기호 색으로만 구분한다 */
 .toolbar-hint .row-ctl .btn.icon:not(.danger) {
-  background: linear-gradient(#3d80cd, #1f5fa9);
-  border-color: #1b5391;
-  color: #fff;
+  background: linear-gradient(#ffffff, #f2f6fb);
+  border-color: #b7cde5;
+  color: var(--primary);
 }
 .toolbar-hint .row-ctl .btn.icon:not(.danger):hover:not(:disabled) {
-  background: linear-gradient(#4a8dd8, #17497f);
+  background: linear-gradient(#f4f8fc, #e4eef8);
+  border-color: var(--primary);
 }
-/* 삭제 = 빨강 */
 .toolbar-hint .row-ctl .btn.icon.danger {
-  background: linear-gradient(#d4584a, #c0392b);
-  border-color: #a5331f;
-  color: #fff;
+  background: linear-gradient(#ffffff, #faf3f2);
+  border-color: #ddb9b3;
+  color: #b4503f;
 }
 .toolbar-hint .row-ctl .btn.icon.danger:hover:not(:disabled) {
-  background: linear-gradient(#e06456, #a5331f);
+  background: linear-gradient(#fdf6f5, #f6e6e3);
+  border-color: #c9796c;
 }
 /* 누를 때 살짝 들어가는 느낌 */
 .toolbar-hint .row-ctl .btn.icon:active:not(:disabled) {
