@@ -586,17 +586,6 @@ body.brush-armed .editor-area { cursor: cell; }
 
 /* 버튼 옆 표식과 하단 안내 문구 */
 .mark { color: var(--danger); font-weight: 800; }
-.hint-note {
-  margin: 12px 0 0;
-  padding: 9px 12px;
-  background: #fffdf2;
-  border: 1px solid #ecdfae;
-  border-radius: var(--radius);
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text-dim);
-}
-.hint-note b { color: var(--text); }
 .danger-text { color: var(--danger); font-weight: 700; }
 .warn-text { color: var(--warn); font-weight: 700; }
 .compact-list { margin: 6px 0 0; padding-left: 20px; }
