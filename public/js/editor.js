@@ -422,7 +422,8 @@
     // execCommand('indent') 는 Chrome 에서 <blockquote> 를 만들어 인용문처럼 보이고,
     // 엑셀에서 들어온 padding-left 들여쓰기는 outdent 로 되돌려지지 않는다.
     // 그래서 선택된 줄의 여백을 직접 조절한다. (엑셀 등록과 같은 방식)
-    INDENT_STEP = 16;
+    // 한 번에 공백 2칸 정도만 움직이도록. (16px 은 3~4칸이라 너무 크게 뛴다)
+    INDENT_STEP = 8;
 
     /** 선택 영역에 걸친 최상위 블록들 (편집 영역의 직계 자식) */
     _selectedBlocks(ed) {
