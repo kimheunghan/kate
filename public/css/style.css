@@ -242,9 +242,9 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 1px 12px;
-  font-size: 12px;
-  line-height: 1.35;          /* 줄 높이를 여기서 고정 */
+  padding: 4px 14px;
+  font-size: 12.5px;
+  line-height: 1.45;          /* 줄 높이를 여기서 고정 */
   color: var(--text-dim);
   background: #fffdf2;
   border-bottom: 1px solid var(--border);
@@ -254,33 +254,33 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .toolbar-hint .row-ctl {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   margin-left: auto;
   white-space: nowrap;
   background: #fff;
   border: 1px solid var(--border-dk);
-  border-radius: 11px;
-  padding: 0 3px 0 9px;
-  box-shadow: 0 1px 2px rgba(20, 34, 51, .08);
+  border-radius: 13px;
+  padding: 0 4px 0 10px;
+  box-shadow: 0 1px 2px rgba(20, 34, 51, .09);
 }
 .toolbar-hint .row-ctl b {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text);
   font-weight: 700;
   letter-spacing: -.2px;
 }
 /* 눌리는 버튼처럼 보이도록 각진 사각 버튼 + 입체감 (높이는 낮게) */
 .toolbar-hint .row-ctl .btn.icon {
-  width: 24px;
-  height: 17px;
-  border-radius: 3px;
+  width: 26px;
+  height: 19px;
+  border-radius: 4px;
   border-width: 1px;
   border-style: solid;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
   padding: 0;
-  box-shadow: 0 1px 0 rgba(20, 34, 51, .12);
+  box-shadow: 0 1px 0 rgba(20, 34, 51, .13);
   transition: background .12s, box-shadow .12s, transform .05s;
 }
 .toolbar-hint .row-ctl .btn.icon:not(.danger) {
