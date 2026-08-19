@@ -40,7 +40,7 @@ async function loadReport(id) {
 
 async function loadItems(reportId) {
   const { rows } = await db.query(
-    `SELECT id, sort_order, task_title, plan_html, result_html
+    `SELECT id, sort_order, task_title, plan_html, result_html, next_plan_html
        FROM wr.report_items
       WHERE report_id = $1
       ORDER BY sort_order, id`,
@@ -82,10 +82,11 @@ function normalizeItems(raw) {
   return raw.slice(0, 100).map((it, idx) => ({
     id: Number.isInteger(Number(it.id)) && Number(it.id) > 0 ? Number(it.id) : null,
     sort_order: idx,
-    // 업무명도 계획/실적과 같은 편집기를 쓰므로 동일하게 정제한다
-    task_title: trimTitleIndent(sanitizeHtml(it.task_title, { maxLength: 20000 })),
+    // 보고 양식과 동일하게 ①당초계획 ②추진실적 ③향후계획 세 칸을 저장한다
+    task_title: '',
     plan_html: sanitizeHtml(it.plan_html),
     result_html: sanitizeHtml(it.result_html),
+    next_plan_html: sanitizeHtml(it.next_plan_html),
   }));
 }
 
@@ -102,17 +103,19 @@ async function saveItems(client, reportId, items) {
     if (it.id && existingIds.has(it.id)) {
       await client.query(
         `UPDATE wr.report_items
-            SET sort_order = $1, task_title = $2, plan_html = $3, result_html = $4
-          WHERE id = $5 AND report_id = $6`,
-        [it.sort_order, it.task_title, it.plan_html, it.result_html, it.id, reportId]
+            SET sort_order = $1, task_title = $2, plan_html = $3,
+                result_html = $4, next_plan_html = $5
+          WHERE id = $6 AND report_id = $7`,
+        [it.sort_order, it.task_title, it.plan_html, it.result_html, it.next_plan_html, it.id, reportId]
       );
       keptIds.add(it.id);
       idMap[it.sort_order] = it.id;
     } else {
       const { rows } = await client.query(
-        `INSERT INTO wr.report_items (report_id, sort_order, task_title, plan_html, result_html)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [reportId, it.sort_order, it.task_title, it.plan_html, it.result_html]
+        `INSERT INTO wr.report_items
+           (report_id, sort_order, task_title, plan_html, result_html, next_plan_html)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [reportId, it.sort_order, it.task_title, it.plan_html, it.result_html, it.next_plan_html]
       );
       keptIds.add(rows[0].id);
       idMap[it.sort_order] = rows[0].id;
@@ -156,7 +159,7 @@ router.get('/', async (req, res, next) => {
       where.push(`EXISTS (
         SELECT 1 FROM wr.report_items ri
          WHERE ri.report_id = r.id
-           AND (ri.task_title ILIKE $${i} OR ri.plan_html ILIKE $${i} OR ri.result_html ILIKE $${i})
+           AND (ri.plan_html ILIKE $${i} OR ri.result_html ILIKE $${i} OR ri.next_plan_html ILIKE $${i})
       )`);
     }
 
@@ -172,11 +175,13 @@ router.get('/', async (req, res, next) => {
              o.name  AS org_name,
              u.name  AS author_name,
              (SELECT count(*)::int FROM wr.report_items ri WHERE ri.report_id = r.id) AS item_count,
-             (SELECT string_agg(
-                        btrim(regexp_replace(
-                          replace(replace(ri.task_title, '&nbsp;', ' '), '&amp;', '&'),
-                          '<[^>]*>', ' ', 'g')), ' / ' ORDER BY ri.sort_order, ri.id)
-                FROM wr.report_items ri WHERE ri.report_id = r.id) AS titles,
+             (SELECT left(btrim(regexp_replace(
+                        replace(replace(
+                          string_agg(coalesce(nullif(ri.plan_html, ''), ri.result_html), ' / '
+                                     ORDER BY ri.sort_order, ri.id),
+                          '&nbsp;', ' '), '&amp;', '&'),
+                        '<[^>]*>', ' ', 'g')), 200)
+                FROM wr.report_items ri WHERE ri.report_id = r.id) AS summary,
              (SELECT count(*)::int FROM wr.attachments  a WHERE a.report_id  = r.id) AS file_count
         FROM wr.reports r
         JOIN wr.report_weeks  w ON w.id = r.week_id
@@ -389,18 +394,26 @@ router.delete('/:id(\\d+)', async (req, res, next) => {
 function buildReportHtml(report, items, files, { forWord = false } = {}) {
   const esc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  const rows = items.map((it) => `
+  const rows = items.map((it, i) => `
       <tr>
-        <td class="title">${it.task_title || ''}</td>
+        <td class="no">${i + 1}</td>
         <td class="cell">${it.plan_html || ''}</td>
         <td class="cell">${it.result_html || ''}</td>
+        <td class="cell">${it.next_plan_html || ''}</td>
       </tr>`).join('');
 
   // 인쇄: @page 여백 0 → 브라우저가 머리글(날짜)/바닥글(URL)을 넣지 않는다
   // Word : WordSection1 으로 가로 방향 A4 지정
   const pageCss = forWord
-    ? `@page WordSection1 { size: 29.7cm 21.0cm; mso-page-orientation: landscape; margin: 1.2cm 1.0cm; }
-  div.WordSection1 { page: WordSection1; }`
+    ? `@page WordSection1 {
+       size: 29.7cm 21.0cm; mso-page-orientation: landscape;
+       /* 상 / 우 / 하 / 좌 — 위쪽을 넉넉히 둔다 */
+       margin: 2.2cm 1.5cm 1.8cm 1.5cm;
+       mso-header-margin: 1.0cm; mso-footer-margin: 1.0cm;
+     }
+  div.WordSection1 { page: WordSection1; }
+  /* Word 는 문서 첫 문단 위 여백을 무시하는 경우가 있어 제목 위에 여유를 준다 */
+  h1 { margin-top: 6pt !important; }`
     : `@page { size: A4 landscape; margin: 0; }
   body { padding: 12mm 10mm; }`;
 
@@ -434,7 +447,7 @@ ${forWord ? `<!--[if gte mso 9]><xml>
     overflow-wrap: anywhere; word-break: break-word;
   }
   th { background: #fffbcc; text-align: center; font-weight: 700; }
-  td.title { background: #fcfcf0; font-weight: 600; }
+  td.no { background: #fcfcf0; text-align: center; font-weight: 600; }
 
   td img { max-width: 100%; height: auto; }
   td table { width: 100%; table-layout: fixed; font-size: 9.5pt; }
@@ -464,9 +477,9 @@ ${forWord ? '<div class="WordSection1">' : ''}
 <h1>주간 추진실적 보고</h1>
 <div class="meta">기관: ${esc(report.org_name)} &nbsp;|&nbsp; 기간: ${esc(report.week_label)} &nbsp;|&nbsp; 작성자: ${esc(report.author_name || '-')} &nbsp;|&nbsp; 상태: ${report.status === 'SUBMITTED' ? '제출완료' : '임시저장'}</div>
 <table>
-  <colgroup><col style="width:25%"><col style="width:34%"><col style="width:41%"></colgroup>
-  <thead><tr><th>업무명</th><th>① 당초 계획</th><th>② 추진 실적</th></tr></thead>
-  <tbody>${rows || '<tr><td colspan="3">등록된 항목이 없습니다.</td></tr>'}</tbody>
+  <colgroup><col style="width:6%"><col style="width:31%"><col style="width:32%"><col style="width:31%"></colgroup>
+  <thead><tr><th>순번</th><th>① 당초 계획</th><th>② 추진 실적</th><th>③ 향후 계획</th></tr></thead>
+  <tbody>${rows || '<tr><td colspan="4">등록된 항목이 없습니다.</td></tr>'}</tbody>
 </table>
 ${report.note ? `<div class="note"><b>특이사항</b><br>${esc(report.note).replace(/\n/g, '<br>')}</div>` : ''}
 ${files.length ? `<div class="note">

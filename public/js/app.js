@@ -10,7 +10,7 @@
     weeks: [],
     orgs: [],
     report: null,      // 현재 로드된 보고서 (없으면 null)
-    rows: [],          // [{ itemId, tr, titleEd, planEd, resultEd }]
+    rows: [],          // [{ itemId, tr, planEd, resultEd, nextEd }]
     toolbar: null,     // 공용 편집 툴바 (SharedToolbar)
     activeEditor: null,// 현재 편집 중인 Editor
     dirty: false,
@@ -228,9 +228,9 @@
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="cell-no"></td>
-      <td><div class="ed-title"></div></td>
       <td><div class="ed-plan"></div></td>
       <td><div class="ed-result"></div></td>
+      <td><div class="ed-next"></div></td>
       <td class="cell-act">
         <button class="btn sm danger btn-del-row" type="button">삭제</button>
         <button class="btn sm btn-up" type="button">▲</button>
@@ -242,18 +242,20 @@
     const onFocus = (ed) => setActiveEditor(ed);
 
     // 세 칸 모두 같은 편집기를 사용한다 (위쪽 공용 툴바가 그대로 적용됨)
-    const titleEd = new window.WR.Editor(tr.querySelector('.ed-title'), {
-      html: item ? item.task_title : '', placeholder: '예) 3. 토지 공간정보 및 규제 속성 데이터 통합 구축',
-      readOnly, onChange, onFocus,
-    });
     const planEd = new window.WR.Editor(tr.querySelector('.ed-plan'), {
-      html: item ? item.plan_html : '', placeholder: '이번 주 계획을 입력하세요', readOnly, onChange, onFocus,
+      html: item ? item.plan_html : '',
+      placeholder: '이번 주 계획을 입력하세요', readOnly, onChange, onFocus,
     });
     const resultEd = new window.WR.Editor(tr.querySelector('.ed-result'), {
-      html: item ? item.result_html : '', placeholder: '실제 수행한 내용을 입력하세요', readOnly, onChange, onFocus,
+      html: item ? item.result_html : '',
+      placeholder: '실제 수행한 내용을 입력하세요', readOnly, onChange, onFocus,
+    });
+    const nextEd = new window.WR.Editor(tr.querySelector('.ed-next'), {
+      html: item ? (item.next_plan_html || '') : '',
+      placeholder: '다음 주 계획을 입력하세요', readOnly, onChange, onFocus,
     });
 
-    const row = { itemId: item ? item.id : null, tr, titleEd, planEd, resultEd };
+    const row = { itemId: item ? item.id : null, tr, planEd, resultEd, nextEd };
     state.rows.push(row);
 
     if (readOnly) {
@@ -283,10 +285,10 @@
     // 에디터 DOM 을 옮기면 내용이 유지되므로 HTML 을 주고받는다
     const other = state.rows[j];
     const swap = (a, b) => {
-      const t1 = a.titleEd.getHtml(), p1 = a.planEd.getHtml(), r1 = a.resultEd.getHtml(), id1 = a.itemId;
-      a.titleEd.setHtml(b.titleEd.getHtml()); a.planEd.setHtml(b.planEd.getHtml());
-      a.resultEd.setHtml(b.resultEd.getHtml()); a.itemId = b.itemId;
-      b.titleEd.setHtml(t1); b.planEd.setHtml(p1); b.resultEd.setHtml(r1); b.itemId = id1;
+      const p1 = a.planEd.getHtml(), r1 = a.resultEd.getHtml(), n1 = a.nextEd.getHtml(), id1 = a.itemId;
+      a.planEd.setHtml(b.planEd.getHtml()); a.resultEd.setHtml(b.resultEd.getHtml());
+      a.nextEd.setHtml(b.nextEd.getHtml()); a.itemId = b.itemId;
+      b.planEd.setHtml(p1); b.resultEd.setHtml(r1); b.nextEd.setHtml(n1); b.itemId = id1;
     };
     swap(row, other);
     state.dirty = true;
@@ -299,10 +301,10 @@
   function collectItems() {
     return state.rows.map((r) => ({
       id: r.itemId,
-      task_title: r.titleEd.getHtml(),
       plan_html: r.planEd.getHtml(),
       result_html: r.resultEd.getHtml(),
-    })).filter((it) => it.task_title || it.plan_html || it.result_html);
+      next_plan_html: r.nextEd.getHtml(),
+    })).filter((it) => it.plan_html || it.result_html || it.next_plan_html);
   }
 
   function bindEditorPanel() {
@@ -329,15 +331,19 @@
         toast(`직전 주차(${prev.label})에 등록된 보고서가 없습니다.`, true);
         return;
       }
-      if (!confirm(`직전 주차(${prev.label})의 업무명과 계획을 가져옵니다.\n현재 작성 중인 내용은 대체됩니다. 계속할까요?`)) return;
+      if (!confirm(`직전 주차(${prev.label})의 [향후 계획]을 이번 주 [당초 계획]으로 가져옵니다.\n현재 작성 중인 내용은 대체됩니다. 계속할까요?`)) return;
 
       // 새 행으로 복사 (id 는 비워서 새 항목으로 저장되게)
+      // 지난주 "향후 계획" 이 이번 주 "당초 계획" 이 된다 (없으면 지난주 계획을 그대로)
       const copied = res.report.items.map((it) => ({
-        id: null, task_title: it.task_title, plan_html: it.plan_html, result_html: '',
+        id: null,
+        plan_html: it.next_plan_html || it.plan_html,
+        result_html: '',
+        next_plan_html: '',
       }));
       renderItems(copied, false);
       state.dirty = true;
-      toast(`${copied.length}개 업무를 가져왔습니다. 실적을 입력하세요.`);
+      toast(`${copied.length}개 항목을 가져왔습니다. 실적을 입력하세요.`);
     } catch (e) { toast(e.message, true); }
   }
 
@@ -350,8 +356,8 @@
       const items = collectItems();
       if (!items.length) { toast('내용을 하나 이상 입력하세요.', true); return; }
       const stripTags = (h) => String(h || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
-      const missing = items.filter((it) => !stripTags(it.task_title));
-      if (missing.length && !confirm('업무명이 비어 있는 항목이 있습니다. 그래도 제출할까요?')) return;
+      const noResult = items.filter((it) => !stripTags(it.result_html));
+      if (noResult.length && !confirm('추진 실적이 비어 있는 항목이 있습니다. 그래도 제출할까요?')) return;
       if (!confirm('제출하시겠습니까?\n제출 후에도 마감 전까지는 수정할 수 있습니다.')) return;
       save('SUBMITTED');
     };
@@ -504,7 +510,7 @@
   function renderList(res) {
     const tbody = $('#list-body');
     if (!res.reports.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="empty">조회된 보고서가 없습니다.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="empty">조회된 보고서가 없습니다.</td></tr>';
       $('#list-pager').innerHTML = '';
       return;
     }
@@ -513,10 +519,11 @@
       <tr>
         <td>${esc(r.week_label)}${r.is_open ? '' : ' <span class="badge closed">마감</span>'}</td>
         <td>${esc(r.org_name)}</td>
+        <td>${esc(r.author_name || '-')}</td>
+        <td class="small summary">${esc(r.summary || '')}</td>
         <td class="center">${statusBadge(r.status)}</td>
         <td class="center">${r.item_count}</td>
         <td class="center">${r.file_count}</td>
-        <td>${esc(r.author_name || '-')}</td>
         <td class="small">${fmtDateTime(r.updated_at)}</td>
         <td class="center nowrap">
           <button class="btn sm" data-open="${r.id}">열기</button>

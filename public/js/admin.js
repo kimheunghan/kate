@@ -60,64 +60,110 @@
   // ==================================================================
   // 1. 등록 현황 (특정 주차)
   // ==================================================================
-  async function renderStatus(weekId) {
-    const [weeksRes, statusRes] = await Promise.all([
-      api.get('/api/weeks?limit=60'),
-      api.get('/api/admin/status' + (weekId ? `?week_id=${weekId}` : '')),
-    ]);
-    const { week, rows, summary } = statusRes;
+  async function renderStatus(weekId, filters) {
+    const f = filters || {};
+    const q = new URLSearchParams();
+    if (weekId) q.set('week_id', weekId);
+    if (f.org) q.set('org_id', f.org);
+    if (f.status) q.set('status', f.status);
+    if (f.q) q.set('q', f.q);
 
+    const [weeksRes, orgsRes, statusRes] = await Promise.all([
+      api.get('/api/weeks?limit=60'),
+      api.get('/api/orgs'),
+      api.get('/api/admin/status' + (q.toString() ? `?${q}` : '')),
+    ]);
+    const { week, rows, summary, byOrg, scopedOrgId } = statusRes;
     if (!week) { body().innerHTML = '<div class="empty">등록된 주차가 없습니다.</div>'; return; }
 
-    const pct = summary.total ? Math.round((summary.submitted / summary.total) * 100) : 0;
+    const orgLocked = !!scopedOrgId && state.me.role === 'ORG_ADMIN';
 
     body().innerHTML = `
+      <p class="small muted">선택한 주차에 <b>가입한 작성자 전원</b>이 나옵니다. 아직 안 낸 사람도 <b>미등록</b> 으로 표시됩니다.</p>
       <div class="row">
-        <label class="field" style="flex:2 1 320px">
-          <span>보고 주차</span>
+        <label class="field" style="flex:2 1 300px"><span>보고 주차</span>
           <select id="st-week">
             ${weeksRes.weeks.map((w) =>
               `<option value="${w.id}" ${w.id === week.id ? 'selected' : ''}>${esc(w.label)}${w.is_open ? '' : ' [마감]'}</option>`).join('')}
           </select>
         </label>
+        <label class="field" style="flex:1 1 160px"><span>기관</span>
+          <select id="st-org" ${orgLocked ? 'disabled' : ''}>
+            <option value="">전체</option>
+            ${orgsRes.orgs.map((o) =>
+              `<option value="${o.id}" ${String(f.org) === String(o.id) || scopedOrgId === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+          </select>
+        </label>
+        <label class="field narrow" style="flex:0 0 140px"><span>상태</span>
+          <select id="st-status">
+            <option value="">전체</option>
+            <option value="NONE"      ${f.status === 'NONE' ? 'selected' : ''}>미등록만</option>
+            <option value="DRAFT"     ${f.status === 'DRAFT' ? 'selected' : ''}>임시저장만</option>
+            <option value="SUBMITTED" ${f.status === 'SUBMITTED' ? 'selected' : ''}>제출완료만</option>
+          </select>
+        </label>
+        <label class="field" style="flex:1 1 160px"><span>이름 검색</span>
+          <input type="text" id="st-q" value="${esc(f.q || '')}" placeholder="예: 홍길동"></label>
         <div class="field narrow">
           <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
-          <button class="btn" id="st-refresh">새로고침</button>
+          <button class="btn primary" id="st-refresh">조회</button>
         </div>
       </div>
 
       <div class="stat-row mt8">
-        <div class="stat"><div class="k">대상 작성자</div><div class="v">${summary.total}</div></div>
+        <div class="stat"><div class="k">대상 인원</div><div class="v">${summary.total}</div></div>
         <div class="stat ok"><div class="k">제출완료</div><div class="v">${summary.submitted}</div></div>
         <div class="stat warn"><div class="k">임시저장</div><div class="v">${summary.draft}</div></div>
         <div class="stat bad"><div class="k">미등록</div><div class="v">${summary.none}</div></div>
-        <div class="stat"><div class="k">제출률</div><div class="v">${pct}%</div></div>
+        <div class="stat"><div class="k">제출률</div><div class="v">${summary.rate}%</div></div>
       </div>
 
-      <div class="table-scroll mt16">
+      ${byOrg.length > 1 ? `
+      <h3 class="sec-title">기관별 소계</h3>
+      <div class="table-scroll">
+        <table class="grid">
+          <thead><tr><th>기관</th><th class="center" style="width:90px">대상</th>
+            <th class="center" style="width:90px">제출</th><th class="center" style="width:90px">임시</th>
+            <th class="center" style="width:90px">미등록</th><th class="center" style="width:90px">제출률</th></tr></thead>
+          <tbody>
+            ${byOrg.map((o) => `
+              <tr>
+                <td><b>${esc(o.org_name || '(소속없음)')}</b></td>
+                <td class="center">${o.total_users}</td>
+                <td class="center">${o.submitted}</td>
+                <td class="center">${o.draft}</td>
+                <td class="center">${o.none_cnt}</td>
+                <td class="center"><b>${o.total_users ? Math.round((o.submitted / o.total_users) * 100) : 0}%</b></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>` : ''}
+
+      <h3 class="sec-title">작성자별 제출 현황 (${rows.length}명)</h3>
+      <div class="table-scroll">
         <table class="grid">
           <thead>
             <tr>
-              <th style="width:220px">기관</th>
+              <th style="width:110px">이름</th>
+              <th style="width:120px">아이디</th>
+              <th style="width:170px">기관</th>
               <th class="center" style="width:100px">상태</th>
-              <th class="center" style="width:70px">업무</th>
-              <th class="center" style="width:70px">첨부</th>
-              <th style="width:110px">작성자</th>
-              <th style="width:150px">최종수정</th>
-              <th style="width:150px">제출시각</th>
+              <th class="center" style="width:60px">항목</th>
+              <th class="center" style="width:60px">첨부</th>
+              <th style="width:140px">최종수정</th>
               <th class="center" style="width:270px">관리</th>
             </tr>
           </thead>
           <tbody>
-            ${rows.map((r) => `
+            ${rows.length ? rows.map((r) => `
               <tr>
-                <td><b>${esc(r.org_name)}</b></td>
+                <td><b>${esc(r.user_name)}</b></td>
+                <td class="small muted">${esc(r.username)}</td>
+                <td>${esc(r.org_name || '-')}</td>
                 <td class="center">${statusBadge(r.status)}</td>
                 <td class="center">${r.item_count}</td>
                 <td class="center">${r.file_count}</td>
-                <td>${r.report_id ? esc(r.author_name || r.user_name || '-') : '-'}</td>
                 <td class="small">${r.report_id ? fmtDateTime(r.updated_at) : '-'}</td>
-                <td class="small">${r.submitted_at ? fmtDateTime(r.submitted_at) : '-'}</td>
                 <td class="center nowrap">
                   ${r.report_id ? `
                     <button class="btn sm" data-open="${r.report_id}">열기</button>
@@ -125,15 +171,25 @@
                     <button class="btn sm" data-export="${r.report_id}"
                       title="한글문서(HWP) 변환은 현재 [Word 다운로드] 하신 후 한글에서 Word문서를 열어서 다른 이름(확장자 .hwp)으로 저장하시기 바랍니다.">Word</button>
                     <button class="btn sm" data-moveorg="${r.report_id}"
-                      title="잘못된 기관으로 등록된 보고서를 올바른 기관으로 옮깁니다 (업무·첨부는 그대로 유지)">소속변경</button>` : '<span class="muted small">-</span>'}
+                      title="잘못된 기관으로 등록된 보고서를 올바른 기관으로 옮깁니다 (업무·첨부는 그대로 유지)">소속변경</button>`
+                    : '<span class="muted small">미제출</span>'}
                 </td>
-              </tr>`).join('')}
+              </tr>`).join('') : '<tr><td colspan="8" class="empty">조건에 맞는 작성자가 없습니다.</td></tr>'}
           </tbody>
         </table>
       </div>`;
 
-    $('#st-week').onchange = () => renderStatus(Number($('#st-week').value));
-    $('#st-refresh').onclick = () => renderStatus(Number($('#st-week').value));
+    const readFilters = () => ({
+      org: $('#st-org').value, status: $('#st-status').value, q: $('#st-q').value.trim(),
+    });
+    $('#st-week').onchange = () => renderStatus(Number($('#st-week').value), readFilters());
+    $('#st-refresh').onclick = () => renderStatus(Number($('#st-week').value), readFilters());
+    ['#st-org', '#st-status'].forEach((sel) => {
+      $(sel).onchange = () => renderStatus(Number($('#st-week').value), readFilters());
+    });
+    $('#st-q').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') renderStatus(Number($('#st-week').value), readFilters());
+    });
     bindOpenPrint();
   }
 
@@ -203,60 +259,51 @@
   async function renderMatrix(n) {
     const weeks = n || 8;
     const res = await api.get(`/api/admin/overview?weeks=${weeks}`);
-
     if (!res.weeks.length) { body().innerHTML = '<div class="empty">데이터가 없습니다.</div>'; return; }
 
-    const cellHtml = (c) => {
-      if (!c || !Number(c.total_users)) return '<td class="cell-n">·</td>';
-
-      const total = Number(c.total_users) || 0;
-      const submitted = Number(c.submitted) || 0;
-      const draft = Number(c.draft) || 0;
-      const none = Number(c.none_cnt) || 0;
-
-      if (submitted === total) {
-        return `<td class="cell-s" title="제출완료 ${submitted}명 / 대상 ${total}명"><b>완료</b><br><span class="small">${submitted}/${total}명</span></td>`;
-      }
-      if (draft > 0 || submitted > 0) {
-        return `<td class="cell-d" title="완료 ${submitted}명 · 임시저장 ${draft}명 · 미등록 ${none}명"><b>진행중</b><br><span class="small">완료 ${submitted} · 임시 ${draft} · 미등록 ${none}</span></td>`;
-      }
-      return `<td class="cell-n" title="미등록 ${none}명 / 대상 ${total}명">미등록<br><span class="small">${none}/${total}명</span></td>`;
+    const shortLabel = (label) => esc(label).replace(/\s*\(/, '<br>(');
+    const cell = (c) => {
+      if (!c || !c.total_users) return '<td class="cell-n">·</td>';
+      const rate = Math.round((c.submitted / c.total_users) * 100);
+      const cls = rate >= 100 ? 'cell-s' : (rate > 0 ? 'cell-d' : 'cell-n');
+      return `<td class="${cls}" title="제출 ${c.submitted} / 임시 ${c.draft} / 미등록 ${c.none_cnt}">
+                <b>${c.submitted}</b><span class="muted">/${c.total_users}</span>
+                <div class="rate">${rate}%</div></td>`;
     };
 
     body().innerHTML = `
+      <p class="small muted">최근 몇 주간 <b>기관별로 몇 명이 제출했는지</b> 흐름을 봅니다.
+        칸의 숫자는 <b>제출 인원 / 대상 인원</b> 이며, 대상 인원은 그 기관에 가입한 작성자 수입니다.</p>
       <div class="row">
-        <label class="field narrow" style="flex:0 0 180px">
-          <span>표시 주차 수</span>
+        <label class="field narrow" style="flex:0 0 180px"><span>표시 주차 수</span>
           <select id="mx-n">
             ${[4, 8, 12, 16, 26].map((k) => `<option value="${k}" ${k === weeks ? 'selected' : ''}>최근 ${k}주</option>`).join('')}
           </select>
         </label>
       </div>
-      <p class="small muted">기관별 작성 대상 인원의 제출 상태입니다.
-        &nbsp;<span class="badge submitted">완료</span> 전원 제출완료
-        &nbsp;<span class="badge draft">진행중</span> 일부 제출 또는 임시저장
-        &nbsp;<span class="badge none">미등록</span> 등록 없음</p>
       <div class="table-scroll mt8">
         <table class="matrix">
           <thead>
             <tr>
               <th class="org">기관</th>
-              ${res.weeks.map((w) => `<th>${esc(w.label.replace(/^\d+년\s*/, '')).replace(/주차\s*/, '주<br>')}</th>`).join('')}
-              <th>제출률</th>
+              ${res.weeks.map((w) => `<th>${shortLabel(w.label)}</th>`).join('')}
             </tr>
           </thead>
           <tbody>
-            ${res.orgs.map((o) => {
-              const cells = res.weeks.map((w) => res.cells[`${w.id}:${o.id}`]);
-              const target = cells.reduce((sum, c) => sum + (Number(c?.total_users) || 0), 0);
-              const done = cells.reduce((sum, c) => sum + (Number(c?.submitted) || 0), 0);
-              const rate = target ? Math.round((done / target) * 100) : 0;
-              return `<tr>
+            ${res.orgs.map((o) => `
+              <tr>
                 <th class="org">${esc(o.name)}</th>
-                ${cells.map(cellHtml).join('')}
-                <td><b>${rate}%</b></td>
-              </tr>`;
-            }).join('')}
+                ${res.weeks.map((w) => cell(res.cells[`${w.id}:${o.id}`])).join('')}
+              </tr>`).join('')}
+            <tr class="total-row">
+              <th class="org">전체</th>
+              ${res.weeks.map((w) => {
+                const t = res.totals[w.id] || { submitted: 0, total_users: 0 };
+                const rate = t.total_users ? Math.round((t.submitted / t.total_users) * 100) : 0;
+                return `<td><b>${t.submitted}</b><span class="muted">/${t.total_users}</span>
+                          <div class="rate">${rate}%</div></td>`;
+              }).join('')}
+            </tr>
           </tbody>
         </table>
       </div>`;

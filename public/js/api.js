@@ -16,7 +16,29 @@
       init.body = JSON.stringify(body);
     }
 
-    const res = await fetch(url, init);
+    // 서버 재기동·네트워크 순단이면 fetch 자체가 TypeError 로 실패한다.
+    // 브라우저 원문("Failed to fetch") 대신 상황을 알려주고,
+    // 조회(GET)는 한 번 자동 재시도한다. 작성 중인 내용은 화면에 그대로 남는다.
+    let res;
+    try {
+      res = await fetch(url, init);
+    } catch (netErr) {
+      if (method === 'GET' && !opts.noRetry) {
+        await new Promise((r) => setTimeout(r, 1200));
+        try {
+          res = await fetch(url, init);
+        } catch (e2) {
+          throw new Error('서버에 연결할 수 없습니다. 네트워크 상태를 확인한 뒤 다시 시도하세요.');
+        }
+      } else {
+        const err = new Error(
+          '서버에 연결하지 못해 저장되지 않았습니다.\n'
+          + '작성하신 내용은 화면에 그대로 있으니, 잠시 후 다시 [저장]을 눌러주세요.'
+        );
+        err.network = true;
+        throw err;
+      }
+    }
 
     if (res.status === 401 && !opts.allowAnonymous) {
       location.href = '/login';
