@@ -46,13 +46,20 @@
         <button class="btn sm" id="btn-excel-template">Excel 양식</button>
         <button class="btn sm primary" id="btn-excel-import">Excel 일괄등록</button>
         <input type="file" id="excel-file-input" accept=".xlsx" class="hidden">
-        <button class="btn sm icon" id="btn-add-row" title="항목 추가">＋</button>
-        <button class="btn sm icon danger" id="btn-del-row" title="항목 삭제">－</button>
       </header>
 
       <!-- 공용 편집 툴바: 현재 편집 중인 칸에 적용됩니다 -->
       <div id="shared-toolbar"></div>
-      <div class="toolbar-hint" id="toolbar-hint">계획 또는 실적 칸을 클릭하면 위 편집 도구를 사용할 수 있습니다.</div>
+
+      <!-- 왼쪽: 편집 도구 안내 / 오른쪽: 업무 추가·삭제 -->
+      <div class="toolbar-hint">
+        <span id="toolbar-hint-text">계획 또는 실적 칸을 클릭하면 위 편집 도구를 사용할 수 있습니다.</span>
+        <span class="row-ctl">
+          <b>업무 추가 / 삭제</b>
+          <button class="btn sm icon" id="btn-add-row" title="맨 아래에 업무 항목을 추가합니다">＋</button>
+          <button class="btn sm icon danger" id="btn-del-row" title="편집 중인 업무 항목을 삭제합니다">－</button>
+        </span>
+      </div>
 
       <div class="body">
         <div class="table-scroll">

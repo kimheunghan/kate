@@ -109,10 +109,10 @@
       ed.area.classList.add('active');
       state.toolbar.setEnabled(true);
       state.toolbar.syncState();
-      $('#toolbar-hint').classList.add('hidden');
+      $('#toolbar-hint-text').classList.add('hidden');
     } else {
       state.toolbar.setEnabled(false);
-      $('#toolbar-hint').classList.remove('hidden');
+      $('#toolbar-hint-text').classList.remove('hidden');
     }
   }
 
