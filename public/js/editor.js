@@ -35,9 +35,12 @@
     ['off',     '해제'],
   ];
 
+  // 브라우저 기본 명령(execCommand fontSize)은 1~7 단계만 지원해
+  // 8·10·12·14·18·24·36pt 밖에 못 쓴다. pt 를 직접 지정하는 방식으로 처리한다.
   const SIZES = [
-    ['', '크기'], ['1', '8pt'], ['2', '10pt'], ['3', '12pt'],
-    ['4', '14pt'], ['5', '18pt'], ['6', '24pt'], ['7', '36pt'],
+    ['', '크기'],
+    ...[8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 36]
+      .map((n) => [String(n), `${n}pt`]),
   ];
 
   const PASTE_TAGS = new Set([
@@ -311,7 +314,7 @@
 
     _build() {
       this._select(FONTS, '글꼴', (v) => v && this._exec('fontName', v));
-      this._select(SIZES, '크기', (v) => v && this._exec('fontSize', v));
+      this._select(SIZES, '글자 크기', (v) => v && this._applyFontSize(v));
       this._sep();
 
       this._btn('굵게 (Ctrl+B)', '<b>가</b>', () => this._exec('bold'), 'bold');
@@ -416,6 +419,53 @@
         fr.readAsDataURL(f);
       };
       input.click();
+    }
+
+    /**
+     * 선택한 글자에 크기(pt)를 적용한다.
+     * execCommand 로는 1~7 단계(8·10·12·14·18·24·36pt)밖에 못 쓰므로
+     * 선택 영역을 span 으로 감싸 원하는 pt 를 직접 지정한다.
+     */
+    _applyFontSize(pt) {
+      const ed = this.getActive();
+      if (!ed || ed.readOnly) return;
+      ed.area.focus();
+      ed.restoreRange();
+
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount || sel.isCollapsed) {
+        global.WR.toast('크기를 바꿀 글자를 먼저 선택하세요.', true);
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      if (!ed.area.contains(range.commonAncestorContainer)) return;
+
+      const span = document.createElement('span');
+      span.style.fontSize = `${pt}pt`;
+
+      try {
+        const frag = range.extractContents();
+        // 안쪽에 남은 크기 지정을 지워 바깥 값이 적용되게 한다
+        frag.querySelectorAll('*').forEach((el) => {
+          if (el.tagName === 'FONT') el.removeAttribute('size');
+          if (!el.style) return;
+          el.style.removeProperty('font-size');
+          if (!el.getAttribute('style')) el.removeAttribute('style');
+        });
+        span.appendChild(frag);
+        range.insertNode(span);
+
+        const r2 = document.createRange();
+        r2.selectNodeContents(span);
+        sel.removeAllRanges();
+        sel.addRange(r2);
+      } catch (e) {
+        console.error('[editor] 글자 크기 적용 실패:', e);
+        return;
+      }
+
+      ed.saveRange();
+      ed.touch();
     }
 
     // ---------------- 들여쓰기 / 내어쓰기 ----------------
