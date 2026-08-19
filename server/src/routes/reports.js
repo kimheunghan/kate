@@ -718,11 +718,11 @@ async function fixHwpxLayout(buf, ratios) {
   // hasMargin="0" 이면 셀별 여백을 무시하므로 반드시 1 로 켜야 한다
   xml = xml.replace(/(<hp:tc [^>]*)hasMargin="0"/g, '$1hasMargin="1"');
 
-  // 좌우 1.0mm / 위아래 1.5mm
+  // 왼/오 1.00mm, 위/아래 2.00mm  (1mm = 283.465 HWPUNIT)
   xml = xml.replace(/<hp:cellMargin[^>]*\/>/g,
-    '<hp:cellMargin left="283" right="283" top="425" bottom="425"/>');
+    '<hp:cellMargin left="283" right="283" top="567" bottom="567"/>');
   xml = xml.replace(/<hp:inMargin[^>]*\/>/g,
-    '<hp:inMargin left="283" right="283" top="425" bottom="425"/>');
+    '<hp:inMargin left="283" right="283" top="567" bottom="567"/>');
 
   // 모든 칸에 실선 테두리, 제목 행(rowAddr=0)은 배경색 있는 테두리
   xml = xml.replace(/(<hp:tbl [^>]*borderFillIDRef=")1(")/g, '$12$2');
