@@ -446,7 +446,11 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
   // 들여쓰기는 padding-left 로 저장되는데 Word 는 이 속성을 무시한다.
   // 문서로 내보낼 때는 Word 가 문단 들여쓰기로 인식하는 margin-left 로 바꾼다.
   // (브라우저 인쇄에서도 결과는 같다)
-  const toDoc = (h) => String(h || '').replace(/padding-left\s*:/gi, 'margin-left:');
+  //  - Word 는 padding-left 를 무시하므로 margin-left 로 바꾼다
+  //  - 화면용 8px 단위는 인쇄물에서 거의 표가 나지 않아 2배로 키운다
+  const toDoc = (h) => String(h || '')
+    .replace(/padding-left\s*:\s*([\d.]+)px/gi, (m, v) => `margin-left: ${Math.round(Number(v) * 2)}px`)
+    .replace(/margin-left\s*:\s*([\d.]+)px/gi, (m, v) => `margin-left: ${Math.round(Number(v))}px`);
 
   const rows = items.map((it, i) => `
       <tr>
@@ -461,10 +465,11 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
   // Word : WordSection1 으로 가로 방향 A4 지정
   const pageCss = forWord
     ? `@page WordSection1 {
-       size: 29.7cm 21.0cm; mso-page-orientation: landscape;
-       /* 상 / 우 / 하 / 좌 — 위쪽을 넉넉히 둔다 */
-       margin: 2.2cm 1.5cm 1.8cm 1.5cm;
-       mso-header-margin: 1.0cm; mso-footer-margin: 1.0cm;
+       /* 가로 A4. Word 는 pt 로 줘야 확실히 인식한다 (841.9 x 595.3pt) */
+       size: 841.9pt 595.3pt;
+       mso-page-orientation: landscape;
+       margin: 1.0cm 1.0cm 1.0cm 1.0cm;
+       mso-header-margin: 0.5cm; mso-footer-margin: 0.5cm;
      }
   div.WordSection1 { page: WordSection1; }
   /* Word 는 문서 첫 문단 위 여백을 무시하는 경우가 있어 제목 위에 여유를 준다 */
@@ -626,7 +631,7 @@ async function fixHwpxLayout(buf, ratios) {
   // 양쪽 정렬이면 글자 사이가 벌어진다. 왼쪽 정렬로.
   head = head.replace(/horizontal="JUSTIFY"/g, 'horizontal="LEFT"');
   // 줄간격 160% → 130%
-  head = head.replace(/(<hh:lineSpacing type="PERCENT" value=")\d+/g, '$1130');
+  head = head.replace(/(<hh:lineSpacing type="PERCENT" value=")\d+/g, '$1150');
 
   // 표 제목 칸 배경색용 borderFill 추가 (실선 테두리 + 연노랑 채우기)
   const solid = /<hh:borderFill id="2"[\s\S]*?<\/hh:borderFill>/.exec(head);
@@ -642,6 +647,19 @@ async function fixHwpxLayout(buf, ratios) {
     head = head.replace('</hh:borderFills>', `${filled}</hh:borderFills>`);
     if (cntM) head = head.replace(/(<hh:borderFills itemCnt=")\d+/, `$1${headFillId}`);
   }
+  // 가운데 정렬용 문단 모양 추가 (표 제목 행, 기관명·참여인력 칸에 쓴다)
+  let centerParaId = 0;
+  const para0 = /<hh:paraPr id="0"[\s\S]*?<\/hh:paraPr>/.exec(head);
+  if (para0) {
+    const cntM = /<hh:paraProperties itemCnt="(\d+)"/.exec(head);
+    centerParaId = cntM ? Number(cntM[1]) : 1;
+    const centered = para0[0]
+      .replace(/id="0"/, `id="${centerParaId}"`)
+      .replace(/horizontal="[A-Z]*"/, 'horizontal="CENTER"');
+    head = head.replace('</hh:paraProperties>', `${centered}</hh:paraProperties>`);
+    if (cntM) head = head.replace(/(<hh:paraProperties itemCnt=")\d+/, `$1${centerParaId + 1}`);
+  }
+
   zip.file('Contents/header.xml', head);
 
   // ---------- section0.xml : 용지·여백·표 크기·셀 여백 ----------
@@ -666,17 +684,29 @@ async function fixHwpxLayout(buf, ratios) {
     });
 
   // 셀 안쪽 여백을 넓혀 글자가 선에 붙지 않게 한다
+  // Word 의 셀 여백(6x7px)과 비슷하게 : 좌우 2mm, 상하 1.5mm
   xml = xml.replace(/<hp:cellMargin[^>]*\/>/g,
-    '<hp:cellMargin left="680" right="680" top="200" bottom="200"/>');
+    '<hp:cellMargin left="566" right="566" top="425" bottom="425"/>');
   xml = xml.replace(/<hp:inMargin[^>]*\/>/g,
-    '<hp:inMargin left="680" right="680" top="200" bottom="200"/>');
+    '<hp:inMargin left="566" right="566" top="425" bottom="425"/>');
 
   // 모든 칸에 실선 테두리, 제목 행(rowAddr=0)은 배경색 있는 테두리
   xml = xml.replace(/(<hp:tbl [^>]*borderFillIDRef=")1(")/g, '$12$2');
   xml = xml.replace(/<hp:tc ([^>]*)borderFillIDRef="\d+"([^>]*)>([\s\S]*?)<\/hp:tc>/g,
     (mm, a, b, body) => {
-      const id = /rowAddr="0"/.test(body) ? headFillId : 2;
-      return `<hp:tc ${a}borderFillIDRef="${id}"${b}>${body}</hp:tc>`;
+      const isHead = /rowAddr="0"/.test(body);
+      // 제목 행과 기관명(0)·참여인력(1) 칸은 가운데 정렬
+      const isLabel = /colAddr="[01]"/.test(body);
+      const id = isHead ? headFillId : 2;
+
+      let inner = body;
+      if ((isHead || isLabel) && centerParaId) {
+        inner = inner.replace(/(<hp:p [^>]*paraPrIDRef=")\d+/g, `$1${centerParaId}`);
+      }
+      // 세로 가운데 정렬
+      inner = inner.replace(/(<hp:subList [^>]*vertAlign=")[A-Z]*/g, '$1CENTER');
+
+      return `<hp:tc ${a}borderFillIDRef="${id}"${b}>${inner}</hp:tc>`;
     });
 
   xml = xml.replace(/horzsize="\d+"/g, `horzsize="${CONTENT}"`);
