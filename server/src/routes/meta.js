@@ -15,11 +15,13 @@ const router = express.Router();
 // ---------------------------------------------------------------------
 router.get('/weeks', auth.requireAuth, async (req, res, next) => {
   try {
-    const limit = Math.min(Number(req.query.limit) || 60, 400);
+    const limit = Math.min(Number(req.query.limit) || 200, 400);
+    // 당해 연도 전체 + 내년 1월까지 보여준다.
+    // (연말·연초 주차를 미리 선택해 작성할 수 있어야 한다)
     const { rows } = await db.query(
       `SELECT id, year, week_no, start_date, end_date, label, is_open
          FROM wr.report_weeks
-        WHERE start_date <= (CURRENT_DATE + INTERVAL '28 days')
+        WHERE start_date < (date_trunc('year', CURRENT_DATE) + INTERVAL '13 months')
         ORDER BY start_date DESC
         LIMIT $1`,
       [limit]
