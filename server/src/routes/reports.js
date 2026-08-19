@@ -607,52 +607,91 @@ async function fixHwpxLayout(buf, ratios) {
 
   const PAGE_W = 84186;                  // A4 가로 297mm
   const PAGE_H = 59528;                  // A4 세로 210mm
-  const MARGIN = 2835;                   // 좌우·상하 여백 10mm (기본 30mm 는 너무 넓다)
+  const MARGIN = 2835;                   // 상하좌우 10mm
   const HEAD_FOOT = 1417;                // 머리말·꼬리말 5mm
   const CONTENT = PAGE_W - MARGIN * 2;
+  const HEAD_FILL = '#FFFBCC';           // 표 제목 배경 (인쇄본과 동일)
 
+  // ---------- header.xml : 글자 크기·줄간격·정렬·표 제목 배경 ----------
+  let head = await zip.file('Contents/header.xml').async('string');
+
+  // 본문 9pt / 제목 10pt. (charPr 0=본문, 1=굵은 제목)
+  head = head.replace(/<hh:charPr id="0" height="\d+"/, '<hh:charPr id="0" height="900"');
+  head = head.replace(/<hh:charPr id="2" height="\d+"/, '<hh:charPr id="2" height="900"');
+  head = head.replace(/<hh:charPr id="4" height="\d+"/, '<hh:charPr id="4" height="900"');
+  head = head.replace(/<hh:charPr id="1" height="\d+"/, '<hh:charPr id="1" height="1000"');
+  head = head.replace(/<hh:charPr id="3" height="\d+"/, '<hh:charPr id="3" height="1000"');
+  head = head.replace(/<hh:charPr id="5" height="\d+"/, '<hh:charPr id="5" height="1500"');
+
+  // 양쪽 정렬이면 글자 사이가 벌어진다. 왼쪽 정렬로.
+  head = head.replace(/horizontal="JUSTIFY"/g, 'horizontal="LEFT"');
+  // 줄간격 160% → 130%
+  head = head.replace(/(<hh:lineSpacing type="PERCENT" value=")\d+/g, '$1130');
+
+  // 표 제목 칸 배경색용 borderFill 추가 (실선 테두리 + 연노랑 채우기)
+  const solid = /<hh:borderFill id="2"[\s\S]*?<\/hh:borderFill>/.exec(head);
+  let headFillId = 2;
+  if (solid) {
+    const cntM = /<hh:borderFills itemCnt="(\d+)"/.exec(head);
+    headFillId = cntM ? Number(cntM[1]) + 1 : 3;
+    const filled = solid[0]
+      .replace(/id="2"/, `id="${headFillId}"`)
+      .replace('</hh:borderFill>',
+        `<hc:fillBrush><hc:winBrush faceColor="${HEAD_FILL}" hatchColor="#000000" alpha="0"/>` +
+        `</hc:fillBrush></hh:borderFill>`);
+    head = head.replace('</hh:borderFills>', `${filled}</hh:borderFills>`);
+    if (cntM) head = head.replace(/(<hh:borderFills itemCnt=")\d+/, `$1${headFillId}`);
+  }
+  zip.file('Contents/header.xml', head);
+
+  // ---------- section0.xml : 용지·여백·표 크기·셀 여백 ----------
   let xml = await zip.file('Contents/section0.xml').async('string');
 
-  // 1) 용지: 가로 크기로 교체
   xml = xml.replace(/(<hp:pagePr[^>]*?)width="\d+" height="\d+"/,
     `$1width="${PAGE_W}" height="${PAGE_H}"`);
-
-  // 2) 여백 축소
   xml = xml.replace(/<hp:margin[^>]*\/>/,
     `<hp:margin header="${HEAD_FOOT}" footer="${HEAD_FOOT}" gutter="0" ` +
     `left="${MARGIN}" right="${MARGIN}" top="${MARGIN}" bottom="${MARGIN}"/>`);
+  xml = xml.replace(/(<hp:sz )width="\d+"( widthRelTo="ABSOLUTE")/g, `$1width="${CONTENT}"$2`);
 
-  // 3) 표 전체 폭
-  xml = xml.replace(/(<hp:sz )width="\d+"( widthRelTo="ABSOLUTE")/g,
-    `$1width="${CONTENT}"$2`);
-
-  // 4) 열 비율대로 셀 폭 배분 (병합 셀은 걸친 열 폭의 합)
+  // 열 비율대로 셀 폭 배분 (병합 셀은 걸친 열 폭의 합)
   const widths = ratios.map((r) => Math.round(CONTENT * r));
   widths[widths.length - 1] = CONTENT - widths.slice(0, -1).reduce((a, b) => a + b, 0);
-
   xml = xml.replace(
     /<hp:cellAddr colAddr="(\d+)" rowAddr="(\d+)"\/><hp:cellSpan colSpan="(\d+)" rowSpan="(\d+)"\/><hp:cellSz width="\d+"/g,
-    (m, col, row, cspan) => {
+    (mm, col, row, cspan) => {
       let w = 0;
       for (let i = 0; i < Number(cspan); i++) w += widths[Number(col) + i] || 0;
-      return m.replace(/<hp:cellSz width="\d+"/, `<hp:cellSz width="${w}"`);
+      return mm.replace(/<hp:cellSz width="\d+"/, `<hp:cellSz width="${w}"`);
     });
 
-  // 5) 셀 테두리: 실선이 정의된 borderFill(id=2) 을 쓰도록
-  xml = xml.replace(/(<hp:tc [^>]*borderFillIDRef=")1(")/g, '$12$2');
+  // 셀 안쪽 여백을 넓혀 글자가 선에 붙지 않게 한다
+  xml = xml.replace(/<hp:cellMargin[^>]*\/>/g,
+    '<hp:cellMargin left="680" right="680" top="200" bottom="200"/>');
+  xml = xml.replace(/<hp:inMargin[^>]*\/>/g,
+    '<hp:inMargin left="680" right="680" top="200" bottom="200"/>');
+
+  // 모든 칸에 실선 테두리, 제목 행(rowAddr=0)은 배경색 있는 테두리
   xml = xml.replace(/(<hp:tbl [^>]*borderFillIDRef=")1(")/g, '$12$2');
+  xml = xml.replace(/<hp:tc ([^>]*)borderFillIDRef="\d+"([^>]*)>([\s\S]*?)<\/hp:tc>/g,
+    (mm, a, b, body) => {
+      const id = /rowAddr="0"/.test(body) ? headFillId : 2;
+      return `<hp:tc ${a}borderFillIDRef="${id}"${b}>${body}</hp:tc>`;
+    });
 
-  // 6) 줄 배치 폭(한글이 다시 계산하지만 초기값도 맞춰 둔다)
-  xml = xml.replace(/horzsize="42520"/g, `horzsize="${CONTENT}"`);
+  xml = xml.replace(/horzsize="\d+"/g, `horzsize="${CONTENT}"`);
 
-  // 7) 다시 압축. mimetype 은 반드시 첫 항목 + 무압축이어야 한글이 인식한다.
+  // ---------- 재압축 (mimetype 은 첫 항목·무압축이어야 한글이 인식) ----------
   const out = new JSZip();
   out.file('mimetype', await zip.file('mimetype').async('string'), { compression: 'STORE' });
   for (const name of Object.keys(zip.files)) {
     const f = zip.files[name];
     if (name === 'mimetype' || f.dir) continue;
-    out.file(name, name === 'Contents/section0.xml' ? xml : await f.async('nodebuffer'),
-      { compression: 'DEFLATE' });
+    let data;
+    if (name === 'Contents/section0.xml') data = xml;
+    else if (name === 'Contents/header.xml') data = head;
+    else data = await f.async('nodebuffer');
+    out.file(name, data, { compression: 'DEFLATE' });
   }
   return out.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
@@ -685,9 +724,10 @@ function buildHwpxHtml(report, items, files, nextWeek) {
   </tr></thead>
   <tbody>${rows || '<tr><td>등록된 항목이 없습니다.</td></tr>'}</tbody>
 </table>
-${report.note ? `<p><b>특이사항</b><br>${esc(report.note).replace(/\n/g, '<br>')}</p>` : ''}
-${files.length ? `<p><b>증적자료 (${files.length}건)</b><br>${
-  files.map((f, i) => `${i + 1}. ${esc(f.original_name)}`).join('<br>')}</p>` : ''}
+${report.note ? `<p><b>특이사항</b></p>${
+  esc(report.note).split('\n').map((t) => `<p>${t}</p>`).join('')}` : ''}
+${files.length ? `<p><b>증적자료 (${files.length}건)</b></p>${
+  files.map((f, i) => `<p>${i + 1}. ${esc(f.original_name)}</p>`).join('')}` : ''}
 </body></html>`;
 }
 
