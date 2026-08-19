@@ -631,7 +631,8 @@
   function renderList(res) {
     const tbody = $('#list-body');
     if (!res.reports.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="empty">조회된 보고서가 없습니다.</td></tr>';
+      const cols = document.querySelectorAll('#tab-list thead th:not(.hidden)').length || 9;
+      tbody.innerHTML = `<tr><td colspan="${cols}" class="empty">조회된 보고서가 없습니다.</td></tr>`;
       $('#list-pager').innerHTML = '';
       return;
     }
@@ -667,6 +668,9 @@
     tbody.querySelectorAll('[data-export]').forEach((b) => {
       b.onclick = () => downloadReport(b.dataset.export);
     });
+
+    // 행은 이 시점에 새로 만들어지므로 열 숨김을 다시 적용해야 헤더와 어긋나지 않는다
+    applyListScopeUi();
 
     const pages = Math.ceil(res.total / res.size);
     $('#list-pager').innerHTML = pages <= 1 ? `<span class="small muted">총 ${res.total}건</span>` : `
