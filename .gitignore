@@ -8,3 +8,9 @@ uploads/*
 *.log
 *.tar
 *.tar.gz
+
+# 편집 전 백업 파일 (커밋 대상 아님)
+*.before-*
+*.bak
+*.orig
+_backup/
