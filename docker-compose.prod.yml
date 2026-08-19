@@ -3,7 +3,7 @@
 #
 #    APP : 192.168.200.115 (Ubuntu 22.04 LTS, podman 4.9.3, 8 Core)  ← 이 파일로 기동
 #    DB  : 192.168.200.116 (Rocky Linux,    podman 5.8.2, 16 Core)  ← docker-compose.db.yml 로 별도 기동
-#    외부 : http://183.101.26.137:<APP_PORT>
+#    외부 : http://183.101.26.137:<APP_PORT>   (개방 포트 범위 16000~16999)
 #
 #    podman-compose -f docker-compose.prod.yml up -d
 #
@@ -64,8 +64,9 @@ services:
       - ${UPLOAD_HOST_DIR:-./data/uploads}:/app/uploads:z
 
     ports:
-      # 외부 공개 포트. 확정되면 .env 의 APP_PORT 만 바꾸면 됩니다.
-      - "${APP_PORT:-8080}:8080"
+      # 외부 공개 포트. .env 의 APP_PORT 로 지정합니다.
+      # 192.168.200.115 는 16000~16999 만 개방되어 있으므로 그 범위에서 고르세요.
+      - "${APP_PORT:-16080}:8080"
 
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]

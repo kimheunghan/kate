@@ -11,7 +11,7 @@ export PATH="$HOME/.local/bin:$PATH"
 podman build -q -t localhost/weekly-report:1.0 -f Containerfile . >/dev/null
 podman-compose up -d --no-deps app >/dev/null 2>&1 || podman-compose up -d >/dev/null 2>&1
 
-PORT="$(grep -E '^APP_PORT=' .env | cut -d= -f2 || echo 8080)"
+PORT="$(grep -E '^APP_PORT=' .env | cut -d= -f2 || echo 16080)"
 for i in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
     echo "[✔] 앱 재배포 완료 (${i}초)"; exit 0

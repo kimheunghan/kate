@@ -15,10 +15,10 @@
 |---|---|---|---|---|
 | **RDB** | `192.168.200.116` | 16 Core | Rocky Linux (최신) | 5.8.2 |
 | **APP** (web/was) | `192.168.200.115` | 8 Core | Ubuntu 22.04 LTS | 4.9.3 |
-| 외부 접속 | `http://183.101.26.137:<APP_PORT>` | — | 포트 미확정 → `.env` 의 `APP_PORT` 만 변경 | |
+| 외부 접속 | `http://183.101.26.137:16080` | — | **개방 포트 16000~16999** · `.env` 의 `APP_PORT` 로 지정 | |
 
 ```
- 인터넷 ──▶ 183.101.26.137:APP_PORT
+ 인터넷 ──▶ 183.101.26.137:16080        (개방 포트 16000~16999)
                     │
                     ▼
         ┌───────────────────────┐         ┌──────────────────────┐
@@ -158,7 +158,7 @@ vi .env
 `.env` 에서 다음 값을 채웁니다.
 
 ```ini
-APP_PORT=8080                       # ← 외부 공개 포트 확정되면 이 값만 변경
+APP_PORT=16080                      # ← 16000~16999 범위에서만 외부 접속 가능
 DB_HOST=192.168.200.116
 DB_PASSWORD=<DB 서버에서 생성된 값과 동일하게>
 SESSION_SECRET=<openssl rand -hex 32>
@@ -172,23 +172,26 @@ bash scripts/deploy.sh status
 bash scripts/deploy.sh logs
 ```
 
-접속: `http://192.168.200.115:8080` → 외부 `http://183.101.26.137:8080`
+접속: `http://192.168.200.115:16080` → 외부 `http://183.101.26.137:16080`
 
 ### 4-4. 포트가 확정되면
 
 `.env` 의 `APP_PORT` 만 바꾸고 재기동하면 됩니다. 코드 수정 불필요.
 
+> **`192.168.200.115` 는 16000~16999 포트만 개방되어 있습니다.**
+> 이 범위를 벗어난 포트로 띄우면 서버 안에서는 접속되지만 외부에서는 닿지 않습니다.
+
 ```bash
-sed -i 's/^APP_PORT=.*/APP_PORT=9090/' .env
+sed -i 's/^APP_PORT=.*/APP_PORT=16080/' .env
 bash scripts/deploy.sh down && bash scripts/deploy.sh up
 ```
 
-> **1024 미만 포트(80 등)** 를 쓰려면 rootless podman 에서는 아래 중 하나가 필요합니다.
+> 운영 포트 범위(16000~16999)는 모두 1024 이상이라 rootless podman 에서 그대로 바인딩됩니다.
+> 만약 80/443 같은 낮은 포트를 써야 한다면 아래 설정이 추가로 필요합니다.
 > ```bash
-> sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
 > echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-podman.conf
+> sudo sysctl --system
 > ```
-> 또는 앞단에 nginx 를 두고 8080 으로 프록시하세요.
 
 ### 4-5. 서버 재부팅 시 자동 기동
 
@@ -208,7 +211,7 @@ DB 서버(`wr-db`)도 동일하게 등록하세요.
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `APP_PORT` | `8080` | 호스트에 노출할 포트 (외부 공개 포트) |
+| `APP_PORT` | `16080` | 호스트에 노출할 포트. **운영 서버는 16000~16999 만 개방** |
 | `SESSION_SECRET` | — | **필수**. 세션 쿠키 서명 키. `openssl rand -hex 32` |
 | `SESSION_TTL_SECONDS` | `43200` | 세션 유지 시간(초). 기본 12시간 |
 | `COOKIE_SECURE` | `false` | HTTPS 로 서비스하면 `true` |

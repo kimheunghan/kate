@@ -84,7 +84,8 @@ case "${1:-}" in
        podman load -i weekly-report-${TS}.tar
        mkdir -p ~/weekly-report && tar xzf weekly-report-deploy-${TS}.tar.gz -C ~/weekly-report
        cd ~/weekly-report && cp .env.example .env
-       # .env 편집: DB_HOST=192.168.200.116, DB_PASSWORD=(DB 서버와 동일), SESSION_SECRET, APP_PORT
+       # .env 편집: DB_HOST=192.168.200.116, DB_PASSWORD=(DB 서버와 동일), SESSION_SECRET
+       #            APP_PORT=16080   ← 개방 포트 범위 16000~16999 안에서 지정
        bash scripts/deploy.sh up
 
   3) 접속 확인
@@ -103,7 +104,7 @@ EOF
     ${COMPOSE} -f "${COMPOSE_FILE}" up -d
     echo
     echo "[*] 기동 확인 (최대 60초 대기)"
-    PORT="$(grep -E '^APP_PORT=' .env | cut -d= -f2 || echo 8080)"
+    PORT="$(grep -E '^APP_PORT=' .env | cut -d= -f2 || echo 16080)"
     for i in $(seq 1 30); do
       if curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
         echo "[✔] 정상 기동 → http://$(hostname -I | awk '{print $1}'):${PORT}"
@@ -120,7 +121,7 @@ EOF
   logs)    podman logs -f --tail 200 wr-app ;;
   status)
     podman ps --filter name=wr- --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-    PORT="$(grep -E '^APP_PORT=' .env 2>/dev/null | cut -d= -f2 || echo 8080)"
+    PORT="$(grep -E '^APP_PORT=' .env 2>/dev/null | cut -d= -f2 || echo 16080)"
     echo; curl -fsS "http://127.0.0.1:${PORT}/api/health" && echo || echo "[!] health 응답 없음"
     ;;
 
