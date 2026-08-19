@@ -485,7 +485,12 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
      }
   div.WordSection1 { page: WordSection1; }
   /* Word 는 문서 첫 문단 위 여백을 무시하는 경우가 있어 제목 위에 여유를 준다 */
-  h1 { margin-top: 6pt !important; }`
+  h1 { margin-top: 6pt !important; }
+  /* 한글 문서와 글자 크기를 맞춘다 (표 제목 8.5pt / 본문 7pt / 문서 제목 15pt).
+     아래 공통 규칙보다 뒤에 오도록 !important 로 고정한다. */
+  th { font-size: 8.5pt !important; }
+  td, td.org, td.who, td table, ol.files, .fitem { font-size: 7pt !important; }
+  .note { font-size: 8.5pt !important; }`
     : `@page { size: A4 portrait; margin: 0; }
   body { padding: 10mm; }`;
 
@@ -646,8 +651,8 @@ async function fixHwpxLayout(buf, ratios) {
 
   // 양쪽 정렬이면 글자 사이가 벌어진다. 왼쪽 정렬로.
   head = head.replace(/horizontal="JUSTIFY"/g, 'horizontal="LEFT"');
-  // 줄간격 160% → 130% (줄이 넘어갈 때 아래로 덜 밀리게)
-  head = head.replace(/(<hh:lineSpacing type="PERCENT" value=")\d+/g, '$1130');
+  // 줄간격 160% 일괄 적용
+  head = head.replace(/(<hh:lineSpacing type="PERCENT" value=")\d+/g, '$1160');
 
   // 표 제목 칸 배경색용 borderFill 추가 (실선 테두리 + 연노랑 채우기)
   const solid = /<hh:borderFill id="2"[\s\S]*?<\/hh:borderFill>/.exec(head);
