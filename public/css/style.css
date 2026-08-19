@@ -248,15 +248,40 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
   background: #fffdf2;
   border-bottom: 1px solid var(--border);
 }
-/* 업무 추가·삭제: 무엇을 하는 버튼인지 글자로 함께 보여준다 */
+/* 업무 추가·삭제: 노란 안내줄 위에서 묻히지 않도록 흰 박스로 영역을 구분한다 */
 .toolbar-hint .row-ctl {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   margin-left: auto;
   white-space: nowrap;
+  background: #fff;
+  border: 1px solid var(--border-dk);
+  border-radius: 20px;
+  padding: 4px 8px 4px 13px;
+  box-shadow: 0 1px 3px rgba(20, 34, 51, .10);
 }
-.toolbar-hint .row-ctl b { font-size: 12.5px; color: var(--text); font-weight: 700; }
+.toolbar-hint .row-ctl b {
+  font-size: 12.5px;
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: -.2px;
+}
+.toolbar-hint .row-ctl .btn.icon {
+  width: 28px; height: 26px;
+  border-radius: 50%;
+  font-size: 15px;
+}
+.toolbar-hint .row-ctl .btn.icon:not(.danger) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.toolbar-hint .row-ctl .btn.icon:not(.danger):hover:not(:disabled) {
+  background: var(--primary); color: #fff;
+}
+.toolbar-hint .row-ctl .btn.icon.danger:hover:not(:disabled) {
+  background: var(--danger); color: #fff; border-color: var(--danger);
+}
 .editor-toolbar .sep { width: 1px; height: 18px; background: var(--border-dk); margin: 0 4px; }
 .editor-toolbar button {
   min-width: 26px; height: 25px;
