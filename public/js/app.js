@@ -43,6 +43,7 @@
 
     fillWeekSelects();
     fillOrgSelects();
+    applyListScopeUi();
     initToolbar();
     bindTabs();
     bindEditorPanel();
@@ -113,6 +114,37 @@
       state.toolbar.setEnabled(false);
       $('#toolbar-hint').classList.remove('hidden');
     }
+  }
+
+  /**
+   * 조회 탭은 권한에 따라 보이는 범위가 다르다.
+   *   작성자      : 본인 보고서만 → 기관·작성자 열이 의미 없으므로 숨긴다
+   *   기관 관리자 : 자기 기관 전체
+   *   전체 관리자 : 전부
+   */
+  function applyListScopeUi() {
+    const role = state.me.role;
+    const onlyMine = role !== 'ADMIN' && role !== 'ORG_ADMIN';
+
+    const orgFilter = $('#f-org');
+    if (orgFilter && orgFilter.closest('label')) {
+      orgFilter.closest('label').classList.toggle('hidden', role !== 'ADMIN');
+    }
+    const note = $('#list-scope-note');
+    if (note) {
+      note.textContent = onlyMine
+        ? '본인이 작성한 보고서만 표시됩니다.'
+        : (role === 'ORG_ADMIN'
+            ? `${state.me.org_name || '소속 기관'} 소속 전체 보고서가 표시됩니다.`
+            : '전체 기관의 보고서가 표시됩니다.');
+    }
+    // 작성자 열은 항상 표시한다 (본인 확인용). 기관 열만 작성자에게 숨긴다.
+    document.querySelectorAll('.col-org').forEach((el) => {
+      el.classList.toggle('hidden', onlyMine);
+    });
+    document.querySelectorAll('.col-author').forEach((el) => {
+      el.classList.remove('hidden');
+    });
   }
 
   function bindTabs() {
@@ -603,7 +635,8 @@
   function renderList(res) {
     const tbody = $('#list-body');
     if (!res.reports.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="empty">조회된 보고서가 없습니다.</td></tr>';
+      const cols = document.querySelectorAll('#tab-list thead th:not(.hidden)').length || 9;
+      tbody.innerHTML = `<tr><td colspan="${cols}" class="empty">조회된 보고서가 없습니다.</td></tr>`;
       $('#list-pager').innerHTML = '';
       return;
     }
@@ -611,9 +644,9 @@
     tbody.innerHTML = res.reports.map((r) => `
       <tr>
         <td>${esc(r.week_label)}${r.is_open ? '' : ' <span class="badge closed">마감</span>'}</td>
-        <td>${esc(r.org_name)}</td>
-        <td>${esc(r.author_name || '-')}</td>
-        <td class="small summary">${esc(r.summary || '')}</td>
+        <td class="col-org">${esc(r.org_name)}</td>
+        <td class="col-author">${esc(r.author_name || '-')}</td>
+        <td class="small summary"><div class="summary-text">${esc(r.summary || '')}</div></td>
         <td class="center">${statusBadge(r.status)}</td>
         <td class="center">${r.item_count}</td>
         <td class="center">${r.file_count}</td>
@@ -639,6 +672,9 @@
     tbody.querySelectorAll('[data-export]').forEach((b) => {
       b.onclick = () => downloadReport(b.dataset.export);
     });
+
+    // 행은 이 시점에 새로 만들어지므로 열 숨김을 다시 적용해야 헤더와 어긋나지 않는다
+    applyListScopeUi();
 
     const pages = Math.ceil(res.total / res.size);
     $('#list-pager').innerHTML = pages <= 1 ? `<span class="small muted">총 ${res.total}건</span>` : `

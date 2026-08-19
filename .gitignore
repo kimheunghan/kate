@@ -5,6 +5,7 @@ dist/
 backup/
 uploads/*
 !uploads/.gitkeep
+*.before-*
 *.log
 *.tar
 *.tar.gz
