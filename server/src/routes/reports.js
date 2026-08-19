@@ -641,6 +641,9 @@ async function fixHwpxLayout(buf, ratios) {
   head = head.replace(/<hh:charPr id="3" height="\d+"/, '<hh:charPr id="3" height="850"');
   head = head.replace(/<hh:charPr id="5" height="\d+"/, '<hh:charPr id="5" height="1500"');
 
+  // 글꼴을 전부 맑은 고딕으로. (기본은 함초롬바탕/바탕/Times New Roman 이 섞여 나온다)
+  head = head.replace(/(<hh:font\b[^>]*\bface=")[^"]*/g, '$1맑은 고딕');
+
   // 양쪽 정렬이면 글자 사이가 벌어진다. 왼쪽 정렬로.
   head = head.replace(/horizontal="JUSTIFY"/g, 'horizontal="LEFT"');
   // 줄간격 160% → 130% (줄이 넘어갈 때 아래로 덜 밀리게)
@@ -678,9 +681,12 @@ async function fixHwpxLayout(buf, ratios) {
   // ---------- section0.xml : 용지·여백·표 크기·셀 여백 ----------
   let xml = await zip.file('Contents/section0.xml').async('string');
 
-  // 용지 방향 : 구역이 여러 개여도 모두 세로로. (/g 없으면 첫 개만 바뀐다)
+  // 용지 방향 : 한글 네이티브 모델은 치수를 항상 세로 물리값으로 두고
+  //   landscape 플래그로 방향을 나타낸다. WIDELY = 세로, NARROWLY = 가로.
+  //   (hwp-convert README 에 명시. 이전에는 반대로 넣어 가로로 열렸다)
+  // 구역이 여러 개여도 모두 세로로. (/g 없으면 첫 개만 바뀐다)
   xml = xml.replace(/<hp:pagePr\b[^>]*>/g, (tag) => tag
-    .replace(/landscape="[A-Z]*"/, 'landscape="NARROWLY"')
+    .replace(/landscape="[A-Z]*"/, 'landscape="WIDELY"')
     .replace(/width="\d+"/, `width="${PAGE_W}"`)
     .replace(/height="\d+"/, `height="${PAGE_H}"`));
   xml = xml.replace(/<hp:margin[^>]*\/>/,
@@ -775,7 +781,7 @@ function buildHwpxHtml(report, items, files, nextWeek) {
 </table>
 ${report.note ? `<p><b>특이사항</b></p>${
   esc(report.note).split('\n').map((t) => `<p>${t}</p>`).join('')}` : ''}
-${files.length ? `<p>&nbsp;</p><p><b>증적자료 (${files.length}건)</b></p>${
+${files.length ? `<p>&#8203;</p><p><b>증적자료 (${files.length}건)</b></p>${
   files.map((f, i) => `<p>${i + 1}. ${esc(f.original_name)}</p>`).join('')}` : ''}
 </body></html>`;
 }
@@ -844,7 +850,13 @@ router.get('/:id(\\d+)/export-hwpx', async (req, res, next) => {
     // hwp-convert 는 ESM 전용이라 동적 import 로 불러온다
     const { htmlToHwpx } = await import('hwp-convert');
     const html = buildHwpxHtml(report, items, files, nextWeek);
-    const out = await htmlToHwpx(html);
+    const out = await htmlToHwpx(html, {
+      page: {
+        size: 'A4',
+        orientation: 'portrait',
+        margins: { left: 10, right: 10, top: 10, bottom: 10, header: 5, footer: 5, gutter: 0 },
+      },
+    });
     // 기관명 11% / 참여인력 9% / 계획 26% / 실적 28% / 향후 26%
     const buf = await fixHwpxLayout(
       Buffer.isBuffer(out) ? out : Buffer.from(out),
