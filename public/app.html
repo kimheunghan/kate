@@ -16,25 +16,22 @@
     <!-- ============================================================ 탭 -->
     <div class="panel">
       <div class="tabs">
-        <button data-tab="write" class="active">보고서 작성 / 수정</button>
+        <button data-tab="write" class="active">주간보고서 작성</button>
         <button data-tab="list">등록 내역 조회</button>
       </div>
 
       <!-- ------------------------------------------------- 작성 탭 -->
       <div class="body" id="tab-write">
-        <div class="row">
-          <label class="field" style="flex:2 1 320px">
+        <div class="search-bar">
+          <label class="sb-field" style="flex:2 1 340px">
             <span>보고 주차</span>
             <select id="sel-week"></select>
           </label>
-          <label class="field" id="org-field" style="flex:1 1 220px">
+          <label class="sb-field" id="org-field" style="flex:1 1 220px">
             <span>기관</span>
             <select id="sel-org"></select>
           </label>
-          <div class="field narrow" style="flex:0 0 auto">
-            <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
-            <button class="btn" id="btn-load">불러오기</button>
-          </div>
+          <button class="btn primary sb-btn" id="btn-load">검색</button>
         </div>
         <div id="write-status"></div>
       </div>
@@ -49,8 +46,7 @@
         <button class="btn sm" id="btn-excel-template">Excel 양식</button>
         <button class="btn sm primary" id="btn-excel-import">Excel 일괄등록</button>
         <input type="file" id="excel-file-input" accept=".xlsx" class="hidden">
-        <button class="btn sm" id="btn-copy-prev" title="직전 주차 보고서의 업무명과 계획을 그대로 가져옵니다">직전 주차 불러오기</button>
-        <button class="btn sm" id="btn-add-row">＋ 업무 추가</button>
+        <button class="btn sm icon" id="btn-add-row" title="항목 추가">＋</button>
       </header>
 
       <!-- 공용 편집 툴바: 현재 편집 중인 칸에 적용됩니다 -->
@@ -104,15 +100,12 @@
     <div class="panel no-print" id="save-panel">
       <div class="body">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn primary" id="btn-save">임시저장</button>
-          <button class="btn primary" id="btn-submit">제출하기</button>
+          <button class="btn primary" id="btn-save">저장</button>
           <button class="btn" id="btn-print">인쇄 / PDF</button>
           <button class="btn" id="btn-export"
                   title="한글문서(HWP) 변환은 현재 [Word 다운로드] 하신 후 한글에서 Word문서를 열어서 다른 이름(확장자 .hwp)으로 저장하시기 바랍니다.">
             Word 다운로드 <span class="mark">※</span>
           </button>
-          <div class="spacer" style="flex:1"></div>
-          <button class="btn danger" id="btn-delete">보고서 삭제</button>
         </div>
         <p class="hint-note">
           <span class="mark">※</span>

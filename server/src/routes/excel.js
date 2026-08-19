@@ -15,304 +15,234 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter(req, file, cb) {
-    const name = String(file.originalname || '').toLowerCase();
-    if (!name.endsWith('.xlsx')) return cb(new Error('Excel .xlsx 파일만 업로드할 수 있습니다.'));
+    try { file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8'); } catch { /* 원본 유지 */ }
+    if (!String(file.originalname).toLowerCase().endsWith('.xlsx')) {
+      return cb(new Error('Excel .xlsx 파일만 업로드할 수 있습니다.'));
+    }
     cb(null, true);
   },
 });
 
-function isoDate(value) {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
-  }
-  if (value && typeof value === 'object') {
-    if (value.result != null) return isoDate(value.result);
-    if (value.text != null) return isoDate(value.text);
-  }
-  const s = String(value == null ? '' : value).trim().replace(/[./]/g, '-');
-  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (!m) return null;
-  const out = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-  const d = new Date(`${out}T00:00:00Z`);
-  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== out ? null : out;
+// 양식은 딱 세 칸이다. 주차는 화면에서 고른 값을 쓰므로 엑셀에 날짜 열을 두지 않는다.
+const COLUMNS = [
+  { header: '① 당초 계획', key: 'plan',   width: 52 },
+  { header: '② 추진 실적', key: 'result', width: 52 },
+  { header: '③ 향후 계획', key: 'next',   width: 52 },
+];
+
+const SAMPLE = {
+  plan: '3. 온톨로지 기반 규제 지식체계 설계 및 데이터 구조\n'
+      + '■ 규제 도메인 구조 설계(~9/30)\n■ 온톨로지 모델 설계(~9/30)\n■ 지식-Rule 연계 설계(~9/30)',
+  result: '3. 온톨로지 기반 규제 지식체계 설계 및 데이터 구조\n'
+      + '■ 온톨로지 모델 설계\n- 용도지역지구별 관련법령 수집\n- 수집 법령의 관계 구성 및 추가\n'
+      + '■ 지식-Rule 연계 설계\n- Rule engine 적용 항목 분류',
+  next: '3. 온톨로지 기반 규제 지식체계 설계 및 데이터 구조\n'
+      + '■ 규제 도메인 구조 설계 계속\n■ 온톨로지 모델 보완\n■ 지식-Rule 연계 설계 계속',
+};
+
+/** 셀 값을 평문으로 (수식·리치텍스트·하이퍼링크 대응) */
+function cellText(v) {
+  if (v == null) return '';
+  if (typeof v === 'string' || typeof v === 'number') return String(v);
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (Array.isArray(v.richText)) return v.richText.map((t) => t.text || '').join('');
+  if (v.text != null) return String(v.text);
+  if (v.result != null) return String(v.result);
+  if (v.hyperlink) return String(v.hyperlink);
+  return '';
 }
 
-function cellText(value) {
-  if (value == null) return '';
-  if (typeof value === 'object') {
-    if (Array.isArray(value.richText)) return value.richText.map((x) => x.text || '').join('');
-    if (value.text != null) return String(value.text);
-    if (value.result != null) return String(value.result);
-    if (value.hyperlink) return String(value.text || value.hyperlink);
-  }
-  return String(value);
-}
-
-function textHtml(value) {
-  const text = cellText(value).trim().slice(0, 200000);
+/** 줄바꿈이 있는 평문을 보고서 본문 HTML 로 (한 줄 = 한 단락) */
+function textToHtml(v) {
+  const text = cellText(v).replace(/\r\n?/g, '\n').trim();
   if (!text) return '';
-  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return sanitizeHtml(escaped.replace(/\r?\n/g, '<br>'));
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const html = text.split('\n')
+    .map((line) => `<div>${esc(line) || '<br>'}</div>`)
+    .join('');
+  return sanitizeHtml(html);
 }
 
-function parseStatus(value) {
-  const s = cellText(value).trim().toUpperCase().replace(/\s+/g, '');
-  return ['SUBMITTED', '제출', '제출완료', '완료'].includes(s) ? 'SUBMITTED' : 'DRAFT';
-}
-
-async function parseWorkbook(buffer) {
-  const book = new ExcelJS.Workbook();
-  await book.xlsx.load(buffer);
-  const sheet = book.getWorksheet('주간보고') || book.worksheets.find((s) => s.state === 'visible');
-  if (!sheet) throw new Error('읽을 수 있는 시트가 없습니다.');
-
-  const headers = {};
-  sheet.getRow(1).eachCell((cell, col) => { headers[cellText(cell.value).trim()] = col; });
-  const required = ['① 당초 계획', '② 추진 실적', '③ 향후 계획'];
-  const missing = required.filter((h) => !headers[h]);
-  if (missing.length) throw new Error(`필수 열이 없습니다: ${missing.join(', ')}`);
-  const endDateColumn = headers['주차 종료일(자동입력)'] || headers['주차 종료일'];
-
-  const grouped = new Map();
-  const errors = [];
-  let itemCount = 0;
-  for (let rowNo = 2; rowNo <= sheet.rowCount; rowNo++) {
-    const row = sheet.getRow(rowNo);
-    if (headers['양식구분'] && cellText(row.getCell(headers['양식구분']).value).trim() === 'EXAMPLE') continue;
-    const weekLabel = headers['주차'] ? cellText(row.getCell(headers['주차']).value).trim() : '';
-    const startRaw = headers['주차 시작일'] ? row.getCell(headers['주차 시작일']).value : null;
-    const endRaw = endDateColumn ? row.getCell(endDateColumn).value : null;
-    const plan = textHtml(row.getCell(headers['① 당초 계획']).value);
-    const result = textHtml(row.getCell(headers['② 추진 실적']).value);
-    const next = textHtml(row.getCell(headers['③ 향후 계획']).value);
-    // 양식에는 모든 대상 주차의 날짜가 미리 들어 있다. 내용이 없는 주차는 건너뛴다.
-    if (!plan && !result && !next) continue;
-
-    const startDate = isoDate(startRaw);
-    const endDate = isoDate(endRaw);
-    if (!weekLabel && !startDate) {
-      errors.push({ row: rowNo, message: '주차 시작일을 선택하세요.' });
-      continue;
-    }
-    const key = weekLabel || `${startDate}:${endDate}`;
-    if (!grouped.has(key)) grouped.set(key, {
-      week_label_input: weekLabel, start_date: startDate, end_date: endDate,
-      statuses: new Set(), items: [],
-    });
-    const group = grouped.get(key);
-    group.statuses.add(parseStatus(headers['저장상태'] ? row.getCell(headers['저장상태']).value : ''));
-    group.items.push({ plan_html: plan, result_html: result, next_plan_html: next });
-    itemCount++;
-    if (itemCount > 1000) throw new Error('한 파일에서 최대 1,000개 업무 행까지 등록할 수 있습니다.');
-  }
-  if (!grouped.size && !errors.length) throw new Error('등록할 내용이 없습니다.');
-  if (grouped.size > 52) throw new Error('한 파일에서 최대 52개 주차까지 등록할 수 있습니다.');
-  return { groups: [...grouped.values()], errors };
-}
-
-async function enrichGroups(parsed, user) {
-  const groups = [];
-  for (const g of parsed.groups) {
-    const { rows } = await db.query(
-      `SELECT w.id AS week_id, w.label, w.start_date, w.end_date, w.is_open,
-              r.id AS report_id, r.status AS existing_status,
-              (SELECT count(*)::int FROM wr.report_items i WHERE i.report_id = r.id) AS existing_items
-         FROM wr.report_weeks w
-         LEFT JOIN wr.reports r ON r.week_id = w.id AND r.author_id = $3
-        WHERE (($1::text <> '' AND w.label = $1)
-           OR  ($1::text = '' AND w.start_date = $2::date
-                AND ($4::date IS NULL OR w.end_date = $4::date)))`,
-      [g.week_label_input || '', g.start_date, user.id, g.end_date]
-    );
-    const match = rows[0];
-    if (!match) {
-      groups.push({ ...g, statuses: undefined, status: [...g.statuses][0] || 'DRAFT', valid: false, error: '등록된 주차와 일치하지 않습니다.' });
-      continue;
-    }
-    const mixed = g.statuses.size > 1;
-    groups.push({
-      start_date: match.start_date || g.start_date, end_date: match.end_date || g.end_date, week_id: match.week_id,
-      week_label: match.label, is_open: match.is_open, report_id: match.report_id,
-      existing_status: match.existing_status, existing_items: match.existing_items || 0,
-      status: mixed ? 'DRAFT' : ([...g.statuses][0] || 'DRAFT'), items: g.items,
-      valid: Boolean(match.is_open || user.role === 'ADMIN'),
-      error: (!match.is_open && user.role !== 'ADMIN') ? '마감된 주차입니다.' : (mixed ? '행별 저장상태가 달라 임시저장으로 처리됩니다.' : null),
-    });
-  }
-  return { groups, errors: parsed.errors };
-}
-
+// ---------------------------------------------------------------------
+// GET /api/reports/excel/template  — 입력 양식 내려받기 (3열)
+// ---------------------------------------------------------------------
 router.get('/template', async (req, res, next) => {
   try {
-    // 과거 주차를 포함한 전체 주차 목록. 날짜는 DB 주차 마스터를 단일 기준으로 사용한다.
-    const { rows: weeks } = await db.query(
-      `SELECT id, week_no, label, start_date, end_date, is_open
-         FROM wr.report_weeks
-        ORDER BY start_date`
-    );
     const book = new ExcelJS.Workbook();
     book.creator = '주간실적 보고 시스템';
-    book.calcProperties.fullCalcOnLoad = true;
-    book.calcProperties.forceFullCalc = true;
-    book.calcProperties.calcMode = 'auto';
-    const guide = book.addWorksheet('작성안내');
-    guide.addRows([
-      ['주간보고 엑셀 일괄등록 안내'],
-      ['1. 주차 시작일 칸의 드롭다운에서 날짜를 선택하면 종료일이 DB 기준으로 자동 세팅됩니다.'],
-      ['2. 작성하려는 주차의 계획·실적·향후계획만 입력하세요. 내용이 없는 행은 자동으로 무시됩니다.'],
-      ['3. 여러 주차를 한 파일에 작성하여 한꺼번에 등록할 수 있습니다.'],
-      ['4. 한 셀 안에서 Alt+Enter로 줄을 나누어 여러 업무를 작성할 수 있습니다.'],
-      ['5. 저장상태는 임시저장 또는 제출완료로 선택합니다. 비우면 임시저장입니다.'],
-      ['6. 기존 보고서가 있으면 업로드 미리보기에서 건너뛰기/교체를 선택합니다.'],
-    ]);
-    guide.getColumn(1).width = 90;
-    guide.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FF1F5FA9' } };
-
-    const lookup = book.addWorksheet('주차목록');
-    lookup.state = 'veryHidden';
-    lookup.addRow(['시작일', '종료일', '주차', '마감여부']);
-    for (const w of weeks) {
-      const row = lookup.addRow([
-        w.start_date, w.end_date,
-        w.label, w.is_open ? '작성가능' : '마감',
-      ]);
-    }
-    if (weeks.length) {
-      book.definedNames.add(`'주차목록'!$A$2:$A$${weeks.length + 1}`, '주차선택목록');
-    }
 
     const sheet = book.addWorksheet('주간보고');
-    sheet.columns = [
-      { header: '주차 시작일', key: 'start', width: 16 },
-      { header: '주차 종료일(자동입력)', key: 'end', width: 23 },
-      { header: '① 당초 계획', key: 'plan', width: 48 },
-      { header: '② 추진 실적', key: 'result', width: 48 },
-      { header: '③ 향후 계획', key: 'next', width: 48 },
-      { header: '저장상태', key: 'status', width: 14 },
-    ];
+    sheet.columns = COLUMNS;
     sheet.views = [{ state: 'frozen', ySplit: 1 }];
-    sheet.autoFilter = 'A1:F1';
-    sheet.getRow(1).height = 28;
-    sheet.getRow(1).eachCell((cell) => {
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+    const head = sheet.getRow(1);
+    head.height = 26;
+    head.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F5FA9' } };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FF999999' } } };
     });
-    // 주간보고 시트 첫 행에 작성예시를 직접 제공하며, 사용자가 바로 수정해 등록할 수 있다.
-    const sampleWeek = weeks.find((w) => w.start_date <= new Date().toISOString().slice(0, 10)
-      && new Date().toISOString().slice(0, 10) <= w.end_date) || weeks[0];
-    sheet.addRow({
-      start: sampleWeek?.start_date || '2026-08-13', end: sampleWeek?.end_date || '2026-08-19',
-      plan: '3. 온톨로지 기반 규제 지식체계 설계 및 데이터 구조\n■ 규제 도메인 구조 설계(~9/30)\n■ 온톨로지 모델 설계(~9/30)\n■ 지식-Rule 연계 설계(~9/30)',
-      result: '3. 온톨로지 기반 규제 지식체계 설계 및 데이터 구조\n■ 온톨로지 모델 설계\n- 용도지역지구별 관련법령 수집\n- 수집 법령의 관계 구성 및 추가\n■ 지식-Rule 연계 설계\n- Rule engine 적용 항목 분류',
-      next: '3. 온톨로지 기반 규제 지식체계 설계 및 데이터 구조\n■ 규제 도메인 구조 설계 계속\n■ 온톨로지 모델 보완\n■ 지식-Rule 연계 설계 계속',
-      status: '임시저장',
-    });
-    sheet.getRow(2).height = 125;
 
-    // 예시 행을 포함해 200개 입력 행 제공
-    for (let r = 2; r <= 201; r++) {
-      sheet.getCell(`A${r}`).dataValidation = {
-        type: 'list', allowBlank: true, formulae: ['주차선택목록'],
-        showErrorMessage: true, errorTitle: '시작일 선택 오류', error: '목록에서 주차 시작일을 선택하세요.',
-      };
-      const endFormula = `IFERROR(VLOOKUP(A${r},'주차목록'!$A$2:$B$${weeks.length + 1},2,FALSE),"")`;
-      sheet.getCell(`B${r}`).value = r === 2 && sampleWeek
-        ? { formula: endFormula, result: sampleWeek.end_date }
-        : { formula: endFormula };
-      sheet.getCell(`F${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['"임시저장,제출완료"'] };
-      for (let c = 3; c <= 5; c++) {
-        sheet.getCell(r, c).alignment = { wrapText: true, vertical: 'top' };
+    // 1행: 바로 고쳐 쓸 수 있는 작성 예시
+    const sample = sheet.addRow(SAMPLE);
+    sample.height = 120;
+
+    // 입력 행 100개에 서식 지정 (줄바꿈 표시 + 위쪽 정렬)
+    for (let r = 2; r <= 101; r++) {
+      const row = sheet.getRow(r);
+      if (r > 2) row.height = 90;
+      for (let c = 1; c <= COLUMNS.length; c++) {
+        row.getCell(c).alignment = { wrapText: true, vertical: 'top' };
+        row.getCell(c).border = {
+          top: { style: 'hair', color: { argb: 'FFCCCCCC' } },
+          bottom: { style: 'hair', color: { argb: 'FFCCCCCC' } },
+          left: { style: 'hair', color: { argb: 'FFCCCCCC' } },
+          right: { style: 'hair', color: { argb: 'FFCCCCCC' } },
+        };
       }
     }
 
-    for (const target of [sheet]) {
-      target.getRow(1).height = 28;
-      target.getRow(1).eachCell((cell) => {
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F5FA9' } };
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      });
-      target.eachRow((row, rowNo) => {
-        if (rowNo > 1) row.eachCell((cell) => { cell.alignment = { ...cell.alignment, wrapText: true, vertical: 'top' }; });
-      });
-    }
-    const buffer = await book.xlsx.writeBuffer();
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="weekly-report-template.xlsx"`);
-    res.send(Buffer.from(buffer));
+    const guide = book.addWorksheet('작성안내');
+    guide.columns = [{ width: 100 }];
+    [
+      '■ 주간보고 Excel 양식 안내',
+      '',
+      '1. [주간보고] 시트의 세 칸만 채우면 됩니다.',
+      '     ① 당초 계획   ② 추진 실적   ③ 향후 계획',
+      '',
+      '2. 보고 주차는 엑셀에 적지 않습니다.',
+      '     웹 화면에서 [보고 주차] 를 고른 뒤 [Excel 일괄등록] 을 누르면',
+      '     그 주차의 보고서로 바로 등록됩니다.',
+      '',
+      '3. 한 행이 보고서의 한 항목(순번 1, 2, 3 …) 이 됩니다.',
+      '     셀 안에서 줄을 바꾸려면 Alt + Enter 를 사용하세요. 줄바꿈은 그대로 반영됩니다.',
+      '',
+      '4. 세 칸이 모두 빈 행은 건너뜁니다.',
+      '',
+      '5. 1행의 예시는 지우고 쓰시거나, 내용만 고쳐서 쓰셔도 됩니다.',
+      '',
+      '※ 등록하면 해당 주차에 이미 있던 내용은 Excel 내용으로 교체됩니다.',
+    ].forEach((line) => {
+      const row = guide.addRow([line]);
+      if (line.startsWith('■')) row.getCell(1).font = { bold: true, size: 12 };
+      if (line.startsWith('※')) row.getCell(1).font = { color: { argb: 'FFC0392B' }, bold: true };
+    });
+
+    const buf = await book.xlsx.writeBuffer();
+    res.setHeader('Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition',
+      `attachment; filename="weekly-report-template.xlsx"; filename*=UTF-8''${encodeURIComponent('주간보고_양식.xlsx')}`);
+    res.end(Buffer.from(buf));
   } catch (err) { next(err); }
 });
 
-router.post('/preview', (req, res, next) => {
+// ---------------------------------------------------------------------
+// 업로드된 통합문서에서 항목 배열을 뽑아낸다
+// ---------------------------------------------------------------------
+async function parseItems(buffer) {
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(buffer);
+
+  const sheet = book.getWorksheet('주간보고') || book.worksheets[0];
+  if (!sheet) throw new Error('시트를 찾을 수 없습니다.');
+
+  // 헤더 행에서 세 칸의 열 번호를 찾는다 (열 순서가 바뀌어도 동작)
+  const idx = { plan: 0, result: 0, next: 0 };
+  sheet.getRow(1).eachCell((cell, col) => {
+    const t = cellText(cell.value).replace(/\s/g, '');
+    if (t.includes('당초계획')) idx.plan = col;
+    else if (t.includes('추진실적')) idx.result = col;
+    else if (t.includes('향후계획')) idx.next = col;
+  });
+  if (!idx.plan && !idx.result && !idx.next) {
+    // 헤더가 없으면 A·B·C 열로 간주
+    idx.plan = 1; idx.result = 2; idx.next = 3;
+  }
+
+  const items = [];
+  sheet.eachRow((row, n) => {
+    if (n === 1) return;                       // 헤더
+    if (items.length >= 100) return;
+    const plan   = idx.plan   ? textToHtml(row.getCell(idx.plan).value)   : '';
+    const result = idx.result ? textToHtml(row.getCell(idx.result).value) : '';
+    const next   = idx.next   ? textToHtml(row.getCell(idx.next).value)   : '';
+    if (!plan && !result && !next) return;     // 빈 행은 건너뛴다
+    items.push({ plan_html: plan, result_html: result, next_plan_html: next });
+  });
+  return items;
+}
+
+// ---------------------------------------------------------------------
+// POST /api/reports/excel/import  — 선택한 주차에 바로 등록
+//   multipart: file, week_id
+// ---------------------------------------------------------------------
+router.post('/import', (req, res, next) => {
   upload.single('file')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'Excel 파일을 선택하세요.' });
+
     try {
-      const parsed = await parseWorkbook(req.file.buffer);
-      const preview = await enrichGroups(parsed, req.user);
-      await audit.log(req, 'EXCEL_PREVIEW', { detail: `${req.file.originalname} / ${preview.groups.length}주차` });
-      res.json(preview);
-    } catch (e) { res.status(400).json({ error: e.message || 'Excel 파일을 읽을 수 없습니다.' }); }
+      const weekId = Number(req.body?.week_id);
+      if (!weekId) return res.status(400).json({ error: '보고 주차를 먼저 선택하세요.' });
+      if (!req.user.org_id) {
+        return res.status(400).json({ error: '소속 기관이 없습니다. 내 정보에서 소속을 지정하세요.' });
+      }
+
+      const { rows: wk } = await db.query(
+        `SELECT id, label, is_open FROM wr.report_weeks WHERE id = $1`, [weekId]
+      );
+      if (!wk[0]) return res.status(400).json({ error: '존재하지 않는 주차입니다.' });
+      if (!wk[0].is_open && req.user.role !== 'ADMIN') {
+        return res.status(403).json({ error: '마감된 주차입니다. 관리자에게 문의하세요.' });
+      }
+
+      const items = await parseItems(req.file.buffer);
+      if (!items.length) {
+        return res.status(400).json({ error: '등록할 내용이 없습니다. 세 칸 중 하나 이상을 채워주세요.' });
+      }
+
+      const reportId = await db.tx(async (client) => {
+        const { rows } = await client.query(
+          `INSERT INTO wr.reports (week_id, org_id, author_id, status)
+           VALUES ($1, $2, $3, 'SUBMITTED')
+           ON CONFLICT (week_id, author_id) WHERE author_id IS NOT NULL DO UPDATE
+              SET org_id = EXCLUDED.org_id, status = 'SUBMITTED',
+                  submitted_at = COALESCE(reports.submitted_at, now())
+           RETURNING id`,
+          [weekId, req.user.org_id, req.user.id]
+        );
+        const id = rows[0].id;
+
+        // 해당 주차 내용은 Excel 내용으로 교체한다
+        await client.query(`UPDATE wr.attachments SET item_id = NULL WHERE report_id = $1`, [id]);
+        await client.query(`DELETE FROM wr.report_items WHERE report_id = $1`, [id]);
+
+        for (let i = 0; i < items.length; i++) {
+          await client.query(
+            `INSERT INTO wr.report_items
+               (report_id, sort_order, task_title, plan_html, result_html, next_plan_html)
+             VALUES ($1, $2, '', $3, $4, $5)`,
+            [id, i, items[i].plan_html, items[i].result_html, items[i].next_plan_html]
+          );
+        }
+        return id;
+      });
+
+      await audit.log(req, 'EXCEL_IMPORT', {
+        targetType: 'report', targetId: reportId,
+        detail: `${req.file.originalname} → ${wk[0].label} / ${items.length}건`,
+      });
+
+      res.json({
+        ok: true, report_id: reportId, week_label: wk[0].label, count: items.length,
+        message: `${wk[0].label} 에 ${items.length}건이 등록되었습니다.`,
+      });
+    } catch (e) {
+      res.status(400).json({ error: e.message || 'Excel 파일을 읽을 수 없습니다.' });
+    }
   });
 });
 
-router.post('/commit', async (req, res, next) => {
-  try {
-    if (!req.user.org_id) return res.status(400).json({ error: '소속 기관이 없습니다.' });
-    const mode = req.body?.mode === 'replace' ? 'replace' : 'skip';
-    const rawGroups = Array.isArray(req.body?.groups) ? req.body.groups.slice(0, 52) : [];
-    if (!rawGroups.length) return res.status(400).json({ error: '저장할 주차가 없습니다.' });
-
-    const parsed = { errors: [], groups: rawGroups.map((g) => ({
-      start_date: isoDate(g.start_date), end_date: isoDate(g.end_date),
-      statuses: new Set([g.status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT']),
-      items: Array.isArray(g.items) ? g.items.slice(0, 100).map((it) => ({
-        plan_html: sanitizeHtml(it.plan_html), result_html: sanitizeHtml(it.result_html),
-        next_plan_html: sanitizeHtml(it.next_plan_html),
-      })).filter((it) => it.plan_html || it.result_html || it.next_plan_html) : [],
-    })) };
-    if (parsed.groups.some((g) => !g.start_date || !g.end_date || !g.items.length)) {
-      return res.status(400).json({ error: '주차 또는 업무 내용이 올바르지 않습니다. 다시 미리보기 하세요.' });
-    }
-    const checked = await enrichGroups(parsed, req.user);
-    const invalid = checked.groups.filter((g) => !g.valid);
-    if (invalid.length) return res.status(400).json({ error: invalid.map((g) => `${g.start_date}: ${g.error}`).join('\n') });
-
-    const result = await db.tx(async (client) => {
-      const saved = []; const skipped = [];
-      for (const g of checked.groups) {
-        if (g.report_id && mode === 'skip') { skipped.push(g.week_label); continue; }
-        const { rows } = await client.query(
-          `INSERT INTO wr.reports (week_id, org_id, author_id, status, submitted_at)
-           VALUES ($1,$2,$3,$4::varchar,CASE WHEN $4::varchar='SUBMITTED' THEN now() ELSE NULL END)
-           ON CONFLICT (week_id, author_id) WHERE author_id IS NOT NULL DO UPDATE
-              SET org_id=EXCLUDED.org_id, status=EXCLUDED.status,
-                  submitted_at=CASE WHEN EXCLUDED.status='SUBMITTED' THEN now() ELSE NULL END
-           RETURNING id`,
-          [g.week_id, req.user.org_id, req.user.id, g.status]
-        );
-        const reportId = rows[0].id;
-        if (g.report_id && mode === 'replace') {
-          await client.query(`UPDATE wr.attachments SET item_id=NULL WHERE report_id=$1`, [reportId]);
-          await client.query(`DELETE FROM wr.report_items WHERE report_id=$1`, [reportId]);
-        }
-        for (let i = 0; i < g.items.length; i++) {
-          const it = g.items[i];
-          await client.query(
-            `INSERT INTO wr.report_items (report_id,sort_order,task_title,plan_html,result_html,next_plan_html)
-             VALUES ($1,$2,'',$3,$4,$5)`, [reportId, i, it.plan_html, it.result_html, it.next_plan_html]
-          );
-        }
-        saved.push({ week_id: g.week_id, week_label: g.week_label, report_id: reportId, items: g.items.length });
-      }
-      return { saved, skipped };
-    });
-    await audit.log(req, 'EXCEL_IMPORT', { detail: `저장 ${result.saved.length}주차 / 건너뜀 ${result.skipped.length}주차 / mode=${mode}` });
-    res.json(result);
-  } catch (err) { next(err); }
-});
-
 module.exports = router;
-// 컨테이너 빌드 검증에서 실제 DB/세션을 변경하지 않고 파서만 시험한다.
-module.exports._test = { parseWorkbook, enrichGroups, isoDate, cellText, textHtml, parseStatus };

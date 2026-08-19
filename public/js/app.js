@@ -226,13 +226,9 @@
 
     // 버튼 활성/비활성
     $('#btn-add-row').disabled = readOnly;
-    $('#btn-copy-prev').disabled = readOnly;
     $('#btn-save').disabled = readOnly;
-    $('#btn-submit').disabled = readOnly;
-    $('#btn-delete').disabled = readOnly || !report;
     $('#btn-print').disabled = !report;
     $('#btn-export').disabled = !report;
-    $('#btn-submit').textContent = report && report.status === 'SUBMITTED' ? '제출 내용 갱신' : '제출하기';
   }
 
   // ==================================================================
@@ -265,9 +261,7 @@
       <td><div class="ed-result"></div></td>
       <td><div class="ed-next"></div></td>
       <td class="cell-act">
-        <button class="btn sm danger btn-del-row" type="button">삭제</button>
-        <button class="btn sm btn-up" type="button">▲</button>
-        <button class="btn sm btn-down" type="button">▼</button>
+        <button class="btn sm danger icon btn-del-row" type="button" title="이 항목 삭제">－</button>
       </td>`;
     tbody.appendChild(tr);
 
@@ -295,36 +289,16 @@
       tr.querySelector('.cell-act').innerHTML = '<span class="muted small">-</span>';
     } else {
       tr.querySelector('.btn-del-row').onclick = () => {
-        if (state.rows.length === 1) { toast('최소 1개의 업무가 필요합니다.', true); return; }
-        if (!confirm('이 업무 행을 삭제할까요?\n(저장해야 실제로 반영됩니다)')) return;
+        if (state.rows.length === 1) { toast('최소 1개의 항목이 필요합니다.', true); return; }
         state.rows = state.rows.filter((r) => r !== row);
         tr.remove();
         state.dirty = true;
         renumber();
       };
-      tr.querySelector('.btn-up').onclick = () => moveRow(row, -1);
-      tr.querySelector('.btn-down').onclick = () => moveRow(row, 1);
     }
 
     renumber();
     return row;
-  }
-
-  function moveRow(row, delta) {
-    const i = state.rows.indexOf(row);
-    const j = i + delta;
-    if (j < 0 || j >= state.rows.length) return;
-
-    // 에디터 DOM 을 옮기면 내용이 유지되므로 HTML 을 주고받는다
-    const other = state.rows[j];
-    const swap = (a, b) => {
-      const p1 = a.planEd.getHtml(), r1 = a.resultEd.getHtml(), n1 = a.nextEd.getHtml(), id1 = a.itemId;
-      a.planEd.setHtml(b.planEd.getHtml()); a.resultEd.setHtml(b.resultEd.getHtml());
-      a.nextEd.setHtml(b.nextEd.getHtml()); a.itemId = b.itemId;
-      b.planEd.setHtml(p1); b.resultEd.setHtml(r1); b.nextEd.setHtml(n1); b.itemId = id1;
-    };
-    swap(row, other);
-    state.dirty = true;
   }
 
   function renumber() {
@@ -348,142 +322,64 @@
     $('#sel-week').onchange = () => $('#btn-load').click();
     $('#sel-org').onchange = () => $('#btn-load').click();
     $('#btn-add-row').onclick = () => { addRow(null, false); state.dirty = true; };
-    $('#btn-copy-prev').onclick = copyFromPreviousWeek;
   }
 
   // ==================================================================
-  // Excel 여러 주차 일괄등록
+  // ==================================================================
+  // Excel 일괄등록 — 화면에서 고른 주차로 바로 등록된다
   // ==================================================================
   function bindExcelImport() {
     $('#btn-excel-template').onclick = () => {
       location.href = '/api/reports/excel/template';
     };
-    $('#btn-excel-import').onclick = () => $('#excel-file-input').click();
+    $('#btn-excel-import').onclick = () => {
+      if (!Number($('#sel-week').value)) { toast('보고 주차를 먼저 선택하세요.', true); return; }
+      $('#excel-file-input').click();
+    };
     $('#excel-file-input').onchange = async (e) => {
       const file = e.target.files && e.target.files[0];
       e.target.value = '';
       if (!file) return;
+
+      const weekId = Number($('#sel-week').value);
+      const weekLabel = $('#sel-week').selectedOptions[0]?.textContent.trim() || '';
+      if (!weekId) { toast('보고 주차를 먼저 선택하세요.', true); return; }
+
+      const msg = state.report
+        ? `"${weekLabel}" 에 이미 등록된 보고서가 있습니다.\n\n`
+          + `Excel 내용으로 교체됩니다. 계속할까요?`
+        : `"${weekLabel}" 보고서로 등록합니다.\n계속할까요?`;
+      if (!confirm(msg)) return;
+
       const form = new FormData();
       form.append('file', file);
-      try {
-        toast('Excel 파일을 분석하고 있습니다.');
-        const preview = await api.post('/api/reports/excel/preview', form);
-        openExcelPreview(preview, file.name);
-      } catch (err) { toast(err.message, true); }
-    };
-  }
+      form.append('week_id', String(weekId));
 
-  function openExcelPreview(preview, fileName) {
-    const groups = preview.groups || [];
-    const errors = preview.errors || [];
-    const validCount = groups.filter((g) => g.valid).length;
-    const existingCount = groups.filter((g) => g.report_id).length;
-    const rows = groups.map((g) => `
-      <tr>
-        <td>${esc(g.week_label || `${g.start_date}~${g.end_date}`)}</td>
-        <td class="center">${g.items.length}</td>
-        <td class="center">${g.status === 'SUBMITTED' ? '제출완료' : '임시저장'}</td>
-        <td class="center">${g.report_id ? `기존 ${g.existing_items}건` : '신규'}</td>
-        <td>${g.valid ? (g.error ? `<span class="warn-text">${esc(g.error)}</span>` : '등록 가능') : `<span class="danger-text">${esc(g.error || '등록 불가')}</span>`}</td>
-      </tr>`).join('');
-    const errorRows = errors.map((e) => `<li>${e.row}행: ${esc(e.message)}</li>`).join('');
-
-    const back = document.createElement('div');
-    back.className = 'modal-back';
-    back.innerHTML = `
-      <div class="modal" style="max-width:900px">
-        <header>Excel 일괄등록 미리보기</header>
-        <div class="body">
-          <p><b>${esc(fileName)}</b> · ${groups.length}개 주차 · 등록 가능 ${validCount}개${existingCount ? ` · 기존 보고서 ${existingCount}개` : ''}</p>
-          ${errors.length ? `<div class="alert error"><b>제외된 행 ${errors.length}건</b><ul class="compact-list">${errorRows}</ul></div>` : ''}
-          <div class="table-scroll">
-            <table class="grid">
-              <thead><tr><th>주차</th><th class="center">업무</th><th class="center">상태</th><th class="center">구분</th><th>검증</th></tr></thead>
-              <tbody>${rows || '<tr><td colspan="5" class="empty">등록 가능한 내용이 없습니다.</td></tr>'}</tbody>
-            </table>
-          </div>
-          <label class="field mt16"><span>기존 보고서 처리</span>
-            <select id="xl-mode">
-              <option value="replace" selected>기존 계획·실적을 Excel 내용으로 교체</option>
-              <option value="skip">기존 보고서는 건너뛰기</option>
-            </select>
-          </label>
-          <div class="alert info">저장 전 검증 결과입니다. 교체를 선택해도 기존 첨부파일은 삭제되지 않고 보고서에 유지됩니다.</div>
-          <div class="alert error hidden" id="xl-error"></div>
-        </div>
-        <footer>
-          <button class="btn" id="xl-cancel">취소</button>
-          <button class="btn primary" id="xl-save" ${validCount ? '' : 'disabled'}>일괄 저장</button>
-        </footer>
-      </div>`;
-    document.body.appendChild(back);
-    const close = () => back.remove();
-    back.querySelector('#xl-cancel').onclick = close;
-    back.addEventListener('click', (e) => { if (e.target === back) close(); });
-    back.querySelector('#xl-save').onclick = async () => {
-      const button = back.querySelector('#xl-save');
-      const mode = back.querySelector('#xl-mode').value;
-      if (mode === 'replace' && !confirm('기존 보고서의 계획·실적을 Excel 내용으로 교체합니다. 계속할까요?')) return;
-      button.disabled = true;
+      const btn = $('#btn-excel-import');
+      btn.disabled = true;
+      btn.textContent = '등록 중...';
       try {
-        const result = await api.post('/api/reports/excel/commit', {
-          mode,
-          groups: groups.filter((g) => g.valid).map((g) => ({
-            start_date: g.start_date, end_date: g.end_date, status: g.status, items: g.items,
-          })),
-        });
-        close();
-        toast(`${result.saved.length}개 주차 저장, ${result.skipped.length}개 주차 건너뜀`);
-        await loadCurrent();
+        const res = await api.post('/api/reports/excel/import', form);
+        state.dirty = false;
+        await loadCurrent();                 // 등록된 내용을 화면에 바로 반영
+        toast(res.message);
       } catch (err) {
-        button.disabled = false;
-        const el = back.querySelector('#xl-error');
-        el.textContent = err.message; el.classList.remove('hidden');
+        toast(err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Excel 일괄등록';
       }
     };
   }
 
-  async function copyFromPreviousWeek() {
-    const weekId = Number($('#sel-week').value);
-    const orgId = Number($('#sel-org').value);
-    const idx = state.weeks.findIndex((w) => w.id === weekId);
-    const prev = state.weeks[idx + 1];      // weeks 는 최신순 정렬
-    if (!prev) { toast('직전 주차 정보가 없습니다.', true); return; }
-
-    try {
-      const res = await api.get(`/api/reports/lookup?week_id=${prev.id}&org_id=${orgId}`);
-      if (!res.report || !res.report.items.length) {
-        toast(`직전 주차(${prev.label})에 등록된 보고서가 없습니다.`, true);
-        return;
-      }
-      if (!confirm(`직전 주차(${prev.label})의 [향후 계획]을 이번 주 [당초 계획]으로 가져옵니다.\n현재 작성 중인 내용은 대체됩니다. 계속할까요?`)) return;
-
-      // 새 행으로 복사 (id 는 비워서 새 항목으로 저장되게)
-      // 지난주 "향후 계획" 이 이번 주 "당초 계획" 이 된다 (없으면 지난주 계획을 그대로)
-      const copied = res.report.items.map((it) => ({
-        id: null,
-        plan_html: it.next_plan_html || it.plan_html,
-        result_html: '',
-        next_plan_html: '',
-      }));
-      renderItems(copied, false);
-      state.dirty = true;
-      toast(`${copied.length}개 항목을 가져왔습니다. 실적을 입력하세요.`);
-    } catch (e) { toast(e.message, true); }
-  }
 
   // ==================================================================
   // 저장 / 삭제
   // ==================================================================
   function bindSaveButtons() {
-    $('#btn-save').onclick = () => save('DRAFT');
-    $('#btn-submit').onclick = () => {
+    $('#btn-save').onclick = () => {
       const items = collectItems();
       if (!items.length) { toast('내용을 하나 이상 입력하세요.', true); return; }
-      const stripTags = (h) => String(h || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
-      const noResult = items.filter((it) => !stripTags(it.result_html));
-      if (noResult.length && !confirm('추진 실적이 비어 있는 항목이 있습니다. 그래도 제출할까요?')) return;
-      if (!confirm('제출하시겠습니까?\n제출 후에도 마감 전까지는 수정할 수 있습니다.')) return;
       save('SUBMITTED');
     };
     $('#btn-print').onclick = () => {
@@ -494,16 +390,6 @@
       if (!state.report) return;
       downloadReport(state.report.id);
     };
-    $('#btn-delete').onclick = async () => {
-      if (!state.report) return;
-      if (!confirm('이 주간보고를 삭제합니다.\n등록된 항목과 첨부파일도 함께 삭제되며 되돌릴 수 없습니다. 계속할까요?')) return;
-      try {
-        await api.del(`/api/reports/${state.report.id}`);
-        toast('삭제되었습니다.');
-        state.dirty = false;
-        await loadCurrent();
-      } catch (e) { toast(e.message, true); }
-    };
   }
 
   /** @returns {Promise<object|null>} 저장된 report */
@@ -512,7 +398,7 @@
     const orgId = Number($('#sel-org').value);
     const payload = { week_id: weekId, org_id: orgId, note: $('#note').value, status, items: collectItems() };
 
-    const btns = [$('#btn-save'), $('#btn-submit')];
+    const btns = [$('#btn-save')];
     btns.forEach((b) => { b.disabled = true; });
 
     try {
@@ -522,7 +408,7 @@
 
       state.dirty = false;
       applyReport(res.report, weekId, orgId);
-      if (!opts.silent) toast(status === 'SUBMITTED' ? '제출되었습니다.' : '임시저장되었습니다.');
+      if (!opts.silent) toast('저장되었습니다.');
       return res.report;
     } catch (e) {
       toast(e.message, true);
