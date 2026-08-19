@@ -363,11 +363,13 @@
       const weekLabel = $('#sel-week').selectedOptions[0]?.textContent.trim() || '';
       if (!weekId) { toast('보고 주차를 먼저 선택하세요.', true); return; }
 
-      const msg = state.report
-        ? `"${weekLabel}" 에 이미 등록된 보고서가 있습니다.\n\n`
-          + `Excel 내용으로 교체됩니다. 계속할까요?`
-        : `"${weekLabel}" 보고서로 등록합니다.\n계속할까요?`;
-      if (!confirm(msg)) return;
+      // 화면에 실제 작성된 내용이 있을 때만 덮어쓰기를 확인받는다.
+      // 비어 있으면(보고서 껍데기만 있어도) 그냥 등록한다.
+      const strip = (h) => String(h || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
+      const hasContent = collectItems()
+        .some((it) => strip(it.plan_html) || strip(it.result_html) || strip(it.next_plan_html));
+      if (hasContent
+          && !confirm(`"${weekLabel}" 에 주간보고 내용이 있습니다.\n\n덮어쓸까요?`)) return;
 
       const form = new FormData();
       form.append('file', file);
