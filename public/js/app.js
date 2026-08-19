@@ -291,19 +291,24 @@
 
     const onChange = () => { state.dirty = true; };
     const onFocus = (ed) => setActiveEditor(ed);
+    // Tab / Shift+Tab 으로도 들여쓰기·내어쓰기 (툴바 버튼과 같은 동작)
+    const onIndent = (ed, delta) => {
+      setActiveEditor(ed);
+      state.toolbar._indent(delta);
+    };
 
     // 세 칸 모두 같은 편집기를 사용한다 (위쪽 공용 툴바가 그대로 적용됨)
     const planEd = new window.WR.Editor(tr.querySelector('.ed-plan'), {
       html: item ? item.plan_html : '',
-      placeholder: '이번 주 계획을 입력하세요', readOnly, onChange, onFocus,
+      placeholder: '이번 주 계획을 입력하세요', readOnly, onChange, onFocus, onIndent,
     });
     const resultEd = new window.WR.Editor(tr.querySelector('.ed-result'), {
       html: item ? item.result_html : '',
-      placeholder: '실제 수행한 내용을 입력하세요', readOnly, onChange, onFocus,
+      placeholder: '실제 수행한 내용을 입력하세요', readOnly, onChange, onFocus, onIndent,
     });
     const nextEd = new window.WR.Editor(tr.querySelector('.ed-next'), {
       html: item ? (item.next_plan_html || '') : '',
-      placeholder: '다음 주 계획을 입력하세요', readOnly, onChange, onFocus,
+      placeholder: '다음 주 계획을 입력하세요', readOnly, onChange, onFocus, onIndent,
     });
 
     const row = { itemId: item ? item.id : null, tr, planEd, resultEd, nextEd };

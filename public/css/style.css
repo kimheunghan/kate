@@ -220,11 +220,10 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
   border-bottom: 1px solid var(--border);
 }
 
-/* 표 위에 하나만 두는 공용 툴바 (스크롤해도 따라옴) */
+/* 표 위 공용 툴바. 화면을 내려도 따라오지 않고 제자리에 둔다
+   (sticky 로 두면 상단바 밑에 달라붙어 내용을 가린다) */
 .editor-toolbar.shared {
-  position: sticky;
-  top: 52px;                 /* 상단바 높이만큼 */
-  z-index: 40;
+  position: static;
   gap: 3px;
   padding: 7px 12px;
   border-top: 1px solid var(--border);

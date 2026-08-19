@@ -232,7 +232,7 @@
       this.area.addEventListener('keydown', (e) => {
         if (e.key === 'Tab') {
           e.preventDefault();
-          this.exec(e.shiftKey ? 'outdent' : 'indent');
+          if (this.opts.onIndent) this.opts.onIndent(this, e.shiftKey ? -1 : 1);
         }
       });
     }
@@ -339,8 +339,8 @@
       this._sep();
 
       this._select(BULLETS, '글머리표 / 번호 매기기', (v) => v && this._applyBullet(v));
-      this._btn('내어쓰기', '◀', () => this._exec('outdent'));
-      this._btn('들여쓰기', '▶', () => this._exec('indent'));
+      this._btn('내어쓰기', '◀', () => this._indent(-1));
+      this._btn('들여쓰기', '▶', () => this._indent(1));
       this._sep();
 
       this._btn('인용', '❝', () => this._exec('formatBlock', 'blockquote'));
@@ -416,6 +416,81 @@
         fr.readAsDataURL(f);
       };
       input.click();
+    }
+
+    // ---------------- 들여쓰기 / 내어쓰기 ----------------
+    // execCommand('indent') 는 Chrome 에서 <blockquote> 를 만들어 인용문처럼 보이고,
+    // 엑셀에서 들어온 padding-left 들여쓰기는 outdent 로 되돌려지지 않는다.
+    // 그래서 선택된 줄의 여백을 직접 조절한다. (엑셀 등록과 같은 방식)
+    INDENT_STEP = 16;
+
+    /** 선택 영역에 걸친 최상위 블록들 (편집 영역의 직계 자식) */
+    _selectedBlocks(ed) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return [];
+      const range = sel.getRangeAt(0);
+
+      const topOf = (node) => {
+        let n = node;
+        if (n === ed.area) return null;
+        while (n && n.parentNode && n.parentNode !== ed.area) n = n.parentNode;
+        return n && n.parentNode === ed.area ? n : null;
+      };
+
+      let start = topOf(range.startContainer);
+      let end = topOf(range.endContainer) || start;
+      const kids = Array.from(ed.area.childNodes);
+
+      // 블록이 하나도 없으면(맨 텍스트) div 로 감싼다
+      if (!start) {
+        if (!ed.area.childNodes.length) return [];
+        const wrap = document.createElement('div');
+        while (ed.area.firstChild) wrap.appendChild(ed.area.firstChild);
+        ed.area.appendChild(wrap);
+        return [wrap];
+      }
+
+      let i = kids.indexOf(start);
+      let j = kids.indexOf(end);
+      if (i === -1) return [];
+      if (j === -1) j = i;
+
+      const out = [];
+      for (let k = Math.min(i, j); k <= Math.max(i, j); k++) {
+        const n = kids[k];
+        if (n.nodeType === 1) out.push(n);
+        else if (n.nodeType === 3 && n.textContent.trim()) {
+          const d = document.createElement('div');
+          n.parentNode.insertBefore(d, n);
+          d.appendChild(n);
+          out.push(d);
+        }
+      }
+      return out;
+    }
+
+    /** delta = +1 들여쓰기 / -1 내어쓰기 */
+    _indent(delta) {
+      const ed = this.getActive();
+      if (!ed || ed.readOnly) return;
+      ed.area.focus();
+      ed.restoreRange();
+
+      const blocks = this._selectedBlocks(ed);
+      if (!blocks.length) return;
+
+      blocks.forEach((el) => {
+        // 목록은 padding-left 가 글머리표 위치를 결정하므로 margin 으로 민다
+        const prop = (el.tagName === 'UL' || el.tagName === 'OL') ? 'marginLeft' : 'paddingLeft';
+        const cur = parseInt(el.style[prop], 10) || 0;
+        const next = Math.max(0, cur + delta * this.INDENT_STEP);
+        if (next) el.style[prop] = `${next}px`;
+        else el.style.removeProperty(prop === 'marginLeft' ? 'margin-left' : 'padding-left');
+        if (!el.getAttribute('style')) el.removeAttribute('style');
+      });
+
+      ed.saveRange();
+      ed.touch();
     }
 
     /** 선택 영역이 들어 있는 목록(UL/OL) 노드를 찾는다 */
