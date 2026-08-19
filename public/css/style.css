@@ -668,12 +668,13 @@ table.grid td.summary {
 }
 .search-bar .sb-field > select,
 .search-bar .sb-field > input {
-  height: 36px;
+  height: 34px;
 }
 .search-bar .sb-btn {
-  height: 36px;
+  height: 34px;
   flex: 0 0 auto;
-  padding: 0 22px;
+  padding: 0 18px;
+  font-size: 13px;
 }
 
 /* 추가/삭제 아이콘 버튼 (+ , －) */
@@ -685,3 +686,14 @@ table.grid td.summary {
   font-weight: 700;
   line-height: 1;
 }
+
+
+/* 작성 화면 상단 안내(등록된 보고서입니다 …) — 선택줄과 간격을 두고 높이는 낮게 */
+#write-status { margin-top: 12px; }
+#write-status .alert {
+  padding: 7px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 0;
+}
+#write-status .alert + .alert { margin-top: 6px; }
