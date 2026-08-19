@@ -7,6 +7,60 @@
 - 프론트엔드: **순수 HTML/CSS/JS** — 빌드 도구·CDN 의존 없음 (폐쇄망에서 그대로 동작)
 - 배포: **Podman 4.9+/5.x, podman-compose 또는 Docker Compose V2 호환 Compose Specification**
 
+
+## 시스템 아키텍처
+
+### 프론트엔드
+
+- 순수 HTML, CSS, JavaScript
+- React, Vue 같은 프레임워크는 사용하지 않음
+- Node.js 애플리케이션이 정적 파일로 제공
+- 화면: `public/app.html`
+- 동작: `public/js/app.js`
+- 디자인: `public/css/style.css`
+
+### 백엔드
+
+- Node.js 20 + Express 기반 REST API
+- 로그인·세션 인증, 보고서 CRUD, 관리자 기능, 첨부파일, Excel 일괄등록 처리
+- Excel 처리: ExcelJS
+- 파일 업로드: Multer
+
+### 데이터베이스
+
+- PostgreSQL 16
+- `wr` 스키마 사용
+- Node.js `pg` 드라이버로 연결
+
+### 컨테이너 배포
+
+- Podman/Docker Compose 호환 구성
+- 앱 컨테이너: `wr-app`
+- DB 컨테이너: `wr-db`
+- `wr-app`이 프론트엔드 정적 파일과 백엔드 REST API를 함께 서비스
+
+> 전체 구조: **순수 JavaScript 프론트엔드 + Node.js/Express 백엔드 + PostgreSQL**
+
+## 현재 운영 배포
+
+- APP: `192.168.200.115:16000` → `wr-app:8080`
+- RDB: `192.168.200.116:16432` → `wr-db:5432`
+- 내부 접속: `http://192.168.200.115:16000`
+- 외부 접속: **미설정** (공인 IP DNAT 및 인바운드 방화벽 설정 필요)
+- APP 경로: `/home/bi/weekly-report-gcp`
+- 첨부 경로: `/home/bi/weekly-report-gcp/uploads`
+- DB 경로: `/home/bi/weekly-report-db/data/pgdata`
+
+```bash
+# APP 상태 및 헬스체크
+podman ps --filter name=wr-app
+curl http://192.168.200.115:16000/api/health
+
+# APP 재기동
+cd /home/bi/weekly-report-gcp
+podman compose -f docker-compose.prod.yml up -d --no-build
+```
+
 ---
 
 ## 1. 서버 구성
@@ -15,16 +69,16 @@
 |---|---|---|---|---|
 | **RDB** | `192.168.200.116` | 16 Core | Rocky Linux (최신) | 5.8.2 |
 | **APP** (web/was) | `192.168.200.115` | 8 Core | Ubuntu 22.04 LTS | 4.9.3 |
-| 외부 접속 | `http://183.101.26.137:16080` | — | **개방 포트 16000~16999** · `.env` 의 `APP_PORT` 로 지정 | |
+| 외부 접속 | **미설정** | — | 공인 IP DNAT 및 인바운드 방화벽 구성 필요 | |
 
 ```
- 인터넷 ──▶ 183.101.26.137:16080        (개방 포트 16000~16999)
+ 외부 접속: 미설정 (공인 IP/DNAT/인바운드 방화벽 설정 필요)
                     │
                     ▼
         ┌───────────────────────┐         ┌──────────────────────┐
         │ APP  192.168.200.115  │ 16432   │ RDB  192.168.200.116 │
         │  wr-app (Node 20)     │────────▶│  wr-db (PostgreSQL16)│
-        │  볼륨: ./data/uploads │         │  볼륨: ./data/pgdata │
+        │  볼륨: ./uploads │         │  볼륨: ./data/pgdata │
         └───────────────────────┘         └──────────────────────┘
 ```
 
@@ -34,7 +88,7 @@
 >
 > | 용도 | 포트 | 비고 |
 > |---|---|---|
-> | 웹 서비스 (APP) | `16080` | `.env` 의 `APP_PORT` |
+> | 웹 서비스 (APP) | `16000` | `.env` 의 `APP_PORT` |
 > | PostgreSQL (RDB) | `16432` | `.env` 의 `DB_PORT`. 컨테이너 내부는 5432 그대로 |
 >
 > 포트를 바꾸려면 `.env` 값만 수정하면 되며, 코드 수정은 필요 없습니다.
@@ -171,13 +225,13 @@ vi .env
 `.env` 에서 다음 값을 채웁니다.
 
 ```ini
-APP_PORT=16080                      # ← 16000~16999 범위에서만 외부 접속 가능
+APP_PORT=16000                      # ← 16000~16999 범위에서만 외부 접속 가능
 DB_HOST=192.168.200.116
 DB_PORT=16432                       # ← RDB 가 호스트에 노출한 포트
 DB_PASSWORD=<DB 서버에서 생성된 값과 동일하게>
 SESSION_SECRET=<openssl rand -hex 32>
 ADMIN_PASSWORD=<초기 관리자 비밀번호>
-UPLOAD_HOST_DIR=/opt/weekly-report/uploads
+UPLOAD_HOST_DIR=./uploads
 ```
 
 ```bash
@@ -186,7 +240,9 @@ bash scripts/deploy.sh status
 bash scripts/deploy.sh logs
 ```
 
-접속: `http://192.168.200.115:16080` → 외부 `http://183.101.26.137:16080`
+내부 접속: `http://192.168.200.115:16000`
+
+외부 접속은 현재 설정되어 있지 않습니다. 공인 IP와 DNAT, 인바운드 방화벽 설정이 완료된 뒤 별도 URL을 문서에 반영합니다.
 
 ### 4-4. 포트가 확정되면
 
@@ -196,7 +252,7 @@ bash scripts/deploy.sh logs
 > 이 범위를 벗어난 포트로 띄우면 서버 안에서는 접속되지만 외부에서는 닿지 않습니다.
 
 ```bash
-sed -i 's/^APP_PORT=.*/APP_PORT=16080/' .env
+sed -i 's/^APP_PORT=.*/APP_PORT=16000/' .env
 bash scripts/deploy.sh down && bash scripts/deploy.sh up
 ```
 
@@ -225,7 +281,7 @@ DB 서버(`wr-db`)도 동일하게 등록하세요.
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `APP_PORT` | `16080` | 호스트에 노출할 포트. **운영 서버는 16000~16999 만 개방** |
+| `APP_PORT` | `16000` | 호스트에 노출할 포트. **운영 서버는 16000~16999 만 개방** |
 | `SESSION_SECRET` | — | **필수**. 세션 쿠키 서명 키. `openssl rand -hex 32` |
 | `SESSION_TTL_SECONDS` | `43200` | 세션 유지 시간(초). 기본 12시간 |
 | `COOKIE_SECURE` | `false` | HTTPS 로 서비스하면 `true` |
