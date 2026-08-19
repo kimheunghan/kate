@@ -126,7 +126,8 @@
   async function downloadFile(url, fallbackName) {
     let res;
     try {
-      res = await fetch(url, { headers: { ...HEADERS }, credentials: 'same-origin' });
+      // cache:'no-store' 를 빼면 크롬이 예전에 받은 문서를 그대로 다시 준다.
+      res = await fetch(url, { headers: { ...HEADERS }, credentials: 'same-origin', cache: 'no-store' });
     } catch (e) {
       toast('서버에 연결할 수 없습니다.', true);
       return;

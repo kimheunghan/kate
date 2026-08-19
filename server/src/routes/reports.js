@@ -632,18 +632,19 @@ async function fixHwpxLayout(buf, ratios) {
   // ---------- header.xml : 글자 크기·줄간격·정렬·표 제목 배경 ----------
   let head = await zip.file('Contents/header.xml').async('string');
 
-  // 본문 9pt / 제목 10pt. (charPr 0=본문, 1=굵은 제목)
-  head = head.replace(/<hh:charPr id="0" height="\d+"/, '<hh:charPr id="0" height="900"');
-  head = head.replace(/<hh:charPr id="2" height="\d+"/, '<hh:charPr id="2" height="900"');
-  head = head.replace(/<hh:charPr id="4" height="\d+"/, '<hh:charPr id="4" height="900"');
-  head = head.replace(/<hh:charPr id="1" height="\d+"/, '<hh:charPr id="1" height="1000"');
-  head = head.replace(/<hh:charPr id="3" height="\d+"/, '<hh:charPr id="3" height="1000"');
+  // 세로(A4) 는 칸이 좁아 9pt 로는 글이 자꾸 다음 줄로 넘어간다.
+  // 본문 8pt / 표 제목 9pt / 문서 제목 15pt.
+  head = head.replace(/<hh:charPr id="0" height="\d+"/, '<hh:charPr id="0" height="800"');
+  head = head.replace(/<hh:charPr id="2" height="\d+"/, '<hh:charPr id="2" height="800"');
+  head = head.replace(/<hh:charPr id="4" height="\d+"/, '<hh:charPr id="4" height="800"');
+  head = head.replace(/<hh:charPr id="1" height="\d+"/, '<hh:charPr id="1" height="900"');
+  head = head.replace(/<hh:charPr id="3" height="\d+"/, '<hh:charPr id="3" height="900"');
   head = head.replace(/<hh:charPr id="5" height="\d+"/, '<hh:charPr id="5" height="1500"');
 
   // 양쪽 정렬이면 글자 사이가 벌어진다. 왼쪽 정렬로.
   head = head.replace(/horizontal="JUSTIFY"/g, 'horizontal="LEFT"');
-  // 줄간격 160% → 130%
-  head = head.replace(/(<hh:lineSpacing type="PERCENT" value=")\d+/g, '$1150');
+  // 줄간격 160% → 130% (줄이 넘어갈 때 아래로 덜 밀리게)
+  head = head.replace(/(<hh:lineSpacing type="PERCENT" value=")\d+/g, '$1130');
 
   // 표 제목 칸 배경색용 borderFill 추가 (실선 테두리 + 연노랑 채우기)
   const solid = /<hh:borderFill id="2"[\s\S]*?<\/hh:borderFill>/.exec(head);
@@ -677,10 +678,11 @@ async function fixHwpxLayout(buf, ratios) {
   // ---------- section0.xml : 용지·여백·표 크기·셀 여백 ----------
   let xml = await zip.file('Contents/section0.xml').async('string');
 
-  // landscape 속성도 세로(NARROWLY)로 맞춘다
-  xml = xml.replace(/(<hp:pagePr[^>]*?)landscape="[A-Z]*"/, '$1landscape="NARROWLY"');
-  xml = xml.replace(/(<hp:pagePr[^>]*?)width="\d+" height="\d+"/,
-    `$1width="${PAGE_W}" height="${PAGE_H}"`);
+  // 용지 방향 : 구역이 여러 개여도 모두 세로로. (/g 없으면 첫 개만 바뀐다)
+  xml = xml.replace(/<hp:pagePr\b[^>]*>/g, (tag) => tag
+    .replace(/landscape="[A-Z]*"/, 'landscape="NARROWLY"')
+    .replace(/width="\d+"/, `width="${PAGE_W}"`)
+    .replace(/height="\d+"/, `height="${PAGE_H}"`));
   xml = xml.replace(/<hp:margin[^>]*\/>/,
     `<hp:margin header="${HEAD_FOOT}" footer="${HEAD_FOOT}" gutter="0" ` +
     `left="${MARGIN}" right="${MARGIN}" top="${MARGIN}" bottom="${MARGIN}"/>`);
@@ -701,11 +703,11 @@ async function fixHwpxLayout(buf, ratios) {
   // hasMargin="0" 이면 셀별 여백을 무시하므로 반드시 1 로 켜야 한다
   xml = xml.replace(/(<hp:tc [^>]*)hasMargin="0"/g, '$1hasMargin="1"');
 
-  // Word 의 셀 여백(6x7px)과 비슷하게 : 좌우 2mm, 상하 1.5mm
+  // 좌우는 1mm 만 (글 폭을 최대한 확보), 위아래는 2mm 로 넉넉히
   xml = xml.replace(/<hp:cellMargin[^>]*\/>/g,
-    '<hp:cellMargin left="566" right="566" top="425" bottom="425"/>');
+    '<hp:cellMargin left="283" right="283" top="566" bottom="566"/>');
   xml = xml.replace(/<hp:inMargin[^>]*\/>/g,
-    '<hp:inMargin left="566" right="566" top="425" bottom="425"/>');
+    '<hp:inMargin left="283" right="283" top="566" bottom="566"/>');
 
   // 모든 칸에 실선 테두리, 제목 행(rowAddr=0)은 배경색 있는 테두리
   xml = xml.replace(/(<hp:tbl [^>]*borderFillIDRef=")1(")/g, '$12$2');
@@ -794,6 +796,7 @@ router.get('/:id(\\d+)/print', async (req, res, next) => {
     const items = await loadItems(report.id);
     const files = await loadAttachments(report.id);
     const nextWeek = await loadNextWeek(report.start_date);
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
     res.type('html').send(buildReportHtml(report, items, files, { forWord: false, nextWeek }));
   } catch (err) { next(err); }
 });
@@ -816,6 +819,9 @@ router.get('/:id(\\d+)/export', async (req, res, next) => {
     await audit.log(req, 'REPORT_EXPORT', { targetType: 'report', targetId: report.id, detail: name });
 
     res.setHeader('Content-Type', 'application/msword; charset=utf-8');
+    // 브라우저가 예전에 받아둔 문서를 캐시에서 다시 꺼내주면
+    // 서식을 고쳐도 옛날 파일이 열린다.
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
     res.setHeader('Content-Disposition',
       `attachment; filename="report.doc"; filename*=UTF-8''${encodeURIComponent(name)}`);
     res.send('﻿' + html);   // Word 가 UTF-8 로 인식하도록 BOM
@@ -849,6 +855,7 @@ router.get('/:id(\\d+)/export-hwpx', async (req, res, next) => {
     await audit.log(req, 'REPORT_EXPORT_HWPX', { targetType: 'report', targetId: report.id, detail: name });
 
     res.setHeader('Content-Type', 'application/hwp+zip');
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
     res.setHeader('Content-Disposition',
       `attachment; filename="report.hwpx"; filename*=UTF-8''${encodeURIComponent(name)}`);
     res.end(buf);
