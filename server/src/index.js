@@ -145,11 +145,34 @@ async function start() {
   await auth.ensureAdminAccount();
   await require('./lib/mailer').verify();
 
-  const server = app.listen(config.port, '0.0.0.0', () => {
-    console.log(`[app] 주간보고 시스템 기동 완료 → http://0.0.0.0:${config.port}`);
+  // 인증서가 지정되어 있으면 HTTPS 로 기동한다
+  let server;
+  let scheme = 'http';
+  const { certFile, keyFile } = config.ssl;
+  if (certFile && keyFile) {
+    if (!fs.existsSync(certFile) || !fs.existsSync(keyFile)) {
+      console.error(`[FATAL] 인증서 파일을 찾을 수 없습니다: ${certFile} / ${keyFile}`);
+      process.exit(1);
+    }
+    const https = require('https');
+    server = https.createServer(
+      { cert: fs.readFileSync(certFile), key: fs.readFileSync(keyFile) }, app
+    );
+    scheme = 'https';
+    console.log('[app] HTTPS 로 기동합니다.');
+  } else {
+    console.log('[app] HTTP 로 기동합니다. (SSL_CERT_FILE/SSL_KEY_FILE 을 지정하면 HTTPS)');
+    console.log('[app] ※ HTTP 에서는 Chrome 이 파일 다운로드를 차단할 수 있습니다.');
+  }
+
+  const onReady = () => {
+    console.log(`[app] 주간보고 시스템 기동 완료 → ${scheme}://0.0.0.0:${config.port}`);
     console.log(`[app] DB: ${config.db.user}@${config.db.host}:${config.db.port}/${config.db.database} (schema=${config.db.schema})`);
     console.log(`[app] 업로드 경로: ${config.upload.dir}`);
-  });
+  };
+
+  if (server) server.listen(config.port, '0.0.0.0', onReady);
+  else server = app.listen(config.port, '0.0.0.0', onReady);
 
   const shutdown = (sig) => {
     console.log(`[app] ${sig} 수신 - 종료합니다.`);

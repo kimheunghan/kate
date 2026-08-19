@@ -60,6 +60,13 @@ const config = {
     resetTokenMinutes: num(process.env.RESET_TOKEN_MINUTES, 30),
   },
 
+  // HTTPS. 인증서 파일 경로가 둘 다 주어지면 HTTPS 로 뜬다.
+  //   HTTP 로 서비스하면 Chrome 이 파일 다운로드를 '안전하지 않음'으로 차단한다.
+  ssl: {
+    certFile: process.env.SSL_CERT_FILE || '',
+    keyFile: process.env.SSL_KEY_FILE || '',
+  },
+
   reset: {
     // SMTP 가 없을 때의 동작
     //   direct = 본인 확인 후 즉시 재설정 화면으로 (관리자 개입 없음)

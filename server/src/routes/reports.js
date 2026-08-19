@@ -442,13 +442,19 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
   const nextRange = nextWeek ? fmtRange(nextWeek.start_date, nextWeek.end_date) : '';
 
   const n = items.length || 1;
+
+  // 들여쓰기는 padding-left 로 저장되는데 Word 는 이 속성을 무시한다.
+  // 문서로 내보낼 때는 Word 가 문단 들여쓰기로 인식하는 margin-left 로 바꾼다.
+  // (브라우저 인쇄에서도 결과는 같다)
+  const toDoc = (h) => String(h || '').replace(/padding-left\s*:/gi, 'margin-left:');
+
   const rows = items.map((it, i) => `
       <tr>
         ${i === 0 ? `<td class="org" rowspan="${n}">${esc(report.org_name)}</td>
         <td class="who" rowspan="${n}">${esc(report.author_name || '-')}</td>` : ''}
-        <td class="cell">${it.plan_html || ''}</td>
-        <td class="cell">${it.result_html || ''}</td>
-        <td class="cell">${it.next_plan_html || ''}</td>
+        <td class="cell">${toDoc(it.plan_html)}</td>
+        <td class="cell">${toDoc(it.result_html)}</td>
+        <td class="cell">${toDoc(it.next_plan_html)}</td>
       </tr>`).join('');
 
   // 인쇄: @page 여백 0 → 브라우저가 머리글(날짜)/바닥글(URL)을 넣지 않는다

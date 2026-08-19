@@ -39,6 +39,8 @@ services:
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
 
+      SSL_CERT_FILE: ${SSL_CERT_FILE:-}
+      SSL_KEY_FILE: ${SSL_KEY_FILE:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
@@ -62,6 +64,7 @@ services:
       # 증적자료는 호스트 디렉터리에 보관해 백업이 쉽도록 한다
       # (:z = SELinux 라벨 재지정. Ubuntu 에서는 무시되므로 그대로 두어도 됨)
       - ${UPLOAD_HOST_DIR:-./data/uploads}:/app/uploads:z
+      - ./certs:/app/certs:ro,z
 
     ports:
       # 외부 공개 포트. .env 의 APP_PORT 로 지정합니다.
