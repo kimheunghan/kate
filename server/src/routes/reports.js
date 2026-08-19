@@ -487,8 +487,7 @@ ${forWord ? `<!--[if gte mso 9]><xml>
   }
   /* Word 는 문단마다 기본 아래 여백(10pt)을 넣는다. 전부 0 으로 맞춘다. */
   p, div, li, td, th { mso-para-margin: 0; mso-pagination: none; }
-  h1 { font-size: 15pt; margin: 0 0 4px; }
-  .meta { color: #555; font-size: 9pt; margin-bottom: 10px; }
+  h1 { font-size: 15pt; margin: 0 0 10px; }
 
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th, td {
@@ -527,7 +526,6 @@ ${forWord ? `<!--[if gte mso 9]><xml>
 <body>
 ${forWord ? '<div class="WordSection1">' : ''}
 <h1>주간 추진실적 보고</h1>
-<div class="meta">기관: ${esc(report.org_name)} &nbsp;|&nbsp; 기간: ${esc(report.week_label)} &nbsp;|&nbsp; 작성자: ${esc(report.author_name || '-')} &nbsp;|&nbsp; 상태: ${report.status === 'SUBMITTED' ? '제출완료' : '임시저장'}</div>
 <table>
   <colgroup><col style="width:11%"><col style="width:9%"><col style="width:26%"><col style="width:28%"><col style="width:26%"></colgroup>
   <thead><tr>
