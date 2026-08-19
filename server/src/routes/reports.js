@@ -491,6 +491,9 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
   th { font-size: 8.5pt !important; }
   td, td.org, td.who, td table, ol.files, .fitem { font-size: 7pt !important; }
   .note { font-size: 8.5pt !important; }
+  /* 특이사항과 증적자료 사이 빈 줄. Word 는 div 의 margin 을 흘려버리는
+     경우가 있어 실제 빈 문단을 하나 넣는다. */
+  p.gap { margin: 0 !important; font-size: 8.5pt !important; line-height: 1.4; }
   /* 글꼴도 한글 문서와 같이 휴먼명조 */
   body, h1, table, th, td, p, div, li, ol, ul, span {
     font-family: "휴먼명조", "HY명조", "HYMyeongJo", "Batang", "바탕", serif !important;
@@ -572,6 +575,7 @@ ${forWord ? '<div class="WordSection1">' : ''}
   <tbody>${rows || '<tr><td colspan="5">등록된 항목이 없습니다.</td></tr>'}</tbody>
 </table>
 ${report.note ? `<div class="note"><b>특이사항</b><br>${esc(report.note).replace(/\n/g, '<br>')}</div>` : ''}
+${files.length && forWord ? '<p class="gap">&nbsp;</p>' : ''}
 ${files.length ? `<div class="note">
   <b>증적자료 (${files.length}건)</b>
   ${forWord
