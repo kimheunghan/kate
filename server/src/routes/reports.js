@@ -574,6 +574,7 @@ ${forWord ? '<div class="WordSection1">' : ''}
   </tr></thead>
   <tbody>${rows || '<tr><td colspan="5">등록된 항목이 없습니다.</td></tr>'}</tbody>
 </table>
+${report.note && forWord ? '<p class="gap">&nbsp;</p>' : ''}
 ${report.note ? `<div class="note"><b>특이사항</b><br>${esc(report.note).replace(/\n/g, '<br>')}</div>` : ''}
 ${files.length && forWord ? '<p class="gap">&nbsp;</p>' : ''}
 ${files.length ? `<div class="note">
@@ -792,7 +793,7 @@ function buildHwpxHtml(report, items, files, nextWeek) {
   </tr></thead>
   <tbody>${rows || '<tr><td>등록된 항목이 없습니다.</td></tr>'}</tbody>
 </table>
-${report.note ? `<p><b>특이사항</b></p>${
+${report.note ? `<p>&#8203;</p><p><b>특이사항</b></p>${
   esc(report.note).split('\n').map((t) => `<p>${t}</p>`).join('')}` : ''}
 ${files.length ? `<p>&#8203;</p><p><b>증적자료 (${files.length}건)</b></p>${
   files.map((f, i) => `<p>${i + 1}. ${esc(f.original_name)}</p>`).join('')}` : ''}
