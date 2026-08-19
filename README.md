@@ -130,7 +130,7 @@ podman compose -f docker-compose.prod.yml up -d --no-build
 ## 3. 빠른 시작 (개발 서버)
 
 ```bash
-cd weekly-report
+cd weekly-report-gcp
 
 # 1) .env 생성 + 비밀값 자동 생성
 bash scripts/gen-secrets.sh
@@ -194,8 +194,8 @@ scp dist/postgres-16-alpine.tar dist/weekly-report-deploy-*.tar.gz  user@192.168
 ssh user@192.168.200.116
 
 podman load -i postgres-16-alpine.tar
-mkdir -p ~/weekly-report && tar xzf weekly-report-deploy-*.tar.gz -C ~/weekly-report
-cd ~/weekly-report
+mkdir -p ~/weekly-report-db && tar xzf weekly-report-deploy-*.tar.gz -C ~/weekly-report-db
+cd ~/weekly-report-db
 
 cp .env.example .env
 bash scripts/gen-secrets.sh          # ← 여기서 나온 DB_PASSWORD 를 APP 서버에도 동일하게 사용
@@ -219,8 +219,8 @@ scp dist/weekly-report-*.tar dist/weekly-report-deploy-*.tar.gz  user@192.168.20
 ssh user@192.168.200.115
 
 podman load -i weekly-report-*.tar
-mkdir -p ~/weekly-report && tar xzf weekly-report-deploy-*.tar.gz -C ~/weekly-report
-cd ~/weekly-report
+mkdir -p ~/weekly-report-gcp && tar xzf weekly-report-deploy-*.tar.gz -C ~/weekly-report-gcp
+cd ~/weekly-report-gcp
 
 cp .env.example .env
 vi .env
@@ -402,7 +402,7 @@ bash scripts/deploy.sh restart
 bash scripts/backup.sh /backup
 
 # cron 등록 예 — 매일 새벽 2시
-0 2 * * * cd /opt/weekly-report && bash scripts/backup.sh /backup >> /var/log/wr-backup.log 2>&1
+0 2 * * * cd /home/bi/weekly-report-gcp && bash scripts/backup.sh /backup >> /var/log/wr-backup.log 2>&1
 
 # 복원
 bash scripts/restore.sh /backup/wr-20260818-020000.sql.gz /backup/wr-20260818-020000.uploads.tar.gz
@@ -436,7 +436,7 @@ bash scripts/restore.sh /backup/wr-20260818-020000.sql.gz /backup/wr-20260818-02
 ## 9. 디렉터리 구조
 
 ```
-weekly-report/
+weekly-report-gcp/
 ├── Containerfile                 APP 이미지 (멀티스테이지 불필요 — 프론트 빌드 없음)
 ├── docker-compose.yml            개발/올인원 (DB + APP)
 ├── docker-compose.db.yml         DB 서버 전용 (192.168.200.116)
@@ -444,8 +444,8 @@ weekly-report/
 ├── .env.example                  환경변수 템플릿
 ├── db/
 │   ├── init/
-│   ├── 01_schema.sql             테이블·인덱스·트리거·뷰
-│   └── 02_seed.sql               기관·주차 초기 데이터
+│   │   ├── 01_schema.sql         테이블·인덱스·트리거·뷰
+│   │   └── 02_seed.sql           기관·주차 초기 데이터
 │   └── migrations/               기존 DB 순차 마이그레이션
 ├── server/
 │   ├── package.json              의존성 4개 (express, pg, multer, cookie-parser)
@@ -457,6 +457,8 @@ weekly-report/
 │   ├── login.html / app.html / admin.html
 │   ├── css/style.css
 │   └── js/                       api, editor, login, app, admin
+├── uploads/                      증적자료 호스트 저장소 (git 제외)
+│   └── <report_id>/<uuid>.<ext>  보고서별 실제 첨부파일
 └── scripts/
     ├── gen-secrets.sh            .env 비밀값 생성
     ├── apply-schema.sh           기존 DB 에 스키마 적용
