@@ -52,14 +52,38 @@ function cellText(v) {
   return '';
 }
 
-/** 줄바꿈이 있는 평문을 보고서 본문 HTML 로 (한 줄 = 한 단락) */
+/**
+ * 줄머리 기호에 따른 들여쓰기 단계.
+ * 엑셀 셀에서는 앞 공백을 넣기 번거롭고, 넣어도 HTML 에서는 공백이 합쳐져 사라진다.
+ * 그래서 기호를 보고 자동으로 단계를 매긴다.
+ *    ■ ◼ ▪ ● □ ○  → 1단계
+ *    - – — · *      → 2단계
+ *    그 외          → 0단계 (다만 직접 넣은 앞 공백이 있으면 그만큼 반영)
+ */
+const INDENT_PX = 16;
+
+function lineIndentLevel(line) {
+  const body = line.replace(/^[\s\u00a0]+/, '');
+  if (/^[■◼▪●□○◆◇]/.test(body)) return 1;
+  if (/^[-–—·*]\s*/.test(body)) return 2;
+
+  const lead = (line.match(/^[\s\u00a0]*/) || [''])[0].replace(/\t/g, '  ').length;
+  return lead >= 2 ? Math.min(Math.floor(lead / 2), 4) : 0;
+}
+
+/** 줄바꿈이 있는 평문을 보고서 본문 HTML 로 (한 줄 = 한 단락, 기호별 들여쓰기 적용) */
 function textToHtml(v) {
-  const text = cellText(v).replace(/\r\n?/g, '\n').trim();
-  if (!text) return '';
-  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const html = text.split('\n')
-    .map((line) => `<div>${esc(line) || '<br>'}</div>`)
-    .join('');
+  const text = cellText(v).replace(/\r\n?/g, '\n').replace(/[\s\u00a0]+$/, '');
+  if (!text.trim()) return '';
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const html = text.split('\n').map((line) => {
+    const level = lineIndentLevel(line);
+    const body = esc(line.replace(/^[\s\u00a0]+/, ''));
+    const style = level ? ` style="padding-left: ${level * INDENT_PX}px"` : '';
+    return `<div${style}>${body || '<br>'}</div>`;
+  }).join('');
+
   return sanitizeHtml(html);
 }
 
