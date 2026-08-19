@@ -551,6 +551,74 @@ ${forWord ? '</div>' : ''}
 </body></html>`;
 }
 
+/**
+ * HWPX 변환용 HTML 로 다듬는다.
+ * hwp-convert 는 표 칸 안의 <div>/<p> 를 한 문단으로 합쳐 버리므로
+ * 줄바꿈은 <br>, 들여쓰기는 앞쪽 &nbsp; 로 바꿔서 넘긴다.
+ */
+function toHwpxCell(html) {
+  if (!html) return '';
+  const SPACE_PX = 4;                     // 공백 한 칸 대략 폭
+
+  // 블록 요소를 줄 단위로 자른다
+  const lines = String(html)
+    .replace(/<br\s*\/?>/gi, '\n@@BR@@\n')
+    .split(/(?=<(?:div|p|li)\b)/i)
+    .flatMap((chunk) => {
+      const m = /<(?:div|p|li)\b([^>]*)>([\s\S]*)/i.exec(chunk);
+      if (!m) return [{ pad: 0, html: chunk }];
+      const padM = /padding-left\s*:\s*([\d.]+)px/i.exec(m[1]);
+      const marM = /margin-left\s*:\s*([\d.]+)px/i.exec(m[1]);
+      const pad = Number((padM && padM[1]) || (marM && marM[1]) || 0);
+      return [{ pad, html: m[2] }];
+    });
+
+  return lines.map(({ pad, html: body }) => {
+    const inner = String(body)
+      .replace(/<\/(?:div|p|li|ul|ol)>/gi, '')
+      .replace(/@@BR@@/g, '<br>')
+      .replace(/\n/g, '')
+      .trim();
+    if (!inner) return '';
+    const indent = '&nbsp;'.repeat(Math.min(Math.round(pad / SPACE_PX), 24));
+    return indent + inner;
+  }).filter(Boolean).join('<br>');
+}
+
+/** HWPX 변환에 넘길 문서 HTML (표 칸 내용만 위 규칙으로 치환) */
+function buildHwpxHtml(report, items, files, nextWeek) {
+  const esc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const thisRange = fmtRange(report.start_date, report.end_date);
+  const nextRange = nextWeek ? fmtRange(nextWeek.start_date, nextWeek.end_date) : '';
+  const n = items.length || 1;
+
+  const rows = items.map((it, i) => `
+    <tr>
+      ${i === 0 ? `<td rowspan="${n}">${esc(report.org_name)}</td>
+      <td rowspan="${n}">${esc(report.author_name || '-')}</td>` : ''}
+      <td>${toHwpxCell(it.plan_html)}</td>
+      <td>${toHwpxCell(it.result_html)}</td>
+      <td>${toHwpxCell(it.next_plan_html)}</td>
+    </tr>`).join('');
+
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<title>주간 추진실적 보고</title></head><body>
+<h1>주간 추진실적 보고</h1>
+<table border="1">
+  <thead><tr>
+    <th>기관명</th><th>참여인력</th>
+    <th>① 당초 계획${thisRange ? `(${thisRange})` : ''}</th>
+    <th>② 추진 실적${thisRange ? `(${thisRange})` : ''}</th>
+    <th>향후 계획${nextRange ? `(${nextRange})` : ''}</th>
+  </tr></thead>
+  <tbody>${rows || '<tr><td>등록된 항목이 없습니다.</td></tr>'}</tbody>
+</table>
+${report.note ? `<p><b>특이사항</b><br>${esc(report.note).replace(/\n/g, '<br>')}</p>` : ''}
+${files.length ? `<p><b>증적자료 (${files.length}건)</b><br>${
+  files.map((f, i) => `${i + 1}. ${esc(f.original_name)}`).join('<br>')}</p>` : ''}
+</body></html>`;
+}
+
 /** 파일명에 쓸 수 없는 문자 정리 */
 function safeFileName(v) {
   return String(v || '').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120);
@@ -593,6 +661,38 @@ router.get('/:id(\\d+)/export', async (req, res, next) => {
       `attachment; filename="report.doc"; filename*=UTF-8''${encodeURIComponent(name)}`);
     res.send('﻿' + html);   // Word 가 UTF-8 로 인식하도록 BOM
   } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------
+// GET /api/reports/:id/export-hwpx  — 한글 문서(HWPX)로 다운로드
+// ---------------------------------------------------------------------
+router.get('/:id(\\d+)/export-hwpx', async (req, res, next) => {
+  try {
+    const report = await loadReport(Number(req.params.id));
+    if (!report) return res.status(404).json({ error: '보고서를 찾을 수 없습니다.' });
+    if (!canViewReport(req.user, report)) return res.status(403).json({ error: '열람 권한이 없습니다.' });
+
+    const items = await loadItems(report.id);
+    const files = await loadAttachments(report.id);
+    const nextWeek = await loadNextWeek(report.start_date);
+
+    // hwp-convert 는 ESM 전용이라 동적 import 로 불러온다
+    const { htmlToHwpx } = await import('hwp-convert');
+    const html = buildHwpxHtml(report, items, files, nextWeek);
+    const out = await htmlToHwpx(html);
+    const buf = Buffer.isBuffer(out) ? out : Buffer.from(out);
+
+    const name = safeFileName(`${report.org_name}_주간보고_${report.week_label}`) + '.hwpx';
+    await audit.log(req, 'REPORT_EXPORT_HWPX', { targetType: 'report', targetId: report.id, detail: name });
+
+    res.setHeader('Content-Type', 'application/hwp+zip');
+    res.setHeader('Content-Disposition',
+      `attachment; filename="report.hwpx"; filename*=UTF-8''${encodeURIComponent(name)}`);
+    res.end(buf);
+  } catch (err) {
+    console.error('[hwpx] 변환 실패:', err.message);
+    res.status(500).json({ error: '한글 문서로 변환하지 못했습니다. Word 다운로드를 이용해 주세요.' });
+  }
 });
 
 module.exports = router;

@@ -3,7 +3,7 @@
    ===================================================================== */
 (function () {
   'use strict';
-  const { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, $, $$ } = window.WR;
+  const { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, $, $$ } = window.WR;
 
   const state = {
     me: null,
@@ -256,6 +256,7 @@
     $('#btn-save').disabled = readOnly;
     $('#btn-print').disabled = !report;
     $('#btn-export').disabled = !report;
+    $('#btn-export-hwpx').disabled = !report;
   }
 
   // ==================================================================
@@ -442,6 +443,10 @@
     $('#btn-export').onclick = () => {
       if (!state.report) return;
       downloadReport(state.report.id);
+    };
+    $('#btn-export-hwpx').onclick = () => {
+      if (!state.report) return;
+      downloadReportHwpx(state.report.id);
     };
   }
 

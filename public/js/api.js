@@ -166,6 +166,11 @@
     downloadFile(`/api/reports/${reportId}/export`, '주간보고.doc');
   }
 
+  /** 보고서를 아래한글 문서(HWPX)로 내려받는다 */
+  function downloadReportHwpx(reportId) {
+    downloadFile(`/api/reports/${reportId}/export-hwpx`, '주간보고.hwpx');
+  }
+
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
 
@@ -379,5 +384,5 @@
     $('#pw-cur', back).focus();
   }
 
-  global.WR = { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
+  global.WR = { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
 })(window);
