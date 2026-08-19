@@ -585,6 +585,72 @@ function toHwpxCell(html) {
   }).filter(Boolean).join('<br>');
 }
 
+/**
+ * hwp-convert 가 만든 HWPX 의 표 레이아웃을 보정한다.
+ *
+ * 라이브러리는 (1) 가로 방향 플래그만 켜고 용지 크기는 세로 그대로 두며,
+ * (2) 모든 열을 같은 폭으로 나누고, (3) 테두리 없는 borderFill 을 쓴다.
+ * 그 결과 한글에서 열면 표가 좁게 뭉개져 보인다.
+ * 생성된 XML 을 직접 고쳐 가로 A4 · 열 비율 · 실선 테두리를 적용한다.
+ *
+ * 단위는 HWPUNIT (1mm = 283.465)
+ */
+async function fixHwpxLayout(buf, ratios) {
+  const JSZip = require('jszip');
+  const zip = await JSZip.loadAsync(buf);
+
+  const PAGE_W = 84186;                  // A4 가로 297mm
+  const PAGE_H = 59528;                  // A4 세로 210mm
+  const MARGIN = 2835;                   // 좌우·상하 여백 10mm (기본 30mm 는 너무 넓다)
+  const HEAD_FOOT = 1417;                // 머리말·꼬리말 5mm
+  const CONTENT = PAGE_W - MARGIN * 2;
+
+  let xml = await zip.file('Contents/section0.xml').async('string');
+
+  // 1) 용지: 가로 크기로 교체
+  xml = xml.replace(/(<hp:pagePr[^>]*?)width="\d+" height="\d+"/,
+    `$1width="${PAGE_W}" height="${PAGE_H}"`);
+
+  // 2) 여백 축소
+  xml = xml.replace(/<hp:margin[^>]*\/>/,
+    `<hp:margin header="${HEAD_FOOT}" footer="${HEAD_FOOT}" gutter="0" ` +
+    `left="${MARGIN}" right="${MARGIN}" top="${MARGIN}" bottom="${MARGIN}"/>`);
+
+  // 3) 표 전체 폭
+  xml = xml.replace(/(<hp:sz )width="\d+"( widthRelTo="ABSOLUTE")/g,
+    `$1width="${CONTENT}"$2`);
+
+  // 4) 열 비율대로 셀 폭 배분 (병합 셀은 걸친 열 폭의 합)
+  const widths = ratios.map((r) => Math.round(CONTENT * r));
+  widths[widths.length - 1] = CONTENT - widths.slice(0, -1).reduce((a, b) => a + b, 0);
+
+  xml = xml.replace(
+    /<hp:cellAddr colAddr="(\d+)" rowAddr="(\d+)"\/><hp:cellSpan colSpan="(\d+)" rowSpan="(\d+)"\/><hp:cellSz width="\d+"/g,
+    (m, col, row, cspan) => {
+      let w = 0;
+      for (let i = 0; i < Number(cspan); i++) w += widths[Number(col) + i] || 0;
+      return m.replace(/<hp:cellSz width="\d+"/, `<hp:cellSz width="${w}"`);
+    });
+
+  // 5) 셀 테두리: 실선이 정의된 borderFill(id=2) 을 쓰도록
+  xml = xml.replace(/(<hp:tc [^>]*borderFillIDRef=")1(")/g, '$12$2');
+  xml = xml.replace(/(<hp:tbl [^>]*borderFillIDRef=")1(")/g, '$12$2');
+
+  // 6) 줄 배치 폭(한글이 다시 계산하지만 초기값도 맞춰 둔다)
+  xml = xml.replace(/horzsize="42520"/g, `horzsize="${CONTENT}"`);
+
+  // 7) 다시 압축. mimetype 은 반드시 첫 항목 + 무압축이어야 한글이 인식한다.
+  const out = new JSZip();
+  out.file('mimetype', await zip.file('mimetype').async('string'), { compression: 'STORE' });
+  for (const name of Object.keys(zip.files)) {
+    const f = zip.files[name];
+    if (name === 'mimetype' || f.dir) continue;
+    out.file(name, name === 'Contents/section0.xml' ? xml : await f.async('nodebuffer'),
+      { compression: 'DEFLATE' });
+  }
+  return out.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
+
 /** HWPX 변환에 넘길 문서 HTML (표 칸 내용만 위 규칙으로 치환) */
 function buildHwpxHtml(report, items, files, nextWeek) {
   const esc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -680,7 +746,11 @@ router.get('/:id(\\d+)/export-hwpx', async (req, res, next) => {
     const { htmlToHwpx } = await import('hwp-convert');
     const html = buildHwpxHtml(report, items, files, nextWeek);
     const out = await htmlToHwpx(html);
-    const buf = Buffer.isBuffer(out) ? out : Buffer.from(out);
+    // 기관명 11% / 참여인력 9% / 계획 26% / 실적 28% / 향후 26%
+    const buf = await fixHwpxLayout(
+      Buffer.isBuffer(out) ? out : Buffer.from(out),
+      [0.11, 0.09, 0.26, 0.28, 0.26]
+    );
 
     const name = safeFileName(`${report.org_name}_주간보고_${report.week_label}`) + '.hwpx';
     await audit.log(req, 'REPORT_EXPORT_HWPX', { targetType: 'report', targetId: report.id, detail: name });
