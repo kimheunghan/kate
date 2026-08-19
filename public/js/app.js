@@ -381,7 +381,7 @@
   // ==================================================================
   function bindExcelImport() {
     $('#btn-excel-template').onclick = () => {
-      location.href = '/api/reports/excel/template';
+      window.WR.downloadFile('/api/reports/excel/template', '주간보고_양식.xlsx');
     };
     $('#btn-excel-import').onclick = () => {
       if (!Number($('#sel-week').value)) { toast('보고 주차를 먼저 선택하세요.', true); return; }
@@ -529,9 +529,17 @@
     list.forEach((a) => {
       const li = document.createElement('li');
       li.innerHTML = `
-        <span class="fname"><a href="/api/attachments/${a.id}/download">${esc(a.original_name)}</a></span>
+        <span class="fname"><a href="#" data-dl="${a.id}">${esc(a.original_name)}</a></span>
         <span class="fmeta">${fmtBytes(a.byte_size)} · ${fmtDateTime(a.created_at)}</span>
         ${readOnly ? '' : '<button class="btn sm danger" type="button">삭제</button>'}`;
+      const link = li.querySelector('[data-dl]');
+      if (link) {
+        link.onclick = (e) => {
+          e.preventDefault();
+          window.WR.downloadFile(`/api/attachments/${a.id}/download`, a.original_name);
+        };
+      }
+
       const btn = li.querySelector('button');
       if (btn) {
         btn.onclick = async () => {

@@ -117,9 +117,53 @@
     w.addEventListener('load', () => { try { w.focus(); w.print(); } catch (e) { /* 사용자가 직접 인쇄 */ } });
   }
 
+  /**
+   * 파일 내려받기.
+   * 주소로 바로 이동시키면(location.href) HTTP 사이트에서는 Chrome 이
+   * '안전하지 않은 다운로드'로 차단한다. 내용을 받아 브라우저가 직접
+   * 파일로 만들어 저장하면(blob:) 그 검사를 받지 않는다.
+   */
+  async function downloadFile(url, fallbackName) {
+    let res;
+    try {
+      res = await fetch(url, { headers: { ...HEADERS }, credentials: 'same-origin' });
+    } catch (e) {
+      toast('서버에 연결할 수 없습니다.', true);
+      return;
+    }
+    if (res.status === 401) { location.href = '/login'; return; }
+    if (!res.ok) {
+      let msg = `내려받지 못했습니다 (${res.status})`;
+      try {
+        const j = await res.json();
+        if (j && j.error) msg = j.error;
+      } catch (e) { /* 본문이 JSON 이 아니면 기본 메시지 */ }
+      toast(msg, true);
+      return;
+    }
+
+    // 서버가 지정한 파일명을 그대로 사용 (한글 파일명은 filename* 에 들어 있다)
+    const cd = res.headers.get('content-disposition') || '';
+    let name = fallbackName || 'download';
+    const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+    const plain = /filename="([^"]+)"/i.exec(cd);
+    if (utf8) { try { name = decodeURIComponent(utf8[1]); } catch (e) { /* 그대로 */ } }
+    else if (plain) name = plain[1];
+
+    const blob = await res.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 30000);
+  }
+
   /** 보고서를 Word 문서로 내려받는다 */
   function downloadReport(reportId) {
-    location.href = `/api/reports/${reportId}/export`;
+    downloadFile(`/api/reports/${reportId}/export`, '주간보고.doc');
   }
 
   function $(sel, root) { return (root || document).querySelector(sel); }
@@ -335,5 +379,5 @@
     $('#pw-cur', back).focus();
   }
 
-  global.WR = { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
+  global.WR = { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
 })(window);
