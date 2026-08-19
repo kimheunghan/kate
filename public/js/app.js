@@ -369,7 +369,7 @@
       const hasContent = collectItems()
         .some((it) => strip(it.plan_html) || strip(it.result_html) || strip(it.next_plan_html));
       if (hasContent
-          && !confirm(`"${weekLabel}" 에 주간보고 내용이 있습니다.\n\n덮어쓸까요?`)) return;
+          && !confirm(`${weekLabel} 주간보고 내용이 있습니다.\n덮어쓸까요?`)) return;
 
       const form = new FormData();
       form.append('file', file);
