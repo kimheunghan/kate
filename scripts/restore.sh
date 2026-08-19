@@ -13,7 +13,7 @@ SQL_GZ="${1:?복원할 .sql.gz 파일을 지정하세요}"
 UPLOADS_GZ="${2:-}"
 
 DB_HOST="${DB_HOST:-localhost}"
-DB_PORT="${DB_PORT:-5432}"
+DB_PORT="${DB_PORT:-16432}"
 DB_NAME="${DB_NAME:-weekly_report}"
 DB_USER="${DB_USER:-wruser}"
 export PGPASSWORD="${DB_PASSWORD:-}"

@@ -25,7 +25,7 @@ services:
 
       # ---- 원격 DB (192.168.200.116) ----
       DB_HOST: "${DB_HOST:?DB_HOST 를 .env 에 설정하세요 (예: 192.168.200.116)}"
-      DB_PORT: ${DB_PORT:-5432}
+      DB_PORT: ${DB_PORT:-16432}      # RDB 가 호스트에 노출한 포트 (16000~16999)
       DB_NAME: ${DB_NAME:-weekly_report}
       DB_USER: ${DB_USER:-wruser}
       DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD 를 .env 에 설정하세요}"

@@ -22,11 +22,22 @@
                     │
                     ▼
         ┌───────────────────────┐         ┌──────────────────────┐
-        │ APP  192.168.200.115  │  5432   │ RDB  192.168.200.116 │
+        │ APP  192.168.200.115  │ 16432   │ RDB  192.168.200.116 │
         │  wr-app (Node 20)     │────────▶│  wr-db (PostgreSQL16)│
         │  볼륨: ./data/uploads │         │  볼륨: ./data/pgdata │
         └───────────────────────┘         └──────────────────────┘
 ```
+
+> ### 포트 정책
+> **두 서버 모두 `16000~16999` 만 개방되어 있습니다.** 이 범위를 벗어나면 서버 안에서는
+> 접속되지만 외부·서버 간 통신이 되지 않습니다.
+>
+> | 용도 | 포트 | 비고 |
+> |---|---|---|
+> | 웹 서비스 (APP) | `16080` | `.env` 의 `APP_PORT` |
+> | PostgreSQL (RDB) | `16432` | `.env` 의 `DB_PORT`. 컨테이너 내부는 5432 그대로 |
+>
+> 포트를 바꾸려면 `.env` 값만 수정하면 되며, 코드 수정은 필요 없습니다.
 
 ---
 
@@ -132,9 +143,11 @@ cp .env.example .env
 bash scripts/gen-secrets.sh          # ← 여기서 나온 DB_PASSWORD 를 APP 서버에도 동일하게 사용
 podman-compose -f docker-compose.db.yml up -d
 
-# 방화벽: APP 서버에서만 5432 접근 허용
+# 방화벽: APP 서버에서만 16432 접근 허용
+#   192.168.200.116 도 개방 포트가 16000~16999 이므로 PostgreSQL 을 16432 로 노출한다.
+#   (컨테이너 내부는 5432 그대로, 호스트에만 16432 로 매핑)
 sudo firewall-cmd --permanent \
-  --add-rich-rule='rule family=ipv4 source address=192.168.200.115/32 port port=5432 protocol=tcp accept'
+  --add-rich-rule='rule family=ipv4 source address=192.168.200.115/32 port port=16432 protocol=tcp accept'
 sudo firewall-cmd --reload
 ```
 
@@ -160,6 +173,7 @@ vi .env
 ```ini
 APP_PORT=16080                      # ← 16000~16999 범위에서만 외부 접속 가능
 DB_HOST=192.168.200.116
+DB_PORT=16432                       # ← RDB 가 호스트에 노출한 포트
 DB_PASSWORD=<DB 서버에서 생성된 값과 동일하게>
 SESSION_SECRET=<openssl rand -hex 32>
 ADMIN_PASSWORD=<초기 관리자 비밀번호>
@@ -218,7 +232,7 @@ DB 서버(`wr-db`)도 동일하게 등록하세요.
 | `MAX_UPLOAD_MB` | `50` | 첨부파일 1개 최대 크기 |
 | `UPLOAD_HOST_DIR` | `./data/uploads` | 증적자료를 보관할 호스트 경로 |
 | `DB_HOST` | `db` | 개발=`db`, 운영=`192.168.200.116` |
-| `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | `5432` / `weekly_report` / `wruser` / — | DB 접속 정보 |
+| `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | `16432` / `weekly_report` / `wruser` / — | DB 접속 정보. **운영 RDB 도 16000~16999 만 개방** |
 | `DB_EXPOSE_PORT` | `15432` | 개발 구성에서 호스트로 노출할 DB 포트 |
 | `PGDATA_HOST_DIR` | `./data/pgdata` | DB 데이터 디렉터리 (DB 서버) |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` / `ADMIN_NAME` | `admin` / — / `관리자` | 관리자 계정이 하나도 없을 때만 자동 생성 |
@@ -355,7 +369,7 @@ bash scripts/restore.sh /backup/wr-20260818-020000.sql.gz /backup/wr-20260818-02
 1. 초기 관리자 비밀번호 변경
 2. `.env` 권한 `600` 유지, git 커밋 금지
 3. 외부에 HTTP 로 공개하므로, 가능하면 앞단에 HTTPS 리버스 프록시를 두고 `COOKIE_SECURE=true` 설정
-4. DB 5432 포트는 APP 서버 IP 에서만 접근 허용
+4. DB 포트(16432)는 APP 서버 IP 에서만 접근 허용
 
 ---
 
@@ -397,7 +411,7 @@ weekly-report/
 
 | 증상 | 확인 |
 |---|---|
-| `[db] 연결 대기 중` 반복 | DB 서버 방화벽(5432), `DB_HOST`/`DB_PASSWORD` 확인. `podman logs wr-db` |
+| `[db] 연결 대기 중` 반복 | DB 서버 방화벽(16432), `DB_HOST`/`DB_PORT`/`DB_PASSWORD` 확인. `podman logs wr-db` |
 | 로그인 후 계속 로그인 화면 | `SESSION_SECRET` 미설정 또는 재기동 시 변경됨. `.env` 고정값 사용 |
 | `SESSION_SECRET 환경변수가 설정되지 않았습니다` | `bash scripts/gen-secrets.sh` 실행 |
 | 첨부 업로드 실패 | `UPLOAD_HOST_DIR` 쓰기 권한, `MAX_UPLOAD_MB` 확인 |

@@ -25,7 +25,9 @@ services:
       - ./db/init:/docker-entrypoint-initdb.d:ro,z
     ports:
       # APP 서버(192.168.200.115) 에서 접속. 방화벽 개방 필요.
-      - "${DB_BIND:-0.0.0.0}:${DB_PORT:-5432}:5432"
+      # 192.168.200.116 은 16000~16999 만 개방되어 있어 5432 를 그대로 쓸 수 없다.
+      # 컨테이너 내부는 5432 유지, 호스트에만 16432 로 매핑한다.
+      - "${DB_BIND:-0.0.0.0}:${DB_PORT:-16432}:5432"
     shm_size: 512mb
     command:
       - postgres

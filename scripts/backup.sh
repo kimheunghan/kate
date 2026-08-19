@@ -17,7 +17,7 @@ TS="$(date +%Y%m%d-%H%M%S)"
 mkdir -p "${OUT}"
 
 DB_HOST="${DB_HOST:-localhost}"
-DB_PORT="${DB_PORT:-5432}"
+DB_PORT="${DB_PORT:-16432}"
 DB_NAME="${DB_NAME:-weekly_report}"
 DB_USER="${DB_USER:-wruser}"
 export PGPASSWORD="${DB_PASSWORD:-}"

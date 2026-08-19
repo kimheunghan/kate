@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 [[ -f .env ]] && set -a && . ./.env && set +a
 
 DB_HOST="${DB_HOST:-localhost}"
-DB_PORT="${DB_PORT:-5432}"
+DB_PORT="${DB_PORT:-16432}"
 DB_NAME="${DB_NAME:-weekly_report}"
 DB_USER="${DB_USER:-wruser}"
 
