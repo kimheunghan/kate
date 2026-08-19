@@ -58,6 +58,7 @@ app.get('/api/health', async (req, res) => {
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api', require('./routes/meta'));
+app.use('/api/reports/excel', require('./routes/excel'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api', require('./routes/files'));
 app.use('/api/admin', require('./routes/admin'));

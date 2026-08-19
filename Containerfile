@@ -15,8 +15,8 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 # 의존성 레이어 분리 (소스만 바뀔 때 npm install 재실행 방지)
-COPY server/package.json ./server/package.json
-RUN cd server && npm install --omit=dev --no-audit --no-fund && npm cache clean --force
+COPY server/package.json server/package-lock.json ./server/
+RUN cd server && npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 
 # 애플리케이션
 COPY server ./server

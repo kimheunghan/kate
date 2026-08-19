@@ -46,6 +46,7 @@
     initToolbar();
     bindTabs();
     bindEditorPanel();
+    bindExcelImport();
     bindFiles();
     bindSaveButtons();
     bindListTab();
@@ -316,6 +317,98 @@
     $('#sel-org').onchange = () => $('#btn-load').click();
     $('#btn-add-row').onclick = () => { addRow(null, false); state.dirty = true; };
     $('#btn-copy-prev').onclick = copyFromPreviousWeek;
+  }
+
+  // ==================================================================
+  // Excel 여러 주차 일괄등록
+  // ==================================================================
+  function bindExcelImport() {
+    $('#btn-excel-template').onclick = () => {
+      location.href = '/api/reports/excel/template';
+    };
+    $('#btn-excel-import').onclick = () => $('#excel-file-input').click();
+    $('#excel-file-input').onchange = async (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      const form = new FormData();
+      form.append('file', file);
+      try {
+        toast('Excel 파일을 분석하고 있습니다.');
+        const preview = await api.post('/api/reports/excel/preview', form);
+        openExcelPreview(preview, file.name);
+      } catch (err) { toast(err.message, true); }
+    };
+  }
+
+  function openExcelPreview(preview, fileName) {
+    const groups = preview.groups || [];
+    const errors = preview.errors || [];
+    const validCount = groups.filter((g) => g.valid).length;
+    const existingCount = groups.filter((g) => g.report_id).length;
+    const rows = groups.map((g) => `
+      <tr>
+        <td>${esc(g.week_label || `${g.start_date}~${g.end_date}`)}</td>
+        <td class="center">${g.items.length}</td>
+        <td class="center">${g.status === 'SUBMITTED' ? '제출완료' : '임시저장'}</td>
+        <td class="center">${g.report_id ? `기존 ${g.existing_items}건` : '신규'}</td>
+        <td>${g.valid ? (g.error ? `<span class="warn-text">${esc(g.error)}</span>` : '등록 가능') : `<span class="danger-text">${esc(g.error || '등록 불가')}</span>`}</td>
+      </tr>`).join('');
+    const errorRows = errors.map((e) => `<li>${e.row}행: ${esc(e.message)}</li>`).join('');
+
+    const back = document.createElement('div');
+    back.className = 'modal-back';
+    back.innerHTML = `
+      <div class="modal" style="max-width:900px">
+        <header>Excel 일괄등록 미리보기</header>
+        <div class="body">
+          <p><b>${esc(fileName)}</b> · ${groups.length}개 주차 · 등록 가능 ${validCount}개${existingCount ? ` · 기존 보고서 ${existingCount}개` : ''}</p>
+          ${errors.length ? `<div class="alert error"><b>제외된 행 ${errors.length}건</b><ul class="compact-list">${errorRows}</ul></div>` : ''}
+          <div class="table-scroll">
+            <table class="grid">
+              <thead><tr><th>주차</th><th class="center">업무</th><th class="center">상태</th><th class="center">구분</th><th>검증</th></tr></thead>
+              <tbody>${rows || '<tr><td colspan="5" class="empty">등록 가능한 내용이 없습니다.</td></tr>'}</tbody>
+            </table>
+          </div>
+          <label class="field mt16"><span>기존 보고서 처리</span>
+            <select id="xl-mode">
+              <option value="replace" selected>기존 계획·실적을 Excel 내용으로 교체</option>
+              <option value="skip">기존 보고서는 건너뛰기</option>
+            </select>
+          </label>
+          <div class="alert info">저장 전 검증 결과입니다. 교체를 선택해도 기존 첨부파일은 삭제되지 않고 보고서에 유지됩니다.</div>
+          <div class="alert error hidden" id="xl-error"></div>
+        </div>
+        <footer>
+          <button class="btn" id="xl-cancel">취소</button>
+          <button class="btn primary" id="xl-save" ${validCount ? '' : 'disabled'}>일괄 저장</button>
+        </footer>
+      </div>`;
+    document.body.appendChild(back);
+    const close = () => back.remove();
+    back.querySelector('#xl-cancel').onclick = close;
+    back.addEventListener('click', (e) => { if (e.target === back) close(); });
+    back.querySelector('#xl-save').onclick = async () => {
+      const button = back.querySelector('#xl-save');
+      const mode = back.querySelector('#xl-mode').value;
+      if (mode === 'replace' && !confirm('기존 보고서의 계획·실적을 Excel 내용으로 교체합니다. 계속할까요?')) return;
+      button.disabled = true;
+      try {
+        const result = await api.post('/api/reports/excel/commit', {
+          mode,
+          groups: groups.filter((g) => g.valid).map((g) => ({
+            start_date: g.start_date, end_date: g.end_date, status: g.status, items: g.items,
+          })),
+        });
+        close();
+        toast(`${result.saved.length}개 주차 저장, ${result.skipped.length}개 주차 건너뜀`);
+        await loadCurrent();
+      } catch (err) {
+        button.disabled = false;
+        const el = back.querySelector('#xl-error');
+        el.textContent = err.message; el.classList.remove('hidden');
+      }
+    };
   }
 
   async function copyFromPreviousWeek() {

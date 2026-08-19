@@ -529,6 +529,9 @@ body.brush-armed .editor-area { cursor: cell; }
   color: var(--text-dim);
 }
 .hint-note b { color: var(--text); }
+.danger-text { color: var(--danger); font-weight: 700; }
+.warn-text { color: var(--warn); font-weight: 700; }
+.compact-list { margin: 6px 0 0; padding-left: 20px; }
 
 /* 상단바의 소속·이름 (클릭하면 내 정보 수정) */
 .topbar button.who {
