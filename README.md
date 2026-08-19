@@ -1,15 +1,93 @@
 # 주간실적 보고 시스템 (Weekly Report System)
 
-작성자별 **주간 추진실적(① 당초 계획 / ② 추진 실적)** 을 웹에서 등록·수정·조회하고,
-증적자료(문서·소스파일)를 첨부하며, 관리자가 전체 등록 현황을 한눈에 확인하는 시스템입니다.
+작성자별 **주간 추진실적(① 당초 계획 / ② 추진 실적 / ③ 향후 계획)** 을 웹에서 등록·수정·조회하고,
+증적자료(문서·소스파일)를 첨부하며, 관리자가 전체 제출 현황을 한눈에 확인하는 시스템입니다.
 
-- 백엔드: **Node.js 20 + Express + PostgreSQL 16**
-- 프론트엔드: **순수 HTML/CSS/JS** — 빌드 도구·CDN 의존 없음 (폐쇄망에서 그대로 동작)
-- 배포: **Podman 4.9+/5.x, podman-compose 또는 Docker Compose V2 호환 Compose Specification**
+- 프론트엔드: **순수 HTML/CSS/JS** — 프레임워크·빌드 도구·CDN 의존 없음 (폐쇄망에서 그대로 동작)
+- 백엔드: **Node.js 20 + Express** (REST API)
+- 데이터베이스: **PostgreSQL 16** (`wr` 스키마)
+- 배포: **Podman 4.9+/5.x**, podman-compose 또는 Docker Compose V2 호환
 
 ---
 
-## 1. 서버 구성
+## 1. 기술 구성
+
+Node.js 애플리케이션 하나가 **프론트 정적 파일과 백엔드 API 를 함께 서비스**합니다.
+별도의 웹서버(nginx 등)나 프론트엔드 빌드 과정이 없습니다.
+
+```
+브라우저
+   │  HTML/CSS/JS 정적 파일 + REST API  (같은 포트)
+   ▼
+wr-app  (Node.js 20 + Express)
+   │  pg 드라이버
+   ▼
+wr-db   (PostgreSQL 16, wr 스키마)
+```
+
+### 프론트엔드 — 순수 HTML · CSS · JavaScript
+
+React, Vue 같은 프레임워크를 쓰지 않습니다. 빌드 도구·CDN 의존이 없어
+폐쇄망 서버에 소스를 그대로 올려도 동작하며, 이관 시 빌드 실패 위험이 없습니다.
+
+| 구분 | 파일 |
+|---|---|
+| 화면 | `public/app.html` (작성/조회), `admin.html`, `login.html`, `signup.html`, `reset.html` |
+| 동작 | `public/js/app.js` (작성/조회), `admin.js`, `api.js`(공통), `editor.js`(리치텍스트) |
+| 디자인 | `public/css/style.css` |
+
+서버에서 정적 파일로 제공하며, 파일이 바뀌면 URL 에 버전(`?v=…`)이 자동으로 붙어
+브라우저가 옛 파일을 계속 쓰는 일이 없습니다.
+
+### 백엔드 — Node.js 20 + Express (REST API)
+
+| 기능 | 라우터 |
+|---|---|
+| 로그인·세션 인증, 회원가입, 비밀번호 재설정 | `server/src/routes/auth.js` |
+| 보고서 CRUD, 인쇄·Word 내보내기 | `routes/reports.js` |
+| 첨부파일(증적자료) 업로드·다운로드 | `routes/files.js` |
+| Excel 일괄 등록·내보내기 | `routes/excel.js` |
+| 관리자 기능(현황·사용자·기관·주차·승인) | `routes/admin.js` |
+| 주차·기관 목록 | `routes/meta.js` |
+
+의존성은 6개뿐입니다.
+
+| 패키지 | 용도 |
+|---|---|
+| `express` | HTTP 서버·라우팅 |
+| `pg` | PostgreSQL 드라이버 |
+| `multer` | 파일 업로드 |
+| `exceljs` | Excel 처리 |
+| `cookie-parser` | 세션 쿠키 |
+| `nodemailer` | 메일 발송(SMTP 설정 시에만 동작) |
+
+비밀번호 해싱은 Node 내장 `crypto.scrypt`, HTML 정제(XSS 방어)는
+`server/src/lib/sanitize.js` 자체 구현이라 네이티브 모듈 의존이 없습니다.
+
+### 데이터베이스 — PostgreSQL 16
+
+- `wr` 스키마 사용 (`public` 아님)
+- Node.js `pg` 드라이버로 연결, 커넥션 풀 사용
+- 스키마 정의 `db/init/01_schema.sql`, 변경 이력 `db/migrations/*.sql`
+
+### 배포 — Podman / Docker Compose 호환 컨테이너
+
+| 컨테이너 | 이미지 | 역할 |
+|---|---|---|
+| `wr-app` | `localhost/weekly-report:1.0` (Containerfile 로 빌드) | 웹 + API |
+| `wr-db` | `postgres:16-alpine` | 데이터베이스 |
+
+Compose 파일 3종을 용도에 따라 사용합니다.
+
+| 파일 | 용도 |
+|---|---|
+| `docker-compose.yml` | 개발·올인원 (앱 + DB 한 호스트) |
+| `docker-compose.db.yml` | 운영 DB 서버 전용 (192.168.200.116) |
+| `docker-compose.prod.yml` | 운영 APP 서버 전용 (192.168.200.115) |
+
+---
+
+## 2. 서버 구성
 
 | 역할 | 주소 | 사양 | OS | podman |
 |---|---|---|---|---|
@@ -41,35 +119,48 @@
 
 ---
 
-## 2. 기능
+## 3. 기능
 
 ### 사용자 (작성자)
 - **로그인 / 비밀번호 변경** (세션 12시간, 로그인 10회 실패 시 5분 잠금)
-- **주간보고 작성** — 업무별로 `업무명 / ① 당초 계획 / ② 추진 실적` 행을 추가·삭제·순서변경
+- **주간보고 작성** — 항목별로 `① 당초 계획 / ② 추진 실적 / ③ 향후 계획` 행을 추가·삭제·순서변경
+  (보고서는 **작성자 1명 × 주차 1건**. 기관은 작성 당시 소속으로 기록되어 기관별 집계에 쓰입니다)
 - **서식 편집기** — 글꼴·크기·굵게·기울임·밑줄·취소선·글자색·형광펜·정렬·글머리표·번호·들여쓰기·인용·링크·표·이미지·서식지우기
   (붙여넣기 시 서식 유지, 화면 캡처 붙여넣기 지원)
 - **증적자료 첨부** — 드래그&드롭 / 다중 업로드 / 한글 파일명 / 다운로드 / 삭제
 - **임시저장 · 제출** 구분, 저장 즉시 화면에 반영
-- **조회** — 주차·기관·상태·검색어(업무명 및 본문)로 검색, 페이징
-- **직전 주차 불러오기** — 지난주 업무명·계획을 그대로 가져와 이어쓰기
+- **조회** — 주차·상태·검색어(본문)로 검색, 페이징. **본인이 작성한 보고서만** 표시
+- **직전 주차 불러오기** — 지난주 `③ 향후 계획` 을 이번 주 `① 당초 계획` 으로 가져와 이어쓰기
 - **Excel 일괄등록** — 주차를 화면에서 선택하지 않고 `.xlsx` 한 파일의 시작일·종료일을 기준으로 여러 주차를 자동 분류하여 미리보기 후 등록
-- **인쇄 / PDF** — 보고서 양식 그대로 출력
+- **인쇄 / PDF · Word 다운로드** — 보고서 양식 그대로 출력 (Word 파일은 한글에서 열어 .hwp 로 저장 가능)
 
 ### 관리자
-- **등록 현황** — 선택 주차의 작성자별 제출 상태와 제출률
+- **등록 현황** — 선택 주차의 **작성자별** 제출 상태. 미제출자까지 모두 표시되며
+  기관·상태·이름으로 필터. 제출률은 `제출 인원 / 대상 인원` (대상 인원은 가입자 수로 자동 산정)
 - **주차별 현황판** — 최근 N주 × 기관별 대상 인원/완료/임시/미등록 집계
 - **기관 관리** — 추가·수정·사용중지·삭제
 - **사용자 관리** — 계정 생성·수정·비밀번호 초기화·정지·삭제 (마지막 관리자 강등 방지)
+- **가입 승인** — 승인제로 운영할 경우 신청 승인·반려, 비밀번호 재설정 요청 처리
+- **보고서 소속변경** — 잘못된 기관으로 등록된 보고서를 올바른 기관으로 이관
 - **주차 마감** — 마감 시 일반 사용자는 수정 불가, 관리자는 계속 수정 가능
 - **활동 로그** — 로그인·저장·삭제·업로드 이력
 
-> 요청하신 대로 **진도율 / 향후계획은 화면에 노출하지 않습니다.**
-> 다만 나중에 추가할 때 DB 마이그레이션이 필요 없도록
-> `report_items.progress_rate`, `report_items.next_plan_html` 컬럼은 미리 만들어 두었습니다.
+### 권한 체계
+
+| 권한 | 보고서 열람 범위 | 관리 기능 |
+|---|---|---|
+| `USER` (작성자) | **본인이 작성한 것만** | — |
+| `ORG_ADMIN` (기관 관리자) | 자기 기관 소속 전체 | 자기 기관 사용자·현황 관리 |
+| `ADMIN` (전체 관리자) | 전부 | 기관·주차·전체 사용자·활동 로그 |
+
+목록뿐 아니라 상세 조회·인쇄·Word 내보내기·첨부 다운로드에도 동일한 범위가 적용됩니다.
+
+> **진도율(`report_items.progress_rate`)은 화면에 노출하지 않습니다.**
+> 나중에 추가할 때 DB 마이그레이션이 필요 없도록 컬럼은 미리 만들어 두었습니다.
 
 ---
 
-## 3. 빠른 시작 (개발 서버)
+## 4. 빠른 시작 (개발 서버)
 
 ```bash
 cd weekly-report
@@ -81,11 +172,11 @@ bash scripts/gen-secrets.sh
 podman-compose up -d --build
 
 # 3) 확인
-curl http://127.0.0.1:8080/api/health
+curl http://127.0.0.1:16080/api/health     # APP_PORT 기본값 16080
 podman logs -f wr-app
 ```
 
-브라우저에서 `http://<서버IP>:8080` 접속 →
+브라우저에서 `http://<서버IP>:16080` 접속 → (`.env` 의 `APP_PORT`)
 `scripts/gen-secrets.sh` 가 출력한 **admin / (생성된 비밀번호)** 로 로그인 →
 최초 로그인 시 비밀번호 변경 안내가 뜹니다.
 
@@ -102,7 +193,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ---
 
-## 4. 운영 이관 절차 (소스·이미지)
+## 5. 운영 이관 절차 (소스·이미지)
 
 이관 대상은 세 묶음입니다.
 
@@ -112,7 +203,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 `.env`, DB 데이터, 첨부파일은 보안과 데이터 보호를 위해 소스 패키지에 포함하지 않습니다.
 
-### 4-1. 이관 패키지 만들기 (개발 서버에서)
+### 5-1. 이관 패키지 만들기 (개발 서버에서)
 
 ```bash
 bash scripts/deploy.sh package
@@ -129,7 +220,7 @@ bash scripts/deploy.sh package
 > 대상 서버가 인터넷이 되면 이미지 tar 없이 소스를 옮긴 뒤
 > `bash scripts/deploy.sh build`로 APP 이미지를 만들 수 있습니다.
 
-### 4-2. DB 서버 (192.168.200.116, Rocky Linux)
+### 5-2. DB 서버 (192.168.200.116, Rocky Linux)
 
 ```bash
 scp dist/postgres-16-alpine.tar dist/weekly-report-deploy-*.tar.gz  user@192.168.200.116:~/
@@ -154,7 +245,7 @@ sudo firewall-cmd --reload
 최초 기동 시 `db/init/01_schema.sql`, `02_seed.sql` 이 **자동 실행**되어
 스키마 · 기관 · 주차(2025~2027, 수요일~화요일 주기 157주)가 그대로 생성됩니다.
 
-### 4-3. APP 서버 (192.168.200.115, Ubuntu 22.04)
+### 5-3. APP 서버 (192.168.200.115, Ubuntu 22.04)
 
 ```bash
 scp dist/weekly-report-*.tar dist/weekly-report-deploy-*.tar.gz  user@192.168.200.115:~/
@@ -188,7 +279,7 @@ bash scripts/deploy.sh logs
 
 접속: `http://192.168.200.115:16080` → 외부 `http://183.101.26.137:16080`
 
-### 4-4. 포트가 확정되면
+### 5-4. 포트가 확정되면
 
 `.env` 의 `APP_PORT` 만 바꾸고 재기동하면 됩니다. 코드 수정 불필요.
 
@@ -207,7 +298,7 @@ bash scripts/deploy.sh down && bash scripts/deploy.sh up
 > sudo sysctl --system
 > ```
 
-### 4-5. 서버 재부팅 시 자동 기동
+### 5-5. 서버 재부팅 시 자동 기동
 
 ```bash
 podman generate systemd --new --name wr-app --files --restart-policy=always
@@ -221,7 +312,7 @@ DB 서버(`wr-db`)도 동일하게 등록하세요.
 
 ---
 
-## 5. 환경변수 (`.env`)
+## 6. 환경변수 (`.env`)
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
@@ -239,7 +330,7 @@ DB 서버(`wr-db`)도 동일하게 등록하세요.
 
 ---
 
-## 6. DB 스키마 및 이관
+## 7. DB 스키마 및 이관
 
 스키마 이름은 **`wr`** 입니다. 전체 정의는 `db/init/01_schema.sql`.
 
@@ -267,7 +358,7 @@ SELECT r.id, w.label, u.name AS author_name,
  ORDER BY r.id, i.sort_order;
 ```
 
-### 6-1. 신규 DB 서버에 빈 스키마 생성
+### 7-1. 신규 DB 서버에 빈 스키마 생성
 
 `docker-compose.db.yml`로 빈 데이터 디렉터리를 최초 기동하면 `db/init/*.sql`이 자동 실행됩니다.
 
@@ -280,7 +371,7 @@ podman logs -f wr-db
 
 `db/init` 자동 실행은 **PGDATA가 비어 있는 최초 1회만** 수행됩니다.
 
-### 6-2. 기존 DB를 최신 스키마로 갱신
+### 7-2. 기존 DB를 최신 스키마로 갱신
 
 ```bash
 DB_HOST=192.168.200.116 bash scripts/apply-schema.sh
@@ -295,7 +386,7 @@ DB_HOST=192.168.200.116 bash scripts/apply-schema.sh
 마이그레이션 적용 전에는 반드시 `scripts/backup.sh`로 백업하십시오.
 `psql`이 없으면 PostgreSQL 컨테이너를 이용합니다.
 
-### 6-3. 기존 데이터까지 다른 DB 서버로 이관
+### 7-3. 기존 데이터까지 다른 DB 서버로 이관
 
 원본 서버:
 
@@ -320,7 +411,7 @@ bash scripts/deploy.sh restart
 
 복원은 대상 DB의 기존 데이터를 교체하는 작업이므로 스크립트가 `yes` 확인을 요구합니다.
 
-### 6-4. 스키마 버전 파일
+### 7-4. 스키마 버전 파일
 
 - 신규 설치 기준: `db/init/01_schema.sql`, `db/init/02_seed.sql`
 - 기존 설치 변경 이력: `db/migrations/001_*.sql`부터 번호 순서대로 적용
@@ -329,13 +420,18 @@ bash scripts/deploy.sh restart
 
 ### 주차 생성 주기 변경
 
-현재 보고서 양식(`8/13(수)~8/19(화)`)에 맞춰 **수요일 시작**으로 생성됩니다.
-월요일 시작으로 바꾸려면 `db/init/02_seed.sql` 의 `generate_series` 시작일
-`'2025-01-01'`(수) 을 `'2024-12-30'`(월) 으로 바꾸고 다시 적용하세요.
+주간보고는 **매주 수요일**에 작성하며 대상 기간은 직전 목요일 ~ 당일 수요일입니다.
+따라서 주차는 **목~수** 주기이고, 1주차 시작일은 `2026-04-23(목)` 입니다.
+(`2026-04-23 + 16주 = 2026-08-13` → `2026/08/13목~08/19수` 가 **17주차**)
+
+기준일을 바꾸려면 `db/init/02_seed.sql` 의 `WEEK_BASELINE` 주석이 달린 날짜를
+원하는 요일의 날짜로 바꾸고 다시 적용하세요. 이미 운영 중인 DB 는
+`db/migrations/007_week_thu_wed.sql` 처럼 기준일을 바꾼 마이그레이션을 추가하면
+기존 보고서가 겹치는 기간이 가장 큰 새 주차로 자동 이관됩니다.
 
 ---
 
-## 7. 백업 / 복원
+## 8. 백업 / 복원
 
 ```bash
 # 백업 (DB 덤프 + 증적자료). 30일 지난 백업은 자동 삭제
@@ -350,7 +446,7 @@ bash scripts/restore.sh /backup/wr-20260818-020000.sql.gz /backup/wr-20260818-02
 
 ---
 
-## 8. 보안
+## 9. 보안
 
 적용된 항목:
 
@@ -373,7 +469,7 @@ bash scripts/restore.sh /backup/wr-20260818-020000.sql.gz /backup/wr-20260818-02
 
 ---
 
-## 9. 디렉터리 구조
+## 10. 디렉터리 구조
 
 ```
 weekly-report/
@@ -407,7 +503,7 @@ weekly-report/
 
 ---
 
-## 10. 트러블슈팅
+## 11. 트러블슈팅
 
 | 증상 | 확인 |
 |---|---|
@@ -416,7 +512,7 @@ weekly-report/
 | `SESSION_SECRET 환경변수가 설정되지 않았습니다` | `bash scripts/gen-secrets.sh` 실행 |
 | 첨부 업로드 실패 | `UPLOAD_HOST_DIR` 쓰기 권한, `MAX_UPLOAD_MB` 확인 |
 | SELinux 로 볼륨 접근 거부 (Rocky) | compose 의 `:z` 옵션 유지, 또는 `sudo setsebool -P container_manage_cgroup on` |
-| 포트 바인딩 실패 | rootless podman 은 1024 미만 포트 불가 → 4-4 항목 참고 |
+| 포트 바인딩 실패 | rootless podman 은 1024 미만 포트 불가 → 5-4 항목 참고 |
 | 스키마가 안 만들어짐 | `db/init` 은 **최초 기동 시에만** 실행됨 → `scripts/apply-schema.sh` 사용 |
 | 이미지 재빌드가 반영 안 됨 | `bash scripts/deploy.sh build` 후 APP 컨테이너 재생성 |
 
@@ -426,6 +522,6 @@ weekly-report/
 podman ps
 podman logs -f wr-app
 podman logs -f wr-db
-curl http://127.0.0.1:8080/api/health          # {"ok":true,"db":"up",...}
+curl http://127.0.0.1:16080/api/health         # {"ok":true,"db":"up",...}
 podman exec -it wr-db psql -U wruser -d weekly_report -c '\dt wr.*'
 ```
