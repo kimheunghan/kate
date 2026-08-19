@@ -60,7 +60,7 @@ function cellText(v) {
  *    - – — · *      → 2단계
  *    그 외          → 0단계 (다만 직접 넣은 앞 공백이 있으면 그만큼 반영)
  */
-const INDENT_PX = 16;
+const INDENT_PX = 8;   // 1단계 8px, 2단계 16px (공백 2칸 / 4칸 정도)
 
 function lineIndentLevel(line) {
   const body = line.replace(/^[\s\u00a0]+/, '');
