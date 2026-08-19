@@ -494,14 +494,16 @@ ${forWord ? `<!--[if gte mso 9]><xml>
     border: 1px solid #333; padding: 6px 7px; vertical-align: top;
     overflow-wrap: anywhere; word-break: break-word;
   }
-  th { background: #fffbcc; text-align: center; font-weight: 700; }
+  /* 제목보다 본문을 한 단계 작게 (같은 크기면 표가 답답해 보인다) */
+  th { background: #fffbcc; text-align: center; font-weight: 700; font-size: 10pt; }
+  td { font-size: 9pt; line-height: 1.45; }
   td.org, td.who {
     background: #fcfcf0; text-align: center; vertical-align: middle;
-    font-weight: 600; font-size: 10pt;
+    font-weight: 600; font-size: 9.5pt;
   }
 
   td img { max-width: 100%; height: auto; }
-  td table { width: 100%; table-layout: fixed; font-size: 9.5pt; }
+  td table { width: 100%; table-layout: fixed; font-size: 8.5pt; }
   td pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0; }
   td ul, td ol { margin: 3px 0; padding-left: 18px; }
   td p { margin: 0 0 3px; }
@@ -510,7 +512,7 @@ ${forWord ? `<!--[if gte mso 9]><xml>
   tr { page-break-inside: avoid; break-inside: avoid; }
 
   .note { margin-top: 12px; font-size: 10pt; page-break-inside: avoid; break-inside: avoid; }
-  ol.files { margin: 5px 0 0; padding-left: 20px; font-size: 9.5pt; }
+  ol.files { margin: 5px 0 0; padding-left: 20px; font-size: 9pt; }
   ol.files li { margin-bottom: 2px; overflow-wrap: anywhere; }
 
   /* Word 용: 목록 태그 없이 번호를 직접 붙인 줄. 여백·줄간격을 명시해
