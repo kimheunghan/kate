@@ -47,6 +47,7 @@
         <button class="btn sm primary" id="btn-excel-import">Excel 일괄등록</button>
         <input type="file" id="excel-file-input" accept=".xlsx" class="hidden">
         <button class="btn sm icon" id="btn-add-row" title="항목 추가">＋</button>
+        <button class="btn sm icon danger" id="btn-del-row" title="항목 삭제">－</button>
       </header>
 
       <!-- 공용 편집 툴바: 현재 편집 중인 칸에 적용됩니다 -->
@@ -57,7 +58,7 @@
         <div class="table-scroll">
           <table class="report-table">
             <colgroup>
-              <col class="c-no"><col class="c-cell"><col class="c-cell"><col class="c-cell"><col class="c-act">
+              <col class="c-no"><col class="c-cell"><col class="c-cell"><col class="c-cell">
             </colgroup>
             <thead>
               <tr>
@@ -65,7 +66,6 @@
                 <th>① 당초 계획</th>
                 <th>② 추진 실적</th>
                 <th>③ 향후 계획</th>
-                <th>관리</th>
               </tr>
             </thead>
             <tbody id="items-body"></tbody>

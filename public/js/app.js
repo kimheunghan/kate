@@ -226,6 +226,7 @@
 
     // 버튼 활성/비활성
     $('#btn-add-row').disabled = readOnly;
+    $('#btn-del-row').disabled = readOnly;
     $('#btn-save').disabled = readOnly;
     $('#btn-print').disabled = !report;
     $('#btn-export').disabled = !report;
@@ -240,7 +241,7 @@
     state.rows = [];
     if (!items || !items.length) {
       if (readOnly) {
-        $('#items-body').innerHTML = '<tr><td colspan="5" class="empty">등록된 항목이 없습니다.</td></tr>';
+        $('#items-body').innerHTML = '<tr><td colspan="4" class="empty">등록된 항목이 없습니다.</td></tr>';
         return;
       }
       addRow(null, readOnly);
@@ -259,10 +260,7 @@
       <td class="cell-no"></td>
       <td><div class="ed-plan"></div></td>
       <td><div class="ed-result"></div></td>
-      <td><div class="ed-next"></div></td>
-      <td class="cell-act">
-        <button class="btn sm danger icon btn-del-row" type="button" title="이 항목 삭제">－</button>
-      </td>`;
+      <td><div class="ed-next"></div></td>`;
     tbody.appendChild(tr);
 
     const onChange = () => { state.dirty = true; };
@@ -284,18 +282,6 @@
 
     const row = { itemId: item ? item.id : null, tr, planEd, resultEd, nextEd };
     state.rows.push(row);
-
-    if (readOnly) {
-      tr.querySelector('.cell-act').innerHTML = '<span class="muted small">-</span>';
-    } else {
-      tr.querySelector('.btn-del-row').onclick = () => {
-        if (state.rows.length === 1) { toast('최소 1개의 항목이 필요합니다.', true); return; }
-        state.rows = state.rows.filter((r) => r !== row);
-        tr.remove();
-        state.dirty = true;
-        renumber();
-      };
-    }
 
     renumber();
     return row;
@@ -322,6 +308,31 @@
     $('#sel-week').onchange = () => $('#btn-load').click();
     $('#sel-org').onchange = () => $('#btn-load').click();
     $('#btn-add-row').onclick = () => { addRow(null, false); state.dirty = true; };
+
+    // － : 편집 중인 항목을 지운다. 편집 중인 칸이 없으면 마지막 항목.
+    $('#btn-del-row').onclick = () => {
+      if (!state.rows.length) return;
+      if (state.rows.length === 1) { toast('최소 1개의 항목이 필요합니다.', true); return; }
+
+      const active = state.activeEditor;
+      let target = active
+        ? state.rows.find((r) => r.planEd === active || r.resultEd === active || r.nextEd === active)
+        : null;
+      const isLast = !target;
+      if (!target) target = state.rows[state.rows.length - 1];
+
+      const hasText = [target.planEd, target.resultEd, target.nextEd]
+        .some((ed) => ed.area.textContent.trim() || ed.area.querySelector('img'));
+      const no = state.rows.indexOf(target) + 1;
+      if (hasText && !confirm(`${no}번 항목을 삭제할까요?`)) return;
+
+      if (active && !isLast) setActiveEditor(null);
+      state.rows = state.rows.filter((r) => r !== target);
+      target.tr.remove();
+      state.dirty = true;
+      renumber();
+      toast(`${no}번 항목을 삭제했습니다.`);
+    };
   }
 
   // ==================================================================
