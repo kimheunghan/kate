@@ -308,7 +308,7 @@
     $('#btn-add-row').onclick = () => { addRow(null, false); state.dirty = true; };
 
     // － : 편집 중인 항목을 지운다. 편집 중인 칸이 없으면 마지막 항목.
-    //      실수로 연속 클릭해 내용이 사라지지 않도록 항상 확인을 받는다.
+    //      항목이 하나만 남았을 때만 확인을 받는다 (그 외에는 바로 삭제).
     $('#btn-del-row').onclick = () => {
       if (!state.rows.length) return;
 
@@ -320,8 +320,7 @@
         if (!filled) { toast('최소 1개의 항목이 필요합니다.', true); return; }
         if (!confirm(
           '마지막 항목이라 삭제할 수 없습니다.\n\n'
-          + '대신 이 항목의 ①②③ 내용을 모두 비울까요?\n'
-          + '(저장하기 전이라면 [취소] 후 새로고침하면 되돌릴 수 있습니다)'
+          + '대신 이 항목의 ①②③ 내용을 모두 비울까요?'
         )) return;
         [only.planEd, only.resultEd, only.nextEd].forEach((ed) => ed.setHtml(''));
         state.dirty = true;
@@ -337,15 +336,6 @@
       if (!target) target = state.rows[state.rows.length - 1];
 
       const no = state.rows.indexOf(target) + 1;
-      const preview = [plain(target.planEd), plain(target.resultEd), plain(target.nextEd)]
-        .find((t) => t) || '';
-
-      const msg = `${no}번 항목을 삭제합니다.`
-        + (byActive ? '' : '  (편집 중인 칸이 없어 마지막 항목을 지웁니다)')
-        + (preview ? `\n\n  "${preview.slice(0, 60)}${preview.length > 60 ? '…' : ''}"` : '\n\n  (빈 항목)')
-        + '\n\n계속할까요?';
-      if (!confirm(msg)) return;
-
       if (byActive) setActiveEditor(null);
       state.rows = state.rows.filter((r) => r !== target);
       target.tr.remove();
