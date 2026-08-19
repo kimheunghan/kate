@@ -406,15 +406,46 @@ router.delete('/:id(\\d+)', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------
+// 날짜 표기 : 2026-08-13 → 8/13.목
+// ---------------------------------------------------------------------
+const KOR_DOW = ['일', '월', '화', '수', '목', '금', '토'];
+
+function fmtDate(iso) {
+  const [y, m, d] = String(iso || '').split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return `${m}/${d}.${KOR_DOW[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}`;
+}
+
+function fmtRange(start, end) {
+  const a = fmtDate(start); const b = fmtDate(end);
+  return a && b ? `${a}~${b}` : '';
+}
+
+/** 해당 주차 바로 다음 주차 (향후 계획의 대상 기간) */
+async function loadNextWeek(startDate) {
+  const { rows } = await db.query(
+    `SELECT start_date, end_date FROM wr.report_weeks
+      WHERE start_date > $1 ORDER BY start_date LIMIT 1`,
+    [startDate]
+  );
+  return rows[0] || null;
+}
+
+// ---------------------------------------------------------------------
 // 보고서 문서 HTML 생성 (인쇄 / Word 다운로드 공용)
 //   forWord=true 이면 Word·한글이 페이지 설정을 인식하도록 mso 지시문을 넣는다.
 // ---------------------------------------------------------------------
-function buildReportHtml(report, items, files, { forWord = false } = {}) {
+function buildReportHtml(report, items, files, { forWord = false, nextWeek = null } = {}) {
   const esc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+  const thisRange = fmtRange(report.start_date, report.end_date);
+  const nextRange = nextWeek ? fmtRange(nextWeek.start_date, nextWeek.end_date) : '';
+
+  const n = items.length || 1;
   const rows = items.map((it, i) => `
       <tr>
-        <td class="no">${i + 1}</td>
+        ${i === 0 ? `<td class="org" rowspan="${n}">${esc(report.org_name)}</td>
+        <td class="who" rowspan="${n}">${esc(report.author_name || '-')}</td>` : ''}
         <td class="cell">${it.plan_html || ''}</td>
         <td class="cell">${it.result_html || ''}</td>
         <td class="cell">${it.next_plan_html || ''}</td>
@@ -465,7 +496,10 @@ ${forWord ? `<!--[if gte mso 9]><xml>
     overflow-wrap: anywhere; word-break: break-word;
   }
   th { background: #fffbcc; text-align: center; font-weight: 700; }
-  td.no { background: #fcfcf0; text-align: center; font-weight: 600; }
+  td.org, td.who {
+    background: #fcfcf0; text-align: center; vertical-align: middle;
+    font-weight: 600; font-size: 10pt;
+  }
 
   td img { max-width: 100%; height: auto; }
   td table { width: 100%; table-layout: fixed; font-size: 9.5pt; }
@@ -495,9 +529,15 @@ ${forWord ? '<div class="WordSection1">' : ''}
 <h1>주간 추진실적 보고</h1>
 <div class="meta">기관: ${esc(report.org_name)} &nbsp;|&nbsp; 기간: ${esc(report.week_label)} &nbsp;|&nbsp; 작성자: ${esc(report.author_name || '-')} &nbsp;|&nbsp; 상태: ${report.status === 'SUBMITTED' ? '제출완료' : '임시저장'}</div>
 <table>
-  <colgroup><col style="width:6%"><col style="width:31%"><col style="width:32%"><col style="width:31%"></colgroup>
-  <thead><tr><th>순번</th><th>① 당초 계획</th><th>② 추진 실적</th><th>③ 향후 계획</th></tr></thead>
-  <tbody>${rows || '<tr><td colspan="4">등록된 항목이 없습니다.</td></tr>'}</tbody>
+  <colgroup><col style="width:11%"><col style="width:9%"><col style="width:26%"><col style="width:28%"><col style="width:26%"></colgroup>
+  <thead><tr>
+    <th>기관명</th>
+    <th>참여인력</th>
+    <th>① 당초 계획${thisRange ? `(${thisRange})` : ''}</th>
+    <th>② 추진 실적${thisRange ? `(${thisRange})` : ''}</th>
+    <th>향후 계획${nextRange ? `(${nextRange})` : ''}</th>
+  </tr></thead>
+  <tbody>${rows || '<tr><td colspan="5">등록된 항목이 없습니다.</td></tr>'}</tbody>
 </table>
 ${report.note ? `<div class="note"><b>특이사항</b><br>${esc(report.note).replace(/\n/g, '<br>')}</div>` : ''}
 ${files.length ? `<div class="note">
@@ -526,7 +566,8 @@ router.get('/:id(\\d+)/print', async (req, res, next) => {
     if (!canViewReport(req.user, report)) return res.status(403).send('열람 권한이 없습니다.');
     const items = await loadItems(report.id);
     const files = await loadAttachments(report.id);
-    res.type('html').send(buildReportHtml(report, items, files, { forWord: false }));
+    const nextWeek = await loadNextWeek(report.start_date);
+    res.type('html').send(buildReportHtml(report, items, files, { forWord: false, nextWeek }));
   } catch (err) { next(err); }
 });
 
@@ -541,7 +582,8 @@ router.get('/:id(\\d+)/export', async (req, res, next) => {
     const items = await loadItems(report.id);
     const files = await loadAttachments(report.id);
 
-    const html = buildReportHtml(report, items, files, { forWord: true });
+    const nextWeek = await loadNextWeek(report.start_date);
+    const html = buildReportHtml(report, items, files, { forWord: true, nextWeek });
     const name = safeFileName(`${report.org_name}_주간보고_${report.week_label}`) + '.doc';
 
     await audit.log(req, 'REPORT_EXPORT', { targetType: 'report', targetId: report.id, detail: name });

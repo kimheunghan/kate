@@ -188,6 +188,33 @@
     } catch (e) { toast(e.message, true); }
   }
 
+  const KOR_DOW = ['일', '월', '화', '수', '목', '금', '토'];
+
+  /** 2026-08-13 → 8/13.목 */
+  function fmtDay(iso) {
+    const [y, m, d] = String(iso || '').split('-').map(Number);
+    if (!y || !m || !d) return '';
+    return `${m}/${d}.${KOR_DOW[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}`;
+  }
+
+  function fmtRange(start, end) {
+    const a = fmtDay(start); const b = fmtDay(end);
+    return a && b ? `${a}~${b}` : '';
+  }
+
+  /** 표 제목에 대상 기간을 표시. 향후 계획은 다음 주차 기간을 쓴다. */
+  function updateTableHeads(week) {
+    const cur = week ? fmtRange(week.start_date, week.end_date) : '';
+    // weeks 는 최신순 정렬이므로 바로 앞 항목이 다음 주차
+    const idx = week ? state.weeks.findIndex((w) => w.id === week.id) : -1;
+    const nextWeek = idx > 0 ? state.weeks[idx - 1] : null;
+    const nxt = nextWeek ? fmtRange(nextWeek.start_date, nextWeek.end_date) : '';
+
+    $('#th-plan').innerHTML = `① 당초 계획${cur ? `<span class="th-date">(${cur})</span>` : ''}`;
+    $('#th-result').innerHTML = `② 추진 실적${cur ? `<span class="th-date">(${cur})</span>` : ''}`;
+    $('#th-next').innerHTML = `③ 향후 계획${nxt ? `<span class="th-date">(${nxt})</span>` : ''}`;
+  }
+
   function applyReport(report, weekId, orgId) {
     state.report = report;
     state.dirty = false;
@@ -198,6 +225,7 @@
     const readOnly = report ? !report.can_edit : (closed && state.me.role !== 'ADMIN');
 
     $('#editor-title').textContent = `${org ? org.name : ''} · ${week ? week.label : ''}`;
+    updateTableHeads(week);
     $('#editor-badge').innerHTML =
       (report ? statusBadge(report.status) : statusBadge('NONE')) +
       (closed ? ' <span class="badge closed">마감</span>' : '');

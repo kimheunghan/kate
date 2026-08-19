@@ -697,3 +697,12 @@ table.grid td.summary {
   margin-bottom: 0;
 }
 #write-status .alert + .alert { margin-top: 6px; }
+
+/* 표 제목의 대상 기간 표기 */
+.report-table th .th-date {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
