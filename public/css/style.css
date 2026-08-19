@@ -267,20 +267,41 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
   font-weight: 700;
   letter-spacing: -.2px;
 }
+/* 눌리는 버튼처럼 보이도록 각진 사각 버튼 + 입체감 */
 .toolbar-hint .row-ctl .btn.icon {
-  width: 28px; height: 26px;
-  border-radius: 50%;
+  width: 30px;
+  height: 27px;
+  border-radius: 5px;
+  border-width: 1px;
+  border-style: solid;
   font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 1px 0 rgba(20, 34, 51, .16);
+  transition: background .12s, box-shadow .12s, transform .05s;
 }
 .toolbar-hint .row-ctl .btn.icon:not(.danger) {
-  border-color: var(--primary);
-  color: var(--primary);
+  background: linear-gradient(#f4f8fd, #e4eef9);
+  border-color: #9bbde0;
+  color: var(--primary-dk);
 }
 .toolbar-hint .row-ctl .btn.icon:not(.danger):hover:not(:disabled) {
-  background: var(--primary); color: #fff;
+  background: linear-gradient(#e8f1fb, #d3e5f6);
+  border-color: var(--primary);
+}
+.toolbar-hint .row-ctl .btn.icon.danger {
+  background: linear-gradient(#fdf5f4, #f8e6e3);
+  border-color: #dfaea7;
+  color: var(--danger);
 }
 .toolbar-hint .row-ctl .btn.icon.danger:hover:not(:disabled) {
-  background: var(--danger); color: #fff; border-color: var(--danger);
+  background: linear-gradient(#fbeae7, #f4d7d2);
+  border-color: var(--danger);
+}
+/* 누를 때 살짝 들어가는 느낌 */
+.toolbar-hint .row-ctl .btn.icon:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(20, 34, 51, .18);
 }
 .editor-toolbar .sep { width: 1px; height: 18px; background: var(--border-dk); margin: 0 4px; }
 .editor-toolbar button {
