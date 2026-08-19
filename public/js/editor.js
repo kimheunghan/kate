@@ -422,8 +422,20 @@
     // execCommand('indent') 는 Chrome 에서 <blockquote> 를 만들어 인용문처럼 보이고,
     // 엑셀에서 들어온 padding-left 들여쓰기는 outdent 로 되돌려지지 않는다.
     // 그래서 선택된 줄의 여백을 직접 조절한다. (엑셀 등록과 같은 방식)
-    // 한 번에 공백 2칸 정도만 움직이도록. (16px 은 3~4칸이라 너무 크게 뛴다)
-    INDENT_STEP = 8;
+    /**
+     * 들여쓰기 한 칸 = 실제 공백 한 칸 폭.
+     * 글꼴·크기에 따라 다르므로 편집 영역의 실제 글꼴로 측정한다.
+     * (고정값을 쓰면 스페이스로 조절할 때와 간격이 어긋난다)
+     */
+    _spaceWidth(ed) {
+      const probe = document.createElement('span');
+      probe.textContent = '\u00a0'.repeat(20);
+      probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;left:-9999px';
+      ed.area.appendChild(probe);
+      const w = probe.getBoundingClientRect().width / 20;
+      probe.remove();
+      return w > 1 ? Math.round(w * 100) / 100 : 4;
+    }
 
     /** 선택 영역에 걸친 최상위 블록들 (편집 영역의 직계 자식) */
     _selectedBlocks(ed) {
@@ -480,11 +492,13 @@
       const blocks = this._selectedBlocks(ed);
       if (!blocks.length) return;
 
+      const step = this._spaceWidth(ed);
+
       blocks.forEach((el) => {
         // 목록은 padding-left 가 글머리표 위치를 결정하므로 margin 으로 민다
         const prop = (el.tagName === 'UL' || el.tagName === 'OL') ? 'marginLeft' : 'paddingLeft';
-        const cur = parseInt(el.style[prop], 10) || 0;
-        const next = Math.max(0, cur + delta * this.INDENT_STEP);
+        const cur = parseFloat(el.style[prop]) || 0;
+        const next = Math.max(0, Math.round((cur + delta * step) * 100) / 100);
         if (next) el.style[prop] = `${next}px`;
         else el.style.removeProperty(prop === 'marginLeft' ? 'margin-left' : 'padding-left');
         if (!el.getAttribute('style')) el.removeAttribute('style');
