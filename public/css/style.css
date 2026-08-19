@@ -270,37 +270,40 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
   font-weight: 700;
   letter-spacing: -.2px;
 }
-/* 눌리는 버튼처럼 보이도록 각진 사각 버튼 + 입체감 (높이는 낮게) */
+/* 색이 채워진 작은 버튼. 글리프가 아래로 처지지 않도록 flex 로 정확히 가운데 정렬 */
 .toolbar-hint .row-ctl .btn.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 26px;
-  height: 19px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid transparent;
   border-radius: 4px;
-  border-width: 1px;
-  border-style: solid;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1;
-  padding: 0;
-  box-shadow: 0 1px 0 rgba(20, 34, 51, .13);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(20, 34, 51, .18);
   transition: background .12s, box-shadow .12s, transform .05s;
 }
+/* 추가 = 파랑 */
 .toolbar-hint .row-ctl .btn.icon:not(.danger) {
-  background: #fff;
-  border-color: var(--primary);
-  color: var(--primary-dk);
+  background: linear-gradient(#3d80cd, #1f5fa9);
+  border-color: #1b5391;
+  color: #fff;
 }
 .toolbar-hint .row-ctl .btn.icon:not(.danger):hover:not(:disabled) {
-  background: linear-gradient(#e8f1fb, #d3e5f6);
-  border-color: var(--primary);
+  background: linear-gradient(#4a8dd8, #17497f);
 }
+/* 삭제 = 빨강 */
 .toolbar-hint .row-ctl .btn.icon.danger {
-  background: #fff;
-  border-color: #d99a92;
-  color: var(--danger);
+  background: linear-gradient(#d4584a, #c0392b);
+  border-color: #a5331f;
+  color: #fff;
 }
 .toolbar-hint .row-ctl .btn.icon.danger:hover:not(:disabled) {
-  background: linear-gradient(#fbeae7, #f4d7d2);
-  border-color: var(--danger);
+  background: linear-gradient(#e06456, #a5331f);
 }
 /* 누를 때 살짝 들어가는 느낌 */
 .toolbar-hint .row-ctl .btn.icon:active:not(:disabled) {
