@@ -446,11 +446,23 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
   // 들여쓰기는 padding-left 로 저장되는데 Word 는 이 속성을 무시한다.
   // 문서로 내보낼 때는 Word 가 문단 들여쓰기로 인식하는 margin-left 로 바꾼다.
   // (브라우저 인쇄에서도 결과는 같다)
-  //  - Word 는 padding-left 를 무시하므로 margin-left 로 바꾼다
-  //  - 화면용 8px 단위는 인쇄물에서 거의 표가 나지 않아 2배로 키운다
-  const toDoc = (h) => String(h || '')
-    .replace(/padding-left\s*:\s*([\d.]+)px/gi, (m, v) => `margin-left: ${Math.round(Number(v) * 2)}px`)
-    .replace(/margin-left\s*:\s*([\d.]+)px/gi, (m, v) => `margin-left: ${Math.round(Number(v))}px`);
+  /**
+   * 들여쓰기를 공백 문자로 바꾼다.
+   * Word 는 표 칸 안 <div> 의 padding-left / margin-left 를 무시해서
+   * 여백 속성으로는 들여쓰기가 전혀 표시되지 않는다.
+   * 줄머리에 &nbsp; 를 넣으면 Word·브라우저·한글 모두에서 동일하게 보인다.
+   * (화면 편집기는 8px 단위 = 공백 2칸)
+   */
+  const toDoc = (h) => String(h || '').replace(
+    /<(div|p|li)([^>]*)>/gi,
+    (m, tag, attrs) => {
+      const px = (/(?:padding|margin)-left\s*:\s*([\d.]+)px/i.exec(attrs) || [])[1];
+      const spaces = px ? Math.min(Math.round(Number(px) / 4), 40) : 0;
+      const cleaned = attrs
+        .replace(/(?:padding|margin)-left\s*:\s*[\d.]+px;?\s*/gi, '')
+        .replace(/style="\s*"/i, '');
+      return `<${tag}${cleaned}>${'&nbsp;'.repeat(spaces)}`;
+    });
 
   const rows = items.map((it, i) => `
       <tr>
@@ -465,17 +477,17 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
   // Word : WordSection1 으로 가로 방향 A4 지정
   const pageCss = forWord
     ? `@page WordSection1 {
-       /* 가로 A4. Word 는 pt 로 줘야 확실히 인식한다 (841.9 x 595.3pt) */
-       size: 841.9pt 595.3pt;
-       mso-page-orientation: landscape;
+       /* 세로 A4 (595.3 x 841.9pt). Word 는 pt 로 줘야 확실히 인식한다 */
+       size: 595.3pt 841.9pt;
+       mso-page-orientation: portrait;
        margin: 1.0cm 1.0cm 1.0cm 1.0cm;
        mso-header-margin: 0.5cm; mso-footer-margin: 0.5cm;
      }
   div.WordSection1 { page: WordSection1; }
   /* Word 는 문서 첫 문단 위 여백을 무시하는 경우가 있어 제목 위에 여유를 준다 */
   h1 { margin-top: 6pt !important; }`
-    : `@page { size: A4 landscape; margin: 0; }
-  body { padding: 12mm 10mm; }`;
+    : `@page { size: A4 portrait; margin: 0; }
+  body { padding: 10mm; }`;
 
   return `<!doctype html>
 <html lang="ko"${forWord ? ' xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"' : ''}>
@@ -610,8 +622,8 @@ async function fixHwpxLayout(buf, ratios) {
   const JSZip = require('jszip');
   const zip = await JSZip.loadAsync(buf);
 
-  const PAGE_W = 84186;                  // A4 가로 297mm
-  const PAGE_H = 59528;                  // A4 세로 210mm
+  const PAGE_W = 59528;                  // A4 세로 — 폭 210mm
+  const PAGE_H = 84186;                  // A4 세로 — 높이 297mm
   const MARGIN = 2835;                   // 상하좌우 10mm
   const HEAD_FOOT = 1417;                // 머리말·꼬리말 5mm
   const CONTENT = PAGE_W - MARGIN * 2;
@@ -665,6 +677,8 @@ async function fixHwpxLayout(buf, ratios) {
   // ---------- section0.xml : 용지·여백·표 크기·셀 여백 ----------
   let xml = await zip.file('Contents/section0.xml').async('string');
 
+  // landscape 속성도 세로(NARROWLY)로 맞춘다
+  xml = xml.replace(/(<hp:pagePr[^>]*?)landscape="[A-Z]*"/, '$1landscape="NARROWLY"');
   xml = xml.replace(/(<hp:pagePr[^>]*?)width="\d+" height="\d+"/,
     `$1width="${PAGE_W}" height="${PAGE_H}"`);
   xml = xml.replace(/<hp:margin[^>]*\/>/,
@@ -684,6 +698,9 @@ async function fixHwpxLayout(buf, ratios) {
     });
 
   // 셀 안쪽 여백을 넓혀 글자가 선에 붙지 않게 한다
+  // hasMargin="0" 이면 셀별 여백을 무시하므로 반드시 1 로 켜야 한다
+  xml = xml.replace(/(<hp:tc [^>]*)hasMargin="0"/g, '$1hasMargin="1"');
+
   // Word 의 셀 여백(6x7px)과 비슷하게 : 좌우 2mm, 상하 1.5mm
   xml = xml.replace(/<hp:cellMargin[^>]*\/>/g,
     '<hp:cellMargin left="566" right="566" top="425" bottom="425"/>');
