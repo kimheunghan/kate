@@ -497,22 +497,22 @@ ${forWord ? `<!--[if gte mso 9]><xml>
 
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th, td {
-    border: 1px solid #333; padding: 4px 6px; vertical-align: top;
+    border: 1px solid #333; padding: 6px 7px; vertical-align: top;
     overflow-wrap: anywhere; word-break: break-word;
   }
   /* 제목보다 본문을 한 단계 작게 (같은 크기면 표가 답답해 보인다) */
-  th { background: #fffbcc; text-align: center; font-weight: 700; font-size: 9.5pt; }
-  td { font-size: 8pt; line-height: 1.4; }
+  th { background: #fffbcc; text-align: center; font-weight: 700; font-size: 10pt; }
+  td { font-size: 9pt; line-height: 1.45; }
   td.org, td.who {
     background: #fcfcf0; text-align: center; vertical-align: middle;
-    font-weight: 600; font-size: 8.5pt;
+    font-weight: 600; font-size: 9.5pt;
   }
 
   td img { max-width: 100%; height: auto; }
   td table { width: 100%; table-layout: fixed; font-size: 8.5pt; }
   td pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0; }
-  td ul, td ol { margin: 2px 0; padding-left: 15px; }
-  td p { margin: 0 0 2px; }
+  td ul, td ol { margin: 3px 0; padding-left: 18px; }
+  td p { margin: 0 0 3px; }
 
   thead { display: table-header-group; }
   tr { page-break-inside: avoid; break-inside: avoid; }
