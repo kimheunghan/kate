@@ -632,13 +632,13 @@ async function fixHwpxLayout(buf, ratios) {
   // ---------- header.xml : 글자 크기·줄간격·정렬·표 제목 배경 ----------
   let head = await zip.file('Contents/header.xml').async('string');
 
-  // 세로(A4) 는 칸이 좁아 9pt 로는 글이 자꾸 다음 줄로 넘어간다.
-  // 본문 8pt / 표 제목 9pt / 문서 제목 15pt.
-  head = head.replace(/<hh:charPr id="0" height="\d+"/, '<hh:charPr id="0" height="800"');
-  head = head.replace(/<hh:charPr id="2" height="\d+"/, '<hh:charPr id="2" height="800"');
-  head = head.replace(/<hh:charPr id="4" height="\d+"/, '<hh:charPr id="4" height="800"');
-  head = head.replace(/<hh:charPr id="1" height="\d+"/, '<hh:charPr id="1" height="900"');
-  head = head.replace(/<hh:charPr id="3" height="\d+"/, '<hh:charPr id="3" height="900"');
+  // 세로(A4) 는 칸이 좁아 글이 자꾸 다음 줄로 넘어간다.
+  // 본문 7pt / 표 제목 8.5pt / 문서 제목 15pt.
+  head = head.replace(/<hh:charPr id="0" height="\d+"/, '<hh:charPr id="0" height="700"');
+  head = head.replace(/<hh:charPr id="2" height="\d+"/, '<hh:charPr id="2" height="700"');
+  head = head.replace(/<hh:charPr id="4" height="\d+"/, '<hh:charPr id="4" height="700"');
+  head = head.replace(/<hh:charPr id="1" height="\d+"/, '<hh:charPr id="1" height="850"');
+  head = head.replace(/<hh:charPr id="3" height="\d+"/, '<hh:charPr id="3" height="850"');
   head = head.replace(/<hh:charPr id="5" height="\d+"/, '<hh:charPr id="5" height="1500"');
 
   // 양쪽 정렬이면 글자 사이가 벌어진다. 왼쪽 정렬로.
@@ -703,11 +703,11 @@ async function fixHwpxLayout(buf, ratios) {
   // hasMargin="0" 이면 셀별 여백을 무시하므로 반드시 1 로 켜야 한다
   xml = xml.replace(/(<hp:tc [^>]*)hasMargin="0"/g, '$1hasMargin="1"');
 
-  // 좌우는 1mm 만 (글 폭을 최대한 확보), 위아래는 2mm 로 넉넉히
+  // 좌우 1.0mm / 위아래 1.5mm
   xml = xml.replace(/<hp:cellMargin[^>]*\/>/g,
-    '<hp:cellMargin left="283" right="283" top="566" bottom="566"/>');
+    '<hp:cellMargin left="283" right="283" top="425" bottom="425"/>');
   xml = xml.replace(/<hp:inMargin[^>]*\/>/g,
-    '<hp:inMargin left="283" right="283" top="566" bottom="566"/>');
+    '<hp:inMargin left="283" right="283" top="425" bottom="425"/>');
 
   // 모든 칸에 실선 테두리, 제목 행(rowAddr=0)은 배경색 있는 테두리
   xml = xml.replace(/(<hp:tbl [^>]*borderFillIDRef=")1(")/g, '$12$2');
@@ -775,7 +775,7 @@ function buildHwpxHtml(report, items, files, nextWeek) {
 </table>
 ${report.note ? `<p><b>특이사항</b></p>${
   esc(report.note).split('\n').map((t) => `<p>${t}</p>`).join('')}` : ''}
-${files.length ? `<p><b>증적자료 (${files.length}건)</b></p>${
+${files.length ? `<p>&nbsp;</p><p><b>증적자료 (${files.length}건)</b></p>${
   files.map((f, i) => `<p>${i + 1}. ${esc(f.original_name)}</p>`).join('')}` : ''}
 </body></html>`;
 }
