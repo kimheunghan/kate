@@ -564,7 +564,7 @@ ${forWord ? `<!--[if gte mso 9]><xml>
 ${forWord ? '<div class="WordSection1">' : ''}
 <h1>주간 추진실적 보고</h1>
 <table>
-  <colgroup><col style="width:14%"><col style="width:9%"><col style="width:25%"><col style="width:27%"><col style="width:25%"></colgroup>
+  <colgroup><col style="width:12%"><col style="width:7%"><col style="width:27%"><col style="width:27%"><col style="width:27%"></colgroup>
   <thead><tr>
     <th>기관명</th>
     <th>참여인력</th>
@@ -871,11 +871,10 @@ router.get('/:id(\\d+)/export-hwpx', async (req, res, next) => {
         margins: { left: 10, right: 10, top: 10, bottom: 10, header: 5, footer: 5, gutter: 0 },
       },
     });
-    // 기관명 14% / 참여인력 9% / 계획 25% / 실적 27% / 향후 25%
-    //   기관명은 '㈜비아이매트릭스' 가 한 줄에 들어가야 해서 넓게 잡는다
+    // 기관명 12% / 참여인력 7% / 계획·실적·향후 각 27%
     const buf = await fixHwpxLayout(
       Buffer.isBuffer(out) ? out : Buffer.from(out),
-      [0.14, 0.09, 0.25, 0.27, 0.25]
+      [0.12, 0.07, 0.27, 0.27, 0.27]
     );
 
     const name = safeFileName(`${report.org_name}_주간보고_${report.week_label}`) + '.hwpx';
