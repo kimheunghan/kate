@@ -318,10 +318,7 @@
         const only = state.rows[0];
         const filled = [only.planEd, only.resultEd, only.nextEd].some((ed) => plain(ed));
         if (!filled) { toast('최소 1개의 항목이 필요합니다.', true); return; }
-        if (!confirm(
-          '마지막 항목이라 삭제할 수 없습니다.\n\n'
-          + '대신 이 항목의 ①②③ 내용을 모두 비울까요?'
-        )) return;
+        if (!confirm('주간보고 작성 내용이 전부 삭제됩니다.')) return;
         [only.planEd, only.resultEd, only.nextEd].forEach((ed) => ed.setHtml(''));
         state.dirty = true;
         toast('내용을 비웠습니다.');
