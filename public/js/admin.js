@@ -243,7 +243,6 @@
           <span><i class="sw cell-d"></i>일부 제출</span>
           <span><i class="sw cell-n"></i>제출 없음</span>
         </span>
-        <span><span class="mark">※</span> 칸의 숫자는 <b>제출 인원 / 대상 인원</b>입니다.</span>
       </div>
 
       <div class="table-scroll mt8">
@@ -271,7 +270,9 @@
             </tr>
           </tbody>
         </table>
-      </div>`;
+      </div>
+      <p class="small muted" style="text-align:right;margin:6px 2px 0">
+        <span class="mark">※</span> 칸의 숫자는 <b>제출 인원 / 대상 인원</b>입니다.</p>`;
 
     $('#mx-n').onchange = () => renderMatrix(Number($('#mx-n').value));
   }
