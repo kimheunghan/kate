@@ -637,33 +637,32 @@
 
       const step = this._spaceWidth(ed);
 
-      // 글머리표 목록 안이면 고른 항목만 민다.
-      // 목록(<ul>) 을 밀면 그 안의 줄이 전부 같이 움직인다.
-      const items = this._selectedListItemsIn(ed);
-      if (items.length) {
-        items.forEach((li) => {
-          const cur = parseFloat(li.style.marginLeft) || 0;
-          const next = Math.max(0, Math.round((cur + delta * step) * 100) / 100);
-          if (next) li.style.marginLeft = `${next}px`;
-          else li.style.removeProperty('margin-left');
-          if (!li.getAttribute('style')) li.removeAttribute('style');
-        });
-        ed.saveRange();
-        ed.touch();
-        return;
-      }
-
-      const blocks = this._selectedBlocks(ed);
-      if (!blocks.length) return;
-
-      blocks.forEach((el) => {
-        // 목록은 padding-left 가 글머리표 위치를 결정하므로 margin 으로 민다
-        const prop = (el.tagName === 'UL' || el.tagName === 'OL') ? 'marginLeft' : 'paddingLeft';
+      // 한 칸 미는 공통 처리
+      const shift = (el, prop) => {
         const cur = parseFloat(el.style[prop]) || 0;
         const next = Math.max(0, Math.round((cur + delta * step) * 100) / 100);
         if (next) el.style[prop] = `${next}px`;
         else el.style.removeProperty(prop === 'marginLeft' ? 'margin-left' : 'padding-left');
         if (!el.getAttribute('style')) el.removeAttribute('style');
+      };
+
+      // 글머리표 항목은 하나씩 민다. 목록(<ul>) 을 밀면 그 안의 줄이
+      // 고르지 않은 것까지 전부 같이 움직인다.
+      const items = this._selectedListItemsIn(ed);
+
+      // 일반 줄. 항목을 따로 밀 목록은 여기서 뺀다 (두 번 밀리지 않게)
+      const blocks = this._selectedBlocks(ed).filter((el) => {
+        if (el.tagName !== 'UL' && el.tagName !== 'OL') return true;
+        return !items.some((li) => el.contains(li));
+      });
+
+      if (!items.length && !blocks.length) return;
+
+      // 일반 줄과 글머리표 항목이 함께 걸려 있으면 둘 다 움직인다
+      items.forEach((li) => shift(li, 'marginLeft'));
+      blocks.forEach((el) => {
+        // 목록은 padding-left 가 글머리표 위치를 결정하므로 margin 으로 민다
+        shift(el, (el.tagName === 'UL' || el.tagName === 'OL') ? 'marginLeft' : 'paddingLeft');
       });
 
       ed.saveRange();
