@@ -785,6 +785,29 @@ async function fixHwpxLayout(buf, ratios) {
       return `<hp:tc ${a}borderFillIDRef="${id}"${b}>${inner}</hp:tc>`;
     });
 
+  // ---------- 칸 안의 줄을 문단으로 나눈다 (모양은 그대로) ----------
+  //  한글 변환기는 칸 하나를 문단 하나로만 만든다. 그래서 받아서 한글에서
+  //  SHIFT+TAB(내어쓰기) 을 누르면 그 칸 글이 통째로 밀렸다.
+  //  줄마다 문단으로 나눠 두면 커서가 있는 줄만 조절할 수 있다.
+  //  들여쓰기(줄머리 공백)와 글자는 손대지 않는다. 보이는 모양은 그대로다.
+  let splitPid = 9000;
+  xml = xml.replace(/<hp:tc ([^>]*)>([\s\S]*?)<\/hp:tc>/g, (whole, tcAttrs, body) => {
+    const next = body.replace(/<hp:p\b([^>]*)>([\s\S]*?)<\/hp:p>/g, (pWhole, pAttrs, pBody) => {
+      const text = [...pBody.matchAll(/<hp:t>([\s\S]*?)<\/hp:t>/g)].map((m) => m[1]).join('');
+      if (!text.includes('\n')) return pWhole;      // 한 줄짜리는 그대로
+
+      const charRef = (/charPrIDRef="(\d+)"/.exec(pBody) || [, '0'])[1];
+      const segs = (/<hp:linesegarray>[\s\S]*?<\/hp:linesegarray>/.exec(pBody) || [''])[0];
+
+      return text.split('\n').map((line) => {
+        const attrs = pAttrs.replace(/id="\d+"/, `id="${splitPid++}"`);
+        return `<hp:p${attrs}><hp:run charPrIDRef="${charRef}">` +
+               `<hp:t>${line}</hp:t></hp:run>${segs}</hp:p>`;
+      }).join('');
+    });
+    return `<hp:tc ${tcAttrs}>${next}</hp:tc>`;
+  });
+
   xml = xml.replace(/horzsize="\d+"/g, `horzsize="${CONTENT}"`);
 
   // ---------- 재압축 (mimetype 은 첫 항목·무압축이어야 한글이 인식) ----------
