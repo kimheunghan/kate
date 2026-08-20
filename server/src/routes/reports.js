@@ -211,13 +211,21 @@ router.get('/', async (req, res, next) => {
              o.name  AS org_name,
              u.name  AS author_name,
              (SELECT count(*)::int FROM wr.report_items ri WHERE ri.report_id = r.id) AS item_count,
-             (SELECT left(btrim(regexp_replace(
-                        replace(replace(
-                          string_agg(coalesce(nullif(ri.plan_html, ''), ri.result_html), ' / '
-                                     ORDER BY ri.sort_order, ri.id),
-                          '&nbsp;', ' '), '&amp;', '&'),
-                        '<[^>]*>', ' ', 'g')), 200)
-                FROM wr.report_items ri WHERE ri.report_id = r.id) AS summary,
+             -- 항목마다 번호를 붙여 몇 건인지 한눈에 보이게 한다.
+             -- 실적 보고이므로 ② 추진 실적을 우선 보여주고, 비어 있으면 ① 당초 계획으로 대체.
+             (SELECT left(btrim(string_agg(t.rn || '. ' || t.txt, '   ' ORDER BY t.rn)), 300)
+                FROM (
+                  SELECT row_number() OVER (ORDER BY x.sort_order, x.id) AS rn,
+                         btrim(regexp_replace(
+                           regexp_replace(
+                             replace(replace(
+                               coalesce(nullif(btrim(x.result_html), ''), x.plan_html),
+                               '&nbsp;', ' '), '&amp;', '&'),
+                             '<[^>]*>', ' ', 'g'),
+                           '\s+', ' ', 'g')) AS txt
+                    FROM wr.report_items x WHERE x.report_id = r.id
+                ) t
+               WHERE t.txt <> '') AS summary,
              (SELECT count(*)::int FROM wr.attachments  a WHERE a.report_id  = r.id) AS file_count
         FROM wr.reports r
         JOIN wr.report_weeks  w ON w.id = r.week_id
