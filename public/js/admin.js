@@ -344,6 +344,9 @@
               ${orgs.map((o) => `<option value="${o.id}" ${o.id === u.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
             </select>
           </label>
+          <p class="small muted" style="margin:-4px 0 10px">
+            이 기관에서 작성한 보고서 ${u.report_count || 0}건
+          </p>
           <label class="field"><span>권한</span>
             <select id="e-role">
               <option value="USER"      ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
@@ -364,14 +367,37 @@
     back.addEventListener('click', (e) => { if (e.target === back) close(); });
 
     $('#e-ok', back).onclick = async () => {
+      const payload = {
+        name: $('#e-name', back).value.trim(),
+        email: $('#e-email', back).value.trim() || null,
+        org_id: $('#e-org', back).value ? Number($('#e-org', back).value) : null,
+        role: $('#e-role', back).value,
+      };
+
+      // 소속을 바꾸면, 이 사람이 이전 기관에서 쓴 보고서를 함께 옮길지 확인한다.
+      // (보고서는 작성 당시 소속을 그대로 갖고 있어 자동으로 따라가지 않는다)
+      if (payload.org_id && Number(payload.org_id) !== Number(u.org_id)) {
+        const from = u.org_name || '소속 없음';
+        const to = $('#e-org', back).selectedOptions[0]?.textContent.trim() || '';
+        const cnt = u.report_count || 0;
+        if (cnt > 0) {
+          payload.move_reports = confirm(
+            `"${u.name}" 님의 기관을 "${from}" → "${to}" 로 바꿉니다.\n\n` +
+            `"${from}" 에서 작성한 보고서가 ${cnt}건 있습니다.\n\n` +
+            `[확인] 이 보고서들도 "${to}" 실적으로 함께 옮깁니다.\n` +
+            `[취소] 보고서는 "${from}" 실적으로 그대로 두고 기관만 바꿉니다.\n\n` +
+            `업무·첨부는 어느 쪽이든 삭제되지 않습니다.`
+          );
+        }
+      }
+
       try {
-        await api.put(`/api/admin/users/${u.id}`, {
-          name: $('#e-name', back).value.trim(),
-          email: $('#e-email', back).value.trim() || null,
-          org_id: $('#e-org', back).value ? Number($('#e-org', back).value) : null,
-          role: $('#e-role', back).value,
-        });
-        close(); toast('저장되었습니다.'); renderUsers();
+        const res = await api.put(`/api/admin/users/${u.id}`, payload);
+        close();
+        toast(res.moved_reports
+          ? `저장되었습니다. 보고서 ${res.moved_reports}건을 함께 옮겼습니다.`
+          : '저장되었습니다.');
+        renderUsers();
       } catch (e) { toast(e.message, true); }
     };
   }

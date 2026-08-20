@@ -216,7 +216,9 @@ router.get('/users', async (req, res, next) => {
   try {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.name, u.email, u.phone, u.role, u.org_id, u.is_active,
-              u.must_change_pw, u.approval_status, u.last_login_at, u.created_at, o.name AS org_name
+              u.must_change_pw, u.approval_status, u.last_login_at, u.created_at, o.name AS org_name,
+              (SELECT count(*)::int FROM wr.reports r
+                WHERE r.author_id = u.id AND r.org_id = u.org_id) AS report_count
          FROM wr.users u LEFT JOIN wr.organizations o ON o.id = u.org_id
         WHERE ($1::int IS NULL OR u.org_id = $1::int)
         ORDER BY u.role DESC, o.sort_order NULLS LAST, u.username`,
@@ -401,6 +403,24 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
       }
     }
 
+    // 소속을 바꿀 때, 이 사용자가 이전 기관에서 쓴 보고서도 함께 옮길 수 있다.
+    // (보고서는 작성 당시 소속을 스냅샷으로 갖고 있어 자동으로 따라가지 않는다)
+    let movedReports = 0;
+    const wantMove = req.body?.move_reports === true;
+    const newOrgId = req.body?.org_id ? Number(req.body.org_id) : null;
+    if (wantMove && newOrgId) {
+      const { rows: before } = await db.query(`SELECT org_id FROM wr.users WHERE id = $1`, [id]);
+      const oldOrgId = before[0]?.org_id;
+      if (oldOrgId && Number(oldOrgId) !== newOrgId) {
+        // 보고서 유일성은 (주차 × 작성자) 기준이라 기관을 옮겨도 충돌하지 않는다
+        const mv = await db.query(
+          `UPDATE wr.reports SET org_id = $1 WHERE author_id = $2 AND org_id = $3`,
+          [newOrgId, id, oldOrgId]
+        );
+        movedReports = mv.rowCount;
+      }
+    }
+
     const { rows } = await db.query(
       `UPDATE wr.users
           SET name      = COALESCE($1, name),
@@ -421,8 +441,11 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
       ]
     );
     if (!rows[0]) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
-    await audit.log(req, 'USER_UPDATE', { targetType: 'user', targetId: id, detail: rows[0].username });
-    res.json({ user: rows[0] });
+    await audit.log(req, 'USER_UPDATE', {
+      targetType: 'user', targetId: id,
+      detail: rows[0].username + (movedReports ? ` / 보고서 ${movedReports}건 기관 이동` : ''),
+    });
+    res.json({ user: rows[0], moved_reports: movedReports });
   } catch (err) { next(err); }
 });
 
