@@ -52,7 +52,8 @@
     if (password !== password2) return fail('비밀번호가 서로 일치하지 않습니다.');
     if (!name) return fail('이름을 입력하세요.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('올바른 이메일을 입력하세요.');
-    if (!$('#org_id').value) return fail('소속 기관을 선택하세요.');
+    if (!$('#org_id').value) return fail('기관을 선택하세요.');
+    if (!$('#duty').value) return fail('담당 역할을 선택하세요.');
 
     btn.disabled = true;
     btn.textContent = '신청 중...';

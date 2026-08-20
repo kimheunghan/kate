@@ -331,7 +331,8 @@ router.post('/signup', rateLimit(5, 10 * 60 * 1000), async (req, res, next) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: '올바른 이메일을 입력하세요. (아이디·비밀번호 찾기에 사용됩니다)' });
     }
-    if (!orgId) return res.status(400).json({ error: '소속 기관을 선택하세요.' });
+    if (!orgId) return res.status(400).json({ error: '기관을 선택하세요.' });
+    if (!duty)  return res.status(400).json({ error: '담당 역할을 선택하세요.' });
 
     // 허용 도메인이 지정되어 있으면 해당 메일 주소만 가입할 수 있다
     const domains = config.signup.allowedEmailDomains;
