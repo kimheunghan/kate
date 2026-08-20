@@ -887,10 +887,20 @@ table.grid td.summary .sum-more { color: var(--text-dim); font-size: 12px; opaci
   gap: 12px; flex-wrap: wrap; margin: 10px 2px 0;
 }
 
-/* 쪽 이동(왼쪽)과 내려받기(오른쪽)를 한 줄에 */
+/* 쪽 이동은 가운데, 안내·내려받기는 오른쪽 끝에 둔다.
+   양쪽에 같은 폭의 자리를 두어 쪽 이동이 화면 한가운데 오게 한다. */
 .pager-row {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap; margin-top: 12px;
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 12px; margin-top: 12px;
 }
-.pager-row .pager { margin-top: 0; justify-content: flex-start; }
-.pager-side { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
+.pager-row .pager { grid-column: 2; margin-top: 0; }
+.pager-side {
+  grid-column: 3; justify-self: end;
+  display: inline-flex; align-items: center; gap: 10px; text-align: right;
+}
+/* 좁은 화면에서는 위아래로 나눈다 */
+@media (max-width: 900px) {
+  .pager-row { grid-template-columns: 1fr; }
+  .pager-row .pager { grid-column: 1; }
+  .pager-side { grid-column: 1; justify-self: center; flex-wrap: wrap; justify-content: center; }
+}
