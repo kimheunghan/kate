@@ -588,57 +588,180 @@
     WEEK_TOGGLE: '주차 마감 전환',
   };
 
-  // 활동 로그의 기간 고르기.
-  //  월·주·일 단위를 한 번에 고를 수 있게 미리 담아 둔다.
-  //  '직접 지정' 을 고르면 시각까지 직접 적을 수 있다.
-  const RANGE_LABEL = {
-    today: '오늘', yesterday: '어제',
-    d7: '최근 7일', d30: '최근 30일',
-    week: '이번 주', lastweek: '지난 주',
-    month: '이번 달', lastmonth: '지난 달',
-    custom: '직접 지정',
-  };
+  // ===================================================================
+  //  기간 고르기 — 달력 하나에서 시작일과 종료일을 집는다
+  //  (숙박·항공 예약 사이트에서 쓰는 방식. 타자 없이 클릭만으로)
+  // ===================================================================
+  const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 
   /** 두 자리로 맞춘다 */
   const p2 = (n) => String(n).padStart(2, '0');
-  /** 날짜를 입력칸에 넣을 모양(YYYY-MM-DDTHH:MM)으로 */
-  const stamp = (d, h, m) =>
-    `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(h)}:${p2(m)}`;
+  const ymd = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+  const parseYmd = (s) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+  };
+  const sameDay = (a, b) => a && b && ymd(a) === ymd(b);
 
-  /** 고른 단위에 맞는 시작·끝 시각을 만든다 */
-  function rangeOf(kind) {
-    const now = new Date();
-    const day = (n) => { const d = new Date(now); d.setDate(d.getDate() + n); return d; };
-    const s = (d) => stamp(d, 0, 0);
-    const e = (d) => stamp(d, 23, 59);
+  /**
+   * 달력을 띄워 기간을 고르게 한다.
+   * @param {HTMLElement} anchor  이 요소 아래에 띄운다
+   * @param {{from:string, to:string, onApply:(from:string,to:string)=>void}} opt
+   *   from/to 는 'YYYY-MM-DDTHH:MM' 모양
+   */
+  function openRangeCalendar(anchor, opt) {
+    document.querySelectorAll('.cal-pop').forEach((el) => el.remove());
 
-    switch (kind) {
-      case 'today':     return { from: s(now), to: e(now) };
-      case 'yesterday': return { from: s(day(-1)), to: e(day(-1)) };
-      case 'd7':        return { from: s(day(-6)), to: e(now) };
-      case 'd30':       return { from: s(day(-29)), to: e(now) };
-      case 'week': {    // 월요일 시작
-        const back = (now.getDay() + 6) % 7;
-        return { from: s(day(-back)), to: e(now) };
+    let start = parseYmd(opt.from);
+    let end = parseYmd(opt.to);
+    let cursor = new Date(start || new Date());
+    cursor.setDate(1);
+
+    const hhmm = (s, dflt) => {
+      const m = /T(\d{2}):(\d{2})/.exec(String(s || ''));
+      return m ? `${m[1]}:${m[2]}` : dflt;
+    };
+    let fromTime = hhmm(opt.from, '00:00');
+    let toTime = hhmm(opt.to, '23:59');
+
+    const pop = document.createElement('div');
+    pop.className = 'cal-pop';
+    document.body.appendChild(pop);
+
+    const r = anchor.getBoundingClientRect();
+    pop.style.left = `${Math.min(r.left + window.scrollX, window.innerWidth - 320)}px`;
+    pop.style.top = `${r.bottom + window.scrollY + 6}px`;
+
+    const timeOptions = (sel) => {
+      const out = [];
+      for (let h = 0; h < 24; h++) {
+        for (const m of ['00', '30']) {
+          const v = `${p2(h)}:${m}`;
+          out.push(`<option value="${v}" ${sel === v ? 'selected' : ''}>${v}</option>`);
+        }
       }
-      case 'lastweek': {
-        const back = (now.getDay() + 6) % 7 + 7;
-        const start = day(-back);
-        const end = new Date(start); end.setDate(end.getDate() + 6);
-        return { from: s(start), to: e(end) };
+      if (!out.some((o) => o.includes(`value="${sel}"`))) {
+        out.push(`<option value="${sel}" selected>${sel}</option>`);
       }
-      case 'month':     return { from: s(new Date(now.getFullYear(), now.getMonth(), 1)), to: e(now) };
-      case 'lastmonth': {
-        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const end = new Date(now.getFullYear(), now.getMonth(), 0);
-        return { from: s(start), to: e(end) };
-      }
-      default:          return { from: '', to: '' };
+      return out.join('');
+    };
+
+    function draw() {
+      const y = cursor.getFullYear();
+      const mo = cursor.getMonth();
+      const first = new Date(y, mo, 1);
+      const lead = first.getDay();
+      const days = new Date(y, mo + 1, 0).getDate();
+      const prevDays = new Date(y, mo, 0).getDate();
+      const today = new Date();
+
+      const cells = [];
+      for (let i = lead - 1; i >= 0; i--) cells.push({ d: new Date(y, mo - 1, prevDays - i), other: true });
+      for (let i = 1; i <= days; i++) cells.push({ d: new Date(y, mo, i), other: false });
+      while (cells.length % 7) cells.push({ d: new Date(y, mo + 1, cells.length - lead - days + 1), other: true });
+
+      pop.innerHTML = `
+        <div class="cal-head">
+          <button type="button" data-mv="-1" title="이전 달">‹</button>
+          <span class="ym">${y}년 ${p2(mo + 1)}월</span>
+          <button type="button" data-mv="1" title="다음 달">›</button>
+        </div>
+        <div class="cal-grid">
+          ${DOW.map((w, i) => `<div class="dow${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</div>`).join('')}
+          ${cells.map(({ d, other }) => {
+            const isStart = sameDay(d, start);
+            const isEnd = sameDay(d, end);
+            const between = start && end && d > start && d < end;
+            const cls = ['day'];
+            if (other) cls.push('other');
+            if (between) cls.push('in');
+            if (isStart || isEnd) {
+              cls.push('edge');
+              if (isStart && isEnd) cls.push('only');
+              else if (isStart) cls.push('start');
+              else cls.push('end');
+            }
+            if (sameDay(d, today)) cls.push('today');
+            return `<button type="button" class="${cls.join(' ')}" data-d="${ymd(d)}">${d.getDate()}</button>`;
+          }).join('')}
+        </div>
+        <div class="cal-time">
+          <span>시각</span>
+          <select id="cal-t1">${timeOptions(fromTime)}</select>
+          <span>~</span>
+          <select id="cal-t2">${timeOptions(toTime)}</select>
+        </div>
+        <div class="cal-foot">
+          <span class="picked">${start ? ymd(start) : '시작일 선택'} ~ ${end ? ymd(end) : '종료일 선택'}</span>
+          <span style="display:flex;gap:6px">
+            <button class="btn sm" type="button" id="cal-cancel">취소</button>
+            <button class="btn sm primary" type="button" id="cal-ok" ${start ? '' : 'disabled'}>적용</button>
+          </span>
+        </div>`;
+
+      pop.querySelectorAll('[data-mv]').forEach((b) => {
+        b.onclick = () => { cursor.setMonth(cursor.getMonth() + Number(b.dataset.mv)); draw(); };
+      });
+      pop.querySelectorAll('[data-d]').forEach((b) => {
+        b.onclick = () => {
+          const d = parseYmd(b.dataset.d);
+          if (!start || (start && end)) { start = d; end = null; }
+          else if (d < start) { end = start; start = d; }
+          else { end = d; }
+          draw();
+        };
+      });
+      pop.querySelector('#cal-t1').onchange = (e) => { fromTime = e.target.value; };
+      pop.querySelector('#cal-t2').onchange = (e) => { toTime = e.target.value; };
+      pop.querySelector('#cal-cancel').onclick = close;
+      pop.querySelector('#cal-ok').onclick = () => {
+        const s = start;
+        const e = end || start;
+        close();
+        opt.onApply(`${ymd(s)}T${fromTime}`, `${ymd(e)}T${toTime}`);
+      };
     }
+
+    function close() {
+      pop.remove();
+      document.removeEventListener('mousedown', onOutside, true);
+    }
+    function onOutside(ev) {
+      if (!pop.contains(ev.target) && ev.target !== anchor && !anchor.contains(ev.target)) close();
+    }
+    setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
+
+    draw();
+  }
+
+  // 빠른 선택 단추 (은행·포털의 로그 조회에서 쓰는 방식)
+  const QUICK = {
+    today:     { label: '오늘',      days: 0 },
+    d7:        { label: '1주일',     days: 6 },
+    m1:        { label: '1개월',     months: 1 },
+    m3:        { label: '3개월',     months: 3 },
+  };
+
+  /** 빠른 선택에 맞는 시작·종료를 만든다 */
+  function quickRange(kind) {
+    const now = new Date();
+    const start = new Date(now);
+    const q = QUICK[kind];
+    if (!q) return { from: '', to: '' };
+    if (q.months) start.setMonth(start.getMonth() - q.months);
+    else start.setDate(start.getDate() - q.days);
+    return { from: `${ymd(start)}T00:00`, to: `${ymd(now)}T23:59` };
+  }
+
+  /** 화면에 보여 줄 기간 글귀 */
+  function rangeText(from, to) {
+    if (!from && !to) return '';
+    const cut = (s) => String(s).replace('T', ' ');
+    return `${cut(from)} ~ ${cut(to)}`;
   }
 
   // 활동 로그 검색 조건 (화면을 다시 그려도 유지된다)
-  const auditFilter = { range: '', from: '', to: '', action: '', q: '' };
+  const auditFilter = { quick: '', from: '', to: '', action: '', q: '' };
 
   async function renderAudit() {
     const q = new URLSearchParams({ page: page.audit, size: PAGE_SIZE });
@@ -650,21 +773,21 @@
 
     body().innerHTML = `
       <div class="search-bar">
-        <label class="sb-field" style="flex:0 0 130px">
+        <label class="sb-field" style="flex:0 0 auto">
           <span>기간</span>
-          <select id="al-range">
-            <option value="">전체</option>
-            ${Object.entries(RANGE_LABEL).map(([k, v]) =>
-              `<option value="${k}" ${auditFilter.range === k ? 'selected' : ''}>${v}</option>`).join('')}
-          </select>
-        </label>
-        <label class="sb-field" style="flex:0 0 205px">
-          <span>시작</span>
-          <input type="datetime-local" id="al-from" value="${esc(auditFilter.from)}">
-        </label>
-        <label class="sb-field" style="flex:0 0 205px">
-          <span>종료</span>
-          <input type="datetime-local" id="al-to" value="${esc(auditFilter.to)}">
+          <div class="range-box">
+            <span class="quick-range">
+              ${Object.entries(QUICK).map(([k, v]) =>
+                `<button type="button" data-q="${k}" class="${auditFilter.quick === k ? 'on' : ''}">${v.label}</button>`).join('')}
+              <button type="button" data-q="" class="${auditFilter.quick ? '' : 'on'}">전체</button>
+            </span>
+            <button type="button" class="range-display" id="al-range">
+              <span class="cal-ico">📅</span>
+              ${auditFilter.from
+                ? `<span>${esc(rangeText(auditFilter.from, auditFilter.to))}</span>`
+                : '<span class="none">기간 선택</span>'}
+            </button>
+          </div>
         </label>
         <label class="sb-field" style="flex:0 0 190px">
           <span>행위</span>
@@ -718,8 +841,6 @@
     });
 
     const runSearch = () => {
-      auditFilter.from = $('#al-from').value;
-      auditFilter.to = $('#al-to').value;
       auditFilter.action = $('#al-action').value;
       auditFilter.q = $('#al-q').value.trim();
       page.audit = 1;
@@ -727,29 +848,34 @@
     };
     $('#al-search').onclick = runSearch;
     $('#al-action').onchange = runSearch;
+    $('#al-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
 
-    // 기간을 고르면 시작·종료가 자동으로 채워지고 바로 조회한다
-    $('#al-range').onchange = () => {
-      const kind = $('#al-range').value;
-      auditFilter.range = kind;
-      if (kind && kind !== 'custom') {
-        const r = rangeOf(kind);
+    // 빠른 선택 단추 : 오늘 / 1주일 / 1개월 / 3개월 / 전체
+    body().querySelectorAll('[data-q]').forEach((b) => {
+      b.onclick = () => {
+        const kind = b.dataset.q;
+        auditFilter.quick = kind;
+        const r = quickRange(kind);
         auditFilter.from = r.from;
         auditFilter.to = r.to;
-      } else if (!kind) {
-        auditFilter.from = '';
-        auditFilter.to = '';
-      }
-      auditFilter.action = $('#al-action').value;
-      auditFilter.q = $('#al-q').value.trim();
-      page.audit = 1;
-      renderAudit();
-    };
-    // 시각을 직접 고치면 '직접 지정' 으로 바뀐다
-    ['#al-from', '#al-to'].forEach((s) => {
-      $(s).onchange = () => { auditFilter.range = 'custom'; runSearch(); };
+        runSearch();
+      };
     });
-    $('#al-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+
+    // 달력에서 시작일·종료일을 집는다 (타자 없이 클릭만으로)
+    $('#al-range').onclick = () => {
+      openRangeCalendar($('#al-range'), {
+        from: auditFilter.from,
+        to: auditFilter.to,
+        onApply: (from, to) => {
+          auditFilter.quick = '';
+          auditFilter.from = from;
+          auditFilter.to = to;
+          runSearch();
+        },
+      });
+    };
+
     $('#al-reset').onclick = () => {
       Object.keys(auditFilter).forEach((k) => { auditFilter[k] = ''; });
       page.audit = 1;
