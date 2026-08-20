@@ -573,12 +573,11 @@ ${forWord ? `<!--[if gte mso 9]><xml>
     background: #ffffff; text-align: center; vertical-align: middle;
     font-weight: 600; font-size: 9.5pt;
   }
-  /* 내용 칸(당초 계획·추진 실적·향후 계획)은 글을 칸 위쪽부터 쓴다.
-     Word 는 세로 맞춤 기본이 가운데라 mso- 속성을 함께 줘야 따른다.
-     인쇄·PDF 에도 같이 적용된다. */
+  /* 내용 칸(당초 계획·추진 실적·향후 계획)은 세로 가운데.
+     한글 문서와 같은 모양이 되도록 인쇄·PDF·Word 모두 가운데로 맞춘다. */
   td.cell {
-    vertical-align: top !important;
-    mso-vertical-align-alignment: top !important;
+    vertical-align: middle !important;
+    mso-vertical-align-alignment: center !important;
   }
 
   td img { max-width: 100%; height: auto; }
