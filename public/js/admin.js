@@ -236,7 +236,7 @@
         </label>
       </div>
 
-      <div class="toolbar-hint">
+      <div class="legend-row">
         <span class="legend">
           <span><i class="sw cell-s"></i>전원 제출</span>
           <span><i class="sw cell-d"></i>일부 제출</span>
