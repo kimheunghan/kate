@@ -81,3 +81,9 @@ services:
 
     extra_hosts:
       - "wr-db:${DB_HOST:-192.168.200.116}"
+
+    # pasta : 접속자의 실제 IP 가 그대로 전달된다.
+    # 기본 방식(rootlessport)은 출발지 주소를 중계기 주소로 바꿔 버려
+    # 활동 로그에 컨테이너 내부 주소만 남는다.
+    # DB 는 원래부터 다른 서버(192.168.200.116)에 붙으므로 영향이 없다.
+    network_mode: pasta
