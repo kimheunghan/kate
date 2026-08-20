@@ -249,7 +249,7 @@
     body().innerHTML = `
       <div class="search-bar">
         <label class="sb-field" style="flex:1 1 140px">
-          <span>아이디</span><input type="text" id="u-username" placeholder="영문/숫자">
+          <span>아이디</span><input type="text" id="u-username" placeholder="영문/숫자 4자 이상">
         </label>
         <label class="sb-field" style="flex:1 1 120px">
           <span>이름</span><input type="text" id="u-name">
@@ -336,9 +336,25 @@
         role: $('#u-role').value,
       };
 
+      // 어느 칸이 문제인지 바로 알 수 있게 항목별로 확인하고 그 칸에 커서를 둔다
+      const problem =
+        !payload.username ? ['#u-username', '아이디를 입력하세요.'] :
+        !/^[A-Za-z0-9._-]{4,50}$/.test(payload.username)
+          ? ['#u-username', '아이디는 영문/숫자/._- 조합 4자 이상이어야 합니다.'] :
+        !payload.name ? ['#u-name', '이름을 입력하세요.'] :
+        !payload.password ? ['#u-pw', '초기 비밀번호를 입력하세요.'] :
+        payload.password.length < 8 ? ['#u-pw', '초기 비밀번호는 8자 이상이어야 합니다.'] :
+        (payload.role !== 'ADMIN' && !payload.org_id) ? ['#u-org', '기관을 선택하세요.'] : null;
+
+      if (problem) {
+        toast(problem[1], true);
+        $(problem[0]).focus();
+        return;
+      }
+
       try {
         await addUserWithDuplicateCheck(payload);
-        toast('사용자가 추가되었습니다.');
+        toast(`"${payload.name}" 사용자가 추가되었습니다.`);
         renderUsers();
       } catch (e) { toast(e.message, true); }
     };

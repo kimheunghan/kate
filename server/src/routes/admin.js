@@ -406,12 +406,15 @@ router.post('/users', async (req, res, next) => {
       if (role === 'ADMIN') return res.status(403).json({ error: '총괄관리자 계정은 만들 수 없습니다.' });
     }
 
-    if (!/^[A-Za-z0-9._-]{3,50}$/.test(username)) {
-      return res.status(400).json({ error: '아이디는 영문/숫자/._- 조합 3~50자여야 합니다.' });
+    // 비어 있는 것과 형식이 틀린 것을 구분해 안내한다 (회원가입과 같은 기준)
+    if (!username) return res.status(400).json({ error: '아이디를 입력하세요.' });
+    if (!/^[A-Za-z0-9._-]{4,50}$/.test(username)) {
+      return res.status(400).json({ error: '아이디는 영문/숫자/._- 조합 4~50자여야 합니다.' });
     }
-    if (password.length < 8) return res.status(400).json({ error: '비밀번호는 8자 이상이어야 합니다.' });
     if (!name) return res.status(400).json({ error: '이름을 입력하세요.' });
-    if (role !== 'ADMIN' && !orgId) return res.status(400).json({ error: '소속 기관을 선택하세요.' });
+    if (!password) return res.status(400).json({ error: '초기 비밀번호를 입력하세요.' });
+    if (password.length < 8) return res.status(400).json({ error: '초기 비밀번호는 8자 이상이어야 합니다.' });
+    if (role !== 'ADMIN' && !orgId) return res.status(400).json({ error: '기관을 선택하세요.' });
 
     // 같은 기관 동명이인 확인 (allow_duplicate_name 이 true 면 그대로 진행)
     if (orgId && req.body?.allow_duplicate_name !== true) {
