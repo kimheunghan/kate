@@ -270,11 +270,11 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .toolbar-hint .row-ctl b {
   font-size: 12.5px;
-  color: var(--primary-dk);
-  font-weight: 800;
+  /* 안내에 가까운 글자라 본문보다 옅게 둔다 */
+  color: var(--text-dim);
+  font-weight: 700;
   letter-spacing: -.2px;
   margin-right: 1px;
-  color: var(--text);
 }
 /* 두 버튼의 크기를 완전히 같게 고정한다.
    .btn.icon 의 min-width(30px) 가 남아 있으면 폭이 들쑥날쑥해지므로 함께 덮어쓴다. */
