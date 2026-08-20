@@ -80,21 +80,18 @@
 
     body().innerHTML = `
       <p class="small muted">선택한 주차에 <b>가입한 작성자 전원</b>이 나옵니다. 아직 안 낸 사람도 <b>미등록</b> 으로 표시됩니다.</p>
-      <div class="row">
-        <label class="field" style="flex:2 1 300px"><span>보고 주차</span>
+      <div class="search-bar">
+        <label class="sb-field sb-week" style="flex:1 1 300px">
+          <span>보고 주차</span>
           <select id="st-week">
             ${weeksRes.weeks.map((w) =>
               `<option value="${w.id}" ${w.id === week.id ? 'selected' : ''}>${esc(w.label)}${w.is_open ? '' : ' [마감]'}</option>`).join('')}
           </select>
         </label>
-        <label class="field" style="flex:1 1 160px"><span>기관</span>
-          <select id="st-org" ${orgLocked ? 'disabled' : ''}>
-            <option value="">전체</option>
-            ${orgsRes.orgs.map((o) =>
-              `<option value="${o.id}" ${String(f.org) === String(o.id) || scopedOrgId === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
-          </select>
-        </label>
-        <label class="field narrow" style="flex:0 0 140px"><span>상태</span>
+        <button class="btn primary sb-btn" id="st-refresh">조회</button>
+
+        <label class="sb-field" style="flex:0 0 140px">
+          <span>상태</span>
           <select id="st-status">
             <option value="">전체</option>
             <option value="NONE"      ${f.status === 'NONE' ? 'selected' : ''}>미등록만</option>
@@ -102,12 +99,20 @@
             <option value="SUBMITTED" ${f.status === 'SUBMITTED' ? 'selected' : ''}>제출완료만</option>
           </select>
         </label>
-        <label class="field" style="flex:1 1 160px"><span>이름 검색</span>
-          <input type="text" id="st-q" value="${esc(f.q || '')}" placeholder="예: 홍길동"></label>
-        <div class="field narrow">
-          <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
-          <button class="btn primary" id="st-refresh">조회</button>
-        </div>
+        <label class="sb-field" style="flex:0 0 160px">
+          <span>이름 검색</span>
+          <input type="text" id="st-q" value="${esc(f.q || '')}" placeholder="예: 홍길동">
+        </label>
+
+        <!-- 기관은 작성 화면과 동일하게 오른쪽 끝에 배치 -->
+        <label class="sb-field sb-right" style="flex:0 0 auto">
+          <span>기관</span>
+          <select id="st-org" ${orgLocked ? 'disabled' : ''}>
+            <option value="">전체</option>
+            ${orgsRes.orgs.map((o) =>
+              `<option value="${o.id}" ${String(f.org) === String(o.id) || scopedOrgId === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+          </select>
+        </label>
       </div>
 
       <div class="stat-row mt8">
