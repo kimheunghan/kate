@@ -95,7 +95,7 @@ router.post('/login', async (req, res, next) => {
 
     if (!user || !auth.verifyPassword(password, user.password_hash)) {
       noteFailure(username);
-      await audit.log(req, 'LOGIN_FAIL', { detail: username });
+      await audit.log(req, 'LOGIN_FAIL', { detail: username, actorName: username });
       return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
     }
 
@@ -370,6 +370,7 @@ router.post('/signup', rateLimit(5, 10 * 60 * 1000), async (req, res, next) => {
 
     await audit.log(req, 'SIGNUP', {
       targetType: 'user', targetId: rows[0].id,
+      actorId: rows[0].id, actorName: username,
       detail: `${username} (${auto ? '자동승인' : '승인대기'})`,
     });
     res.status(201).json({
@@ -401,7 +402,10 @@ router.post('/find-id', rateLimit(10, 10 * 60 * 1000), async (req, res, next) =>
         ORDER BY name, id`,
       [name, orgId, base]
     );
-    await audit.log(req, 'FIND_ID', { detail: `${name} / 기관 ${orgId} → ${rows.length}건` });
+    await audit.log(req, 'FIND_ID', {
+      detail: `${name} / 기관 ${orgId} → ${rows.length}건`,
+      actorName: rows.length === 1 ? rows[0].username : name,
+    });
 
     if (!rows.length) {
       return res.status(404).json({ error: '일치하는 가입 정보가 없습니다. 관리자에게 문의하세요.' });
@@ -480,14 +484,16 @@ router.post('/reset-request', rateLimit(5, 10 * 60 * 1000), async (req, res, nex
               SET token_hash = NULL, expires_at = NULL, delivery = 'ADMIN' WHERE id = $1`,
           [created[0].id]
         );
-        await audit.log(req, 'RESET_MAIL_FAIL', { targetType: 'user', targetId: user.id, detail: err.message });
+        await audit.log(req, 'RESET_MAIL_FAIL', { targetType: 'user', targetId: user.id, detail: err.message,
+          actorId: user.id, actorName: user.username });
         return res.json({
           ok: true, delivery: 'ADMIN',
           message: '메일 발송에 실패하여 요청이 접수되었습니다.\n관리자가 확인 후 연락드립니다.',
         });
       }
 
-      await audit.log(req, 'RESET_MAIL_SENT', { targetType: 'user', targetId: user.id, detail: username });
+      await audit.log(req, 'RESET_MAIL_SENT', { targetType: 'user', targetId: user.id, detail: username,
+        actorId: user.id, actorName: user.username });
       // 메일 주소는 일부만 노출
       const masked = user.email.replace(/^(.{1,2})[^@]*(@.*)$/, (m, a, b) => `${a}****${b}`);
       return res.json({
@@ -524,7 +530,8 @@ router.post('/reset-request', rateLimit(5, 10 * 60 * 1000), async (req, res, nex
         );
       });
 
-      await audit.log(req, 'RESET_DIRECT', { targetType: 'user', targetId: user.id, detail: username });
+      await audit.log(req, 'RESET_DIRECT', { targetType: 'user', targetId: user.id, detail: username,
+        actorId: user.id, actorName: user.username });
       return res.json({
         ok: true, delivery: 'DIRECT',
         temp_password: tempPassword,
@@ -545,7 +552,8 @@ router.post('/reset-request', rateLimit(5, 10 * 60 * 1000), async (req, res, nex
         [user.id, ip]
       );
     }
-    await audit.log(req, 'RESET_REQUEST', { targetType: 'user', targetId: user.id, detail: username });
+    await audit.log(req, 'RESET_REQUEST', { targetType: 'user', targetId: user.id, detail: username,
+      actorId: user.id, actorName: user.username });
     res.json({
       ok: true, delivery: 'ADMIN',
       message: '비밀번호 재설정 요청이 접수되었습니다.\n관리자가 확인 후 임시 비밀번호를 알려드립니다.',
@@ -628,7 +636,8 @@ router.post('/reset-complete', rateLimit(10, 10 * 60 * 1000), async (req, res, n
       );
     });
 
-    await audit.log(req, 'RESET_COMPLETE', { targetType: 'user', targetId: row.user_id, detail: row.username });
+    await audit.log(req, 'RESET_COMPLETE', { targetType: 'user', targetId: row.user_id, detail: row.username,
+      actorId: row.user_id, actorName: row.username });
     res.json({ ok: true, username: row.username, message: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인하세요.' });
   } catch (err) { next(err); }
 });
