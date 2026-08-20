@@ -108,11 +108,18 @@ function putSectionTitle(ws, at, text) {
   return at + 1;
 }
 
-/** 표 아래 안내 문구 */
+/**
+ * 표 아래 안내 문구.
+ * text 안의 **굵게** 부분은 굵은 글자로 찍는다.
+ */
 function putNote(ws, at, text) {
   const c = ws.getRow(at + 1).getCell(1);
-  c.value = `※ ${text}`;
-  c.font = { size: 10, color: { argb: 'FF5D6B7D' } };
+  const base = { size: 10, color: { argb: 'FF5D6B7D' } };
+  const parts = String(`※ ${text}`).split(/\*\*(.+?)\*\*/g);
+  c.value = {
+    richText: parts.map((t, i) => ({ text: t, font: { ...base, bold: i % 2 === 1 } }))
+      .filter((r) => r.text !== ''),
+  };
   return at + 2;
 }
 
@@ -404,7 +411,7 @@ router.get('/export/matrix', async (req, res, next) => {
 
     styleBody(ws, headAt);
     putNote(ws, at,
-      '주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다. (칸의 숫자 = 제출 / 대상, ( )은 제출률 현황)');
+      '주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다. (칸의 숫자 = **제출 / 대상**, ( )은 **제출률** 현황)');
 
     const name = `주차별현황_최근${n}주.xlsx`;
     await audit.log(req, 'EXPORT_MATRIX', { detail: name });

@@ -285,7 +285,7 @@
       <div class="hint-row">
         <span class="small muted">
           <span class="mark">※</span> 주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.
-          (칸의 숫자 = <b>제출 / 대상</b>, ( )은 제출률 현황)</span>
+          (칸의 숫자 = <b>제출 / 대상</b>, ( )은 <b>제출률</b> 현황)</span>
         <button class="btn sm dl-btn" id="mx-xlsx">⤓ 엑셀 다운로드</button>
       </div>`;
 
