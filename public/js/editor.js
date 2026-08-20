@@ -1013,6 +1013,9 @@
     }
   }
 
+  // 어떤 판이 돌고 있는지 콘솔에서 바로 확인할 수 있게 남긴다
+  console.log('[편집기] 글머리표: 글자 방식 (목록 태그를 쓰지 않음)');
+
   global.WR = global.WR || {};
   global.WR.Editor = Editor;
   global.WR.SharedToolbar = SharedToolbar;
