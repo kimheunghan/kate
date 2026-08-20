@@ -629,6 +629,15 @@
       return null;
     }
 
+    /** 선택 범위에 걸린 글머리표 항목들 */
+    _selectedListItems(list) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount || !list) return [];
+      const range = sel.getRangeAt(0);
+      return Array.from(list.children)
+        .filter((li) => li.tagName === 'LI' && range.intersectsNode(li));
+    }
+
     /** 글머리표 종류를 적용한다 (없으면 목록으로 만들고, 이미 목록이면 모양만 바꾼다) */
     _applyBullet(kind) {
       const ed = this.getActive();
@@ -658,8 +667,29 @@
       if (list) {
         // 기호는 글자로 지정해 본문 글씨와 같은 크기로 보이게 한다
         const ch = BULLET_CHAR[kind];
-        list.style.listStyleType = ch ? `'${ch}  '` : kind;
+        const type = ch ? `'${ch}  '` : kind;
         list.style.paddingLeft = '24px';
+
+        // 고른 항목만 바꾼다. 목록 전체(<ul>)에 걸면 옆 줄까지 같이 바뀐다.
+        const all = Array.from(list.children).filter((n) => n.tagName === 'LI');
+        const picked = this._selectedListItems(list);
+
+        if (!picked.length || picked.length === all.length) {
+          // 전부 고른 경우는 목록에 한 번만 걸고 항목별 지정은 지운다
+          list.style.listStyleType = type;
+          all.forEach((li) => {
+            li.style.removeProperty('list-style-type');
+            if (!li.getAttribute('style')) li.removeAttribute('style');
+          });
+        } else {
+          // 일부만 고른 경우: 나머지 항목은 지금 모양을 그대로 붙잡아 둔다
+          const cur = list.style.listStyleType;
+          if (cur) {
+            all.forEach((li) => { if (!li.style.listStyleType) li.style.listStyleType = cur; });
+            list.style.removeProperty('list-style-type');
+          }
+          picked.forEach((li) => { li.style.listStyleType = type; });
+        }
       }
       ed.touch();
       this.syncState();
