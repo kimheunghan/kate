@@ -3,7 +3,7 @@
    ===================================================================== */
 (function () {
   'use strict';
-  const { api, toast, esc, roleLabel, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, $, $$ } = window.WR;
+  const { api, toast, esc, roleLabel, fmtDateTime, statusBadge, $, $$ } = window.WR;
 
   const state = { me: null, orgs: [], tab: 'status' };
   const body = () => $('#tab-body');
@@ -138,8 +138,8 @@
               <th class="center" style="width:100px">상태</th>
               <th class="center" style="width:60px">항목</th>
               <th class="center" style="width:60px">첨부</th>
-              <th style="width:140px">최종수정</th>
-              <th class="center" style="width:330px">관리</th>
+              <th style="width:150px">제출시각</th>
+              <th style="width:150px">최종수정</th>
             </tr>
           </thead>
           <tbody>
@@ -153,19 +153,8 @@
                 <td class="center">${statusBadge(r.status)}</td>
                 <td class="center">${r.item_count}</td>
                 <td class="center">${r.file_count}</td>
+                <td class="small">${r.submitted_at ? fmtDateTime(r.submitted_at) : '-'}</td>
                 <td class="small">${r.report_id ? fmtDateTime(r.updated_at) : '-'}</td>
-                <td class="center nowrap">
-                  ${r.report_id ? `
-                    <button class="btn sm" data-open="${r.report_id}">열기</button>
-                    <button class="btn sm" data-print="${r.report_id}">인쇄</button>
-                    <button class="btn sm" data-hwpx="${r.report_id}"
-                      title="아래한글 문서(HWPX)로 내려받습니다">HWPX</button>
-                    <button class="btn sm" data-export="${r.report_id}"
-                      title="한글문서(HWP) 변환은 현재 [Word 다운로드] 하신 후 한글에서 Word문서를 열어서 다른 이름(확장자 .hwp)으로 저장하시기 바랍니다.">Word</button>
-                    <button class="btn sm" data-moveorg="${r.report_id}"
-                      title="잘못된 기관으로 등록된 보고서를 올바른 기관으로 옮깁니다 (업무·첨부는 그대로 유지)">소속변경</button>`
-                    : '<span class="muted small">미제출</span>'}
-                </td>
               </tr>`).join('') : '<tr><td colspan="8" class="empty">조건에 맞는 작성자가 없습니다.</td></tr>'}
           </tbody>
         </table>
@@ -182,70 +171,6 @@
     $('#st-q').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') renderStatus(Number($('#st-week').value), readFilters());
     });
-    bindOpenPrint();
-  }
-
-  function bindOpenPrint() {
-    body().querySelectorAll('[data-open]').forEach((b) => {
-      b.onclick = () => { location.href = `/report?report=${b.dataset.open}`; };
-    });
-    body().querySelectorAll('[data-print]').forEach((b) => {
-      b.onclick = () => openPrint(b.dataset.print);
-    });
-    body().querySelectorAll('[data-export]').forEach((b) => {
-      b.onclick = () => downloadReport(b.dataset.export);
-    });
-    body().querySelectorAll('[data-hwpx]').forEach((b) => {
-      b.onclick = () => downloadReportHwpx(b.dataset.hwpx);
-    });
-    body().querySelectorAll('[data-moveorg]').forEach((b) => {
-      b.onclick = () => moveReportOrg(Number(b.dataset.moveorg));
-    });
-  }
-
-  /** 보고서를 다른 기관으로 옮긴다 (소속을 잘못 지정해 등록한 경우) */
-  async function moveReportOrg(reportId) {
-    let orgs;
-    try { orgs = await api.get('/api/orgs'); } catch (e) { return toast(e.message, true); }
-
-    const back = document.createElement('div');
-    back.className = 'modal-back';
-    back.innerHTML = `
-      <div class="modal" style="max-width:400px">
-        <header>보고서 소속 변경</header>
-        <div class="body">
-          <div class="alert error hidden" id="mo-err"></div>
-          <p class="small muted">잘못된 기관으로 등록된 보고서를 바로잡는 기능입니다.<br>
-            업무·첨부는 그대로 유지되고 <b>기관만</b> 바뀝니다.</p>
-          <label class="field"><span>옮길 기관</span>
-            <select id="mo-org">
-              ${orgs.orgs.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}
-            </select>
-          </label>
-        </div>
-        <footer>
-          <button class="btn" id="mo-cancel">취소</button>
-          <button class="btn primary" id="mo-ok">옮기기</button>
-        </footer>
-      </div>`;
-    document.body.appendChild(back);
-
-    const close = () => back.remove();
-    back.querySelector('#mo-cancel').onclick = close;
-    back.addEventListener('click', (e) => { if (e.target === back) close(); });
-
-    back.querySelector('#mo-ok').onclick = async () => {
-      try {
-        const res = await api.put(`/api/admin/reports/${reportId}/org`,
-          { org_id: Number(back.querySelector('#mo-org').value) });
-        close();
-        toast(`"${res.org_name}" 으로 옮겼습니다.`);
-        render();
-      } catch (e) {
-        const el = back.querySelector('#mo-err');
-        el.textContent = e.message; el.classList.remove('hidden');
-      }
-    };
   }
 
   // ==================================================================
