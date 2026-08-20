@@ -239,6 +239,11 @@
 
       <div class="toolbar-hint">
         <span><span class="mark">※</span> 칸의 숫자는 <b>제출 인원 / 대상 인원</b>입니다.</span>
+        <span class="legend">
+          <span><i class="sw cell-s"></i>전원 제출</span>
+          <span><i class="sw cell-d"></i>일부 제출</span>
+          <span><i class="sw cell-n"></i>제출 없음</span>
+        </span>
       </div>
 
       <div class="table-scroll mt8">
