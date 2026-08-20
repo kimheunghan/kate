@@ -566,10 +566,13 @@
     const btn = $('#btn-week-hwpx');
     if (!btn) return;
     const one = !!$('#f-week').value;
-    btn.textContent = one ? '해당 주차 한글 다운로드(HWPX)' : '전체 주차 ZIP 다운로드';
+    $('#dl-label').textContent = one ? '해당 주차 한글 다운로드(HWPX)' : '전체 주차 ZIP 다운로드';
     btn.title = one
       ? '선택한 주차의 보고서를 한글 문서 한 개로 내려받습니다.'
       : '주차마다 한글 문서를 만들어 ZIP 한 개로 묶어 내려받습니다.';
+    $('#dl-note').innerHTML = one
+      ? '<span class="mark">※</span> 선택한 주차만 한글 문서로 내려받습니다.'
+      : '<span class="mark">※</span> 한 주차만 받으시려면 위에서 주차를 먼저 선택하세요.';
   }
 
   function bindListTab() {
