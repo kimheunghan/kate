@@ -510,7 +510,8 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
     /<(div|p|li)([^>]*)>/gi,
     (m, tag, attrs) => {
       const px = (/(?:padding|margin)-left\s*:\s*([\d.]+)px/i.exec(attrs) || [])[1];
-      const spaces = px ? Math.min(Math.round(Number(px) / 4), 40) : 0;
+      // 한글 문서와 같은 기준 : 한 단계(8px) = 공백 두 칸
+      const spaces = px ? Math.min(Math.round(Number(px) / 8), 12) * 2 : 0;
       const cleaned = attrs
         .replace(/(?:padding|margin)-left\s*:\s*[\d.]+px;?\s*/gi, '')
         .replace(/style="\s*"/i, '');
@@ -664,7 +665,8 @@ ${forWord ? '</div>' : ''}
  */
 function toHwpxCell(html) {
   if (!html) return '';
-  const SPACE_PX = 4;                     // 공백 한 칸 대략 폭
+  const SPACE_PX = 4;                     // 공백 한 칸 폭
+  const STEP_PX = SPACE_PX * 2;           // 들여쓰기 한 단계 = 공백 두 칸
 
   // 블록 요소를 줄 단위로 자른다
   const lines = String(html)
@@ -686,7 +688,10 @@ function toHwpxCell(html) {
       .replace(/\n/g, '')
       .trim();
     if (!inner) return '';
-    const indent = '&nbsp;'.repeat(Math.min(Math.round(pad / SPACE_PX), 24));
+    // 예전에 저장된 19px, 28.5px 같은 값도 한 단계(8px) 배수로 맞춰서 센다.
+    // 그대로 나누면 4칸이어야 할 자리에 5칸이 찍힌다.
+    const level = Math.min(Math.round(pad / STEP_PX), 12);
+    const indent = '&nbsp;'.repeat(level * 2);
     return indent + inner;
   }).filter(Boolean).join('<br>');
 }
