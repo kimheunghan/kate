@@ -142,8 +142,8 @@
               <th style="width:11%">이름</th>
               <th style="width:13%">아이디</th>
               <th class="center" style="width:10%">상태</th>
-              <th class="center" style="width:60px">항목</th>
-              <th class="center" style="width:60px">첨부</th>
+              <th class="center" style="width:6%">항목</th>
+              <th class="center" style="width:6%">첨부</th>
               <th style="width:15%">제출시각</th>
               <th style="width:15%">최종수정</th>
             </tr>
