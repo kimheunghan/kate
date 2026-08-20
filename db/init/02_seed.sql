@@ -39,7 +39,7 @@ WITH gen AS (
            (d + INTERVAL '6 days')::DATE       AS end_date,
            row_number() OVER (ORDER BY d)::INT AS week_no
       FROM generate_series(DATE '2026-04-23',   -- WEEK_BASELINE : 1주차 시작일(목)
-                           DATE '2030-04-17',   -- WEEK_END      : 생성 종료일
+                           DATE '2027-03-25',   -- WEEK_END      : 마지막 주차 시작일 (2027-03-31 종료)
                            INTERVAL '7 days') AS d
 )
 INSERT INTO wr.report_weeks (year, week_no, start_date, end_date, label)
