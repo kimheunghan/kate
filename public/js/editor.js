@@ -236,8 +236,37 @@
         if (e.key === 'Tab') {
           e.preventDefault();
           if (this.opts.onIndent) this.opts.onIndent(this, e.shiftKey ? -1 : 1);
+          return;
+        }
+        // 엔터로 새 줄을 만들면 들여쓰기를 물려받지 않고 맨 앞에서 시작한다.
+        // 들여쓴 줄 끝에서 엔터를 치고 붙여넣으면 통째로 밀려 들어가기 때문이다.
+        // 줄 가운데서 엔터를 쳐 글이 나뉘는 경우는 그대로 둔다.
+        if (e.key === 'Enter' && !e.shiftKey) {
+          setTimeout(() => this._resetNewLineIndent(), 0);
         }
       });
+    }
+
+    /** 방금 엔터로 생긴 빈 줄의 들여쓰기를 없앤다 */
+    _resetNewLineIndent() {
+      const sel = global.getSelection();
+      if (!sel || !sel.rangeCount) return;
+
+      let node = sel.getRangeAt(0).startContainer;
+      if (node.nodeType === 3) node = node.parentNode;
+      // 편집 영역 바로 아래 칸(문단)까지 올라간다
+      while (node && node !== this.area && node.parentNode !== this.area) node = node.parentNode;
+      if (!node || node === this.area || !node.style) return;
+
+      // 글머리표 목록은 들여쓰기가 곧 단계이므로 손대지 않는다
+      if (node.tagName === 'UL' || node.tagName === 'OL' || node.closest('ul, ol')) return;
+      // 글이 들어 있는 줄(가운데서 나뉜 경우)은 그대로 둔다
+      if (node.textContent.replace(/\u200b|\s|\u00a0/g, '') !== '') return;
+
+      node.style.removeProperty('padding-left');
+      node.style.removeProperty('margin-left');
+      if (!node.getAttribute('style')) node.removeAttribute('style');
+      this.saveRange();
     }
   }
 
