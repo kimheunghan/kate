@@ -271,7 +271,8 @@
         </table>
       </div>
       <p class="small muted" style="text-align:right;margin:6px 2px 0">
-        <span class="mark">※</span> 칸의 숫자는 <b>제출 인원 / 대상 인원</b>입니다.</p>`;
+        <span class="mark">※</span> 주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.
+        (칸의 숫자 = <b>제출 / 대상</b>)</p>`;
 
     $('#mx-n').onchange = () => renderMatrix(Number($('#mx-n').value));
   }
