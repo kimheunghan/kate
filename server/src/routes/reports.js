@@ -493,9 +493,12 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
 
   // 업무를 추가해도 줄이 나뉘지 않게, 한 사람은 한 줄로 두고
   // 항목들을 각 칸 안에서 이어 쓴다. (셀 병합과 같은 모양)
+  //  편집기는 첫 줄을 문단으로 감싸지 않고 저장한다. 그대로 이어 붙이면
+  //  다음 업무의 첫 줄이 앞 업무 마지막 줄에 달라붙으므로 업무마다 감싼다.
   const stack = (key) => items
     .map((it) => toDoc(it[key]))
     .filter((h) => String(h).replace(/<[^>]*>|&nbsp;|\s/g, '') !== '')
+    .map((h) => `<div>${h}</div>`)
     .join('') || '&nbsp;';
 
   const rows = `
@@ -805,10 +808,12 @@ function buildHwpxHtml(report, items, files, nextWeek) {
   const thisRange = fmtRange(report.start_date, report.end_date);
   const nextRange = nextWeek ? fmtRange(nextWeek.start_date, nextWeek.end_date) : '';
   // 한 사람은 한 줄. 항목이 여럿이면 칸 안에서 이어 쓴다.
+  //  toHwpxCell 은 줄을 <br> 로 잇는다. 한글 변환기는 <div> 경계를 무시하므로
+  //  업무 사이도 <br> 로 이어야 다음 업무가 앞 줄에 달라붙지 않는다.
   const stack = (key) => items
     .map((it) => toHwpxCell(it[key]))
     .filter((h) => String(h).replace(/<[^>]*>|&nbsp;|\s/g, '') !== '')
-    .join('') || '&#8203;';
+    .join('<br>') || '&#8203;';
 
   const rows = `
     <tr>
@@ -850,10 +855,11 @@ function buildHwpxWeekHtml(week, nextWeek, groups) {
 
   // 한 사람은 한 줄. 항목이 여럿이면 칸 안에서 이어 쓴다.
   // 기관명은 소속 인원 수만큼 세로로 합친다.
+  //  업무 사이는 <br> 로 잇는다 (한글 변환기가 <div> 경계를 무시한다)
   const stack = (items, key) => items
     .map((it) => toHwpxCell(it[key]))
     .filter((h) => String(h).replace(/<[^>]*>|&nbsp;|\s/g, '') !== '')
-    .join('') || '&#8203;';
+    .join('<br>') || '&#8203;';
 
   const rows = [];
   for (const g of groups) {
