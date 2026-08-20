@@ -198,7 +198,11 @@
     _changed() { if (this.opts.onChange) this.opts.onChange(this); }
 
     _bind() {
-      this.area.addEventListener('input', () => { this.saveRange(); this._changed(); });
+      this.area.addEventListener('input', () => {
+        this._restoreMarkers();
+        this.saveRange();
+        this._changed();
+      });
 
       const track = () => {
         this.saveRange();
@@ -261,6 +265,18 @@
       });
     }
 
+    /**
+     * 지워진 글머리표 기호를 되살린다.
+     * 백스페이스로 줄을 지우면 브라우저가 목록을 다시 짜면서 스타일을
+     * 흘려버려 ■ 가 • 로 돌아가는 일이 있다. data-mk 값으로 되돌린다.
+     */
+    _restoreMarkers() {
+      this.area.querySelectorAll('[data-mk]').forEach((el) => {
+        const want = el.dataset.mk;
+        if (want && el.style.listStyleType !== want) el.style.listStyleType = want;
+      });
+    }
+
     /** 커서가 놓인 글머리표 항목 (없으면 null) */
     _currentListItem() {
       const sel = global.getSelection();
@@ -312,7 +328,7 @@
       this.touch();
     }
 
-    /** 엔터를 친 뒤 정리 : 새 줄 들여쓰기 없애기 */
+    /** 엔터를 친 뒤 정리 : 목록 빠져나오기(보조) + 새 줄 들여쓰기 없애기 */
     _afterEnter() {
       const sel = global.getSelection();
       if (!sel || !sel.rangeCount) return;
@@ -320,8 +336,19 @@
       if (node.nodeType === 3) node = node.parentNode;
       if (!node || !node.closest) return;
 
-      // 목록 안이면 들여쓰기가 곧 단계이므로 손대지 않는다
-      if (node.closest('li')) return;
+      const li = node.closest('li');
+      if (li && this.area.contains(li)) {
+        // 엔터를 치기 전 판단이 빗나갔을 때를 위한 보조 처리.
+        // 빈 항목이 둘 연달아 있으면 빈 줄에서 또 엔터를 친 것이다.
+        const prev = li.previousElementSibling;
+        if (isBlank(li) && prev && prev.tagName === 'LI' && isBlank(prev)) {
+          li.remove();
+          this._exitList(prev);
+          return;
+        }
+        // 목록 안이면 들여쓰기가 곧 단계이므로 손대지 않는다
+        return;
+      }
 
       // 편집 영역 바로 아래 칸(문단)까지 올라간다
       while (node && node !== this.area && node.parentNode !== this.area) node = node.parentNode;
@@ -680,7 +707,7 @@
 
       const list = document.createElement(wantOrdered ? 'ol' : 'ul');
       list.style.paddingLeft = '24px';
-      if (!wantOrdered && type) list.style.listStyleType = type;
+      if (!wantOrdered && type) { list.style.listStyleType = type; list.dataset.mk = type; }
       ed.area.insertBefore(list, blocks[0]);
 
       let last = null;
@@ -809,18 +836,23 @@
         if (!picked.length || picked.length === all.length) {
           // 전부 고른 경우는 목록에 한 번만 걸고 항목별 지정은 지운다
           list.style.listStyleType = type;
+          list.dataset.mk = type;
           all.forEach((li) => {
             li.style.removeProperty('list-style-type');
+            li.removeAttribute('data-mk');
             if (!li.getAttribute('style')) li.removeAttribute('style');
           });
         } else {
           // 일부만 고른 경우: 나머지 항목은 지금 모양을 그대로 붙잡아 둔다
           const cur = list.style.listStyleType;
           if (cur) {
-            all.forEach((li) => { if (!li.style.listStyleType) li.style.listStyleType = cur; });
+            all.forEach((li) => {
+              if (!li.style.listStyleType) { li.style.listStyleType = cur; li.dataset.mk = cur; }
+            });
             list.style.removeProperty('list-style-type');
+            list.removeAttribute('data-mk');
           }
-          picked.forEach((li) => { li.style.listStyleType = type; });
+          picked.forEach((li) => { li.style.listStyleType = type; li.dataset.mk = type; });
         }
       }
       ed.touch();

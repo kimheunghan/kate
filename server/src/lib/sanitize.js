@@ -25,7 +25,9 @@ const ALLOWED_TAGS = new Set([
 ]);
 
 // 모든 허용 태그에 공통 허용되는 속성
-const GLOBAL_ATTRS = new Set(['style', 'align', 'dir', 'title']);
+// data-mk : 글머리표 기호를 따로 적어 둔다. 편집 중 스타일이 지워져도
+//           이 값으로 되돌린다. 값은 아래 safeMarker 로 걸러진다.
+const GLOBAL_ATTRS = new Set(['style', 'align', 'dir', 'title', 'data-mk']);
 
 // 태그별 추가 허용 속성
 const TAG_ATTRS = {
@@ -168,6 +170,14 @@ function sanitizeAttrs(tag, rawAttrs) {
     if (name.startsWith('on')) continue;                       // 모든 이벤트 핸들러 차단
     if (!GLOBAL_ATTRS.has(name) && !(allowed && allowed.has(name))) continue;
 
+    if (name === 'data-mk') {
+      // 글머리표 값만 허용 (따옴표 안 글자 몇 개 또는 disc/square/circle/decimal)
+      const v = decodeEntities(value).replace(/"/g, "'").trim();
+      if (/^'[^'<>]{1,4}'$/.test(v) || /^(disc|square|circle|decimal|none)$/.test(v)) {
+        out.push(`data-mk="${escapeAttr(v)}"`);
+      }
+      continue;
+    }
     if (name === 'style') {
       const s = safeStyle(value);
       if (s) out.push(`style="${escapeAttr(s)}"`);
