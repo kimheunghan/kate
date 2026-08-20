@@ -30,8 +30,12 @@ async function resolveOrgId(user, requested) {
 }
 
 /** 보고서를 편집할 수 있는가 — 본인 것이거나 전체 관리자 */
+/**
+ * 보고서를 고칠 수 있는가.
+ * 권한과 상관없이 '본인이 쓴 것' 만 고칠 수 있다.
+ * 총괄관리자도 남이 쓴 보고서는 볼 수만 있다.
+ */
 function canEditReport(user, report) {
-  if (user.role === 'ADMIN') return true;
   return report.author_id != null && Number(report.author_id) === Number(user.id);
 }
 

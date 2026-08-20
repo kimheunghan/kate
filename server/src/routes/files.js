@@ -73,9 +73,9 @@ function canView(user, report) {
   return report.author_id != null && Number(report.author_id) === Number(user.id);
 }
 
-/** 첨부 등록·삭제는 보고서 소유자 본인만 (전체 관리자는 예외) */
+/** 첨부 등록·삭제는 보고서 소유자 본인만 */
 function canEdit(user, report) {
-  if (user.role === 'ADMIN') return true;
+  // 보고서와 같은 규칙 : 본인이 쓴 것에만 붙이거나 지울 수 있다
   return report.author_id != null && Number(report.author_id) === Number(user.id);
 }
 
