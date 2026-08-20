@@ -157,7 +157,10 @@
           <tbody>
             ${rows.length ? rows.map((r) => `
               <tr>
-                <td><b>${esc(r.user_name)}</b></td>
+                <td><b>${esc(r.user_name)}</b>${
+                  r.role === 'ADMIN' ? ' <span class="badge draft">관리자</span>'
+                  : (r.role === 'ORG_ADMIN' ? ' <span class="badge none">기관관리</span>' : '')
+                }</td>
                 <td class="small muted">${esc(r.username)}</td>
                 <td>${esc(r.org_name || '-')}</td>
                 <td class="center">${statusBadge(r.status)}</td>
