@@ -27,13 +27,13 @@
             <span>보고 주차</span>
             <select id="sel-week"></select>
           </label>
+          <button class="btn primary sb-btn" id="btn-load">검색</button>
           <label class="sb-field" id="org-field" style="flex:1 1 220px">
             <span>기관</span>
             <!-- 전체 관리자만 선택 가능. 그 외에는 소속을 글자로만 보여준다. -->
             <select id="sel-org" class="hidden"></select>
             <div id="sel-org-text" class="sb-static"></div>
           </label>
-          <button class="btn primary sb-btn" id="btn-load">검색</button>
         </div>
         <div id="write-status"></div>
       </div>
@@ -142,15 +142,15 @@
           <table class="grid">
             <thead>
               <tr>
+                <th class="col-org" style="width:150px">소속</th>
+                <th class="col-author" style="width:100px">참여인력</th>
                 <th style="width:230px">주차</th>
-                <th class="col-org" style="width:150px">기관</th>
-                <th class="col-author" style="width:100px">작성자</th>
                 <th>내용 요약</th>
                 <th class="center" style="width:90px">상태</th>
-                <th class="center" style="width:70px">항목</th>
-                <th class="center" style="width:70px">첨부</th>
+                <th class="center" style="width:60px">항목</th>
+                <th class="center" style="width:60px">첨부</th>
                 <th style="width:140px">최종수정</th>
-                <th class="center" style="width:210px">관리</th>
+                <th class="center" style="width:150px">관리</th>
               </tr>
             </thead>
             <tbody id="list-body"></tbody>

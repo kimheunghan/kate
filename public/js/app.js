@@ -612,9 +612,9 @@
 
     tbody.innerHTML = res.reports.map((r) => `
       <tr>
-        <td>${esc(r.week_label)}${r.is_open ? '' : ' <span class="badge closed">마감</span>'}</td>
         <td class="col-org">${esc(r.org_name)}</td>
         <td class="col-author">${esc(r.author_name || '-')}</td>
+        <td>${esc(r.week_label)}${r.is_open ? '' : ' <span class="badge closed">마감</span>'}</td>
         <td class="small summary"><div class="summary-text">${esc(r.summary || '')}</div></td>
         <td class="center">${statusBadge(r.status)}</td>
         <td class="center">${r.item_count}</td>
@@ -622,9 +622,7 @@
         <td class="small">${fmtDateTime(r.updated_at)}</td>
         <td class="center nowrap">
           <button class="btn sm" data-open="${r.id}">열기</button>
-          <button class="btn sm" data-print="${r.id}">인쇄</button>
-          <button class="btn sm" data-export="${r.id}"
-                  title="한글문서(HWP) 변환은 현재 [Word 다운로드] 하신 후 한글에서 Word문서를 열어서 다른 이름(확장자 .hwp)으로 저장하시기 바랍니다.">Word</button>
+          <button class="btn sm" data-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받습니다">한글</button>
         </td>
       </tr>`).join('');
 
@@ -635,11 +633,8 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
       };
     });
-    tbody.querySelectorAll('[data-print]').forEach((b) => {
-      b.onclick = () => openPrint(b.dataset.print);
-    });
-    tbody.querySelectorAll('[data-export]').forEach((b) => {
-      b.onclick = () => downloadReport(b.dataset.export);
+    tbody.querySelectorAll('[data-hwpx]').forEach((b) => {
+      b.onclick = () => downloadReportHwpx(b.dataset.hwpx);
     });
 
     // 행은 이 시점에 새로 만들어지므로 열 숨김을 다시 적용해야 헤더와 어긋나지 않는다
