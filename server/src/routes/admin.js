@@ -615,11 +615,10 @@ router.put('/reports/:id(\\d+)/org', async (req, res, next) => {
 // =====================================================================
 router.get('/weeks', async (req, res, next) => {
   try {
-    // 당해 연도 12월 말까지 전부 보여준다
+    // 주차 자체가 사업 기간(~2027-03-31)까지만 만들어져 있으므로 전부 보여준다
     const { rows } = await db.query(
       `SELECT w.*, (SELECT count(*)::int FROM wr.reports r WHERE r.week_id = w.id) AS report_count
          FROM wr.report_weeks w
-        WHERE w.start_date <= (date_trunc('year', CURRENT_DATE) + INTERVAL '1 year' - INTERVAL '1 day')
         ORDER BY w.start_date DESC
         LIMIT 200`
     );
