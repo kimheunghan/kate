@@ -23,13 +23,78 @@
     ['Consolas', 'Consolas'],
   ];
 
+  /**
+   * <ul>/<ol> 을 줄머리에 기호를 붙인 보통 줄로 바꾼다.
+   * 예전에 목록으로 저장된 내용도 열 때 바꿔 두면 편집 중에 깨지지 않는다.
+   * @param {HTMLElement} area  편집 영역
+   * @param {Element[]} blocks  대상 (없으면 영역 전체)
+   * @returns {Element[]} 바뀐 뒤의 줄 목록
+   */
+  function listsToLines(area, blocks) {
+    const src = blocks && blocks.length ? blocks : Array.from(area.children);
+    const out = [];
+
+    src.forEach((b) => {
+      if (!b || (b.tagName !== 'UL' && b.tagName !== 'OL')) { if (b) out.push(b); return; }
+
+      const ordered = b.tagName === 'OL';
+      // 목록 자체의 왼쪽 여백은 줄 들여쓰기로 옮긴다 (24px 은 기본값이라 뺀다)
+      const base = Math.max(0, (parseFloat(b.style.paddingLeft) || 0) - 24)
+                 + (parseFloat(b.style.marginLeft) || 0);
+      const listMk = b.dataset.mk || b.style.listStyleType || '';
+      let no = 1;
+      const made = [];
+
+      Array.from(b.children).forEach((li) => {
+        if (li.tagName !== 'LI') return;
+        const div = document.createElement('div');
+        const pad = base + (parseFloat(li.style.marginLeft) || 0);
+        if (pad) div.style.paddingLeft = `${pad}px`;
+
+        const mk = li.dataset.mk || li.style.listStyleType || listMk;
+        const q = /['"]\s*(\S+)/.exec(mk);
+        const mark = ordered
+          ? `${no++}. `
+          : `${q ? q[1] : (BULLET_CHAR[mk] || '•')} `;
+
+        while (li.firstChild) div.appendChild(li.firstChild);
+        div.insertBefore(document.createTextNode(mark), div.firstChild);
+        made.push(div);
+      });
+
+      made.forEach((d) => area.insertBefore(d, b));
+      b.remove();
+      out.push(...made);
+    });
+
+    return out;
+  }
+
+  /** 그 칸 안의 첫 글자 노드 (없으면 null) */
+  function firstTextNode(el) {
+    for (const n of el.childNodes) {
+      if (n.nodeType === 3) return n;
+      if (n.nodeType === 1) {
+        const t = firstTextNode(n);
+        if (t) return t;
+      }
+    }
+    return null;
+  }
+
   /** 눈에 보이는 글자가 없는 칸인가 (공백·줄바꿈만 있으면 빈 것으로 본다) */
   const isBlank = (el) => el.textContent.replace(/[\s\u00a0\u200b]/g, '') === '';
 
   // 글머리표 종류. value 는 CSS list-style-type 값.
   //  브라우저가 그리는 네모(square)는 글자보다 훨씬 작다. 본문에서 손으로
   //  찍는 ■ 와 크기를 맞추려고 글자로 직접 지정한다. 점·원은 기본 그대로.
-  const BULLET_CHAR = { square: '■', dash: '−' };
+  // 글머리표는 HTML 목록이 아니라 '글자' 로 넣는다.
+  // 목록으로 만들면 브라우저가 편집 중에 목록을 제멋대로 다시 짜면서
+  // 기호가 바뀌거나 줄이 위로 붙어 버린다. 글자로 넣으면 백스페이스·
+  // 엔터·복사붙여넣기 어디서도 그대로 남는다.
+  const BULLET_CHAR = { disc: '•', square: '■', circle: '○', dash: '−' };
+  // 줄머리에 이미 붙어 있는 기호 (바꿀 때 먼저 떼어낸다)
+  const MARKER_RE = /^[\s\u00a0]*(?:[•■○◦▪‣·−–—-]|\d{1,3}[.)])[\s\u00a0]+/;
   const BULLETS = [
     ['',        '글머리표'],
     ['disc',    '•  점'],
@@ -139,6 +204,8 @@
       this.area.spellcheck = false;
       this.area.setAttribute('data-placeholder', opts.placeholder || '내용을 입력하세요');
       this.area.innerHTML = opts.html || '';
+      // 예전에 목록으로 저장된 내용은 글자 줄로 바꿔 둔다
+      listsToLines(this.area, null);
       host.appendChild(this.area);
 
       if (!this.readOnly) this._bind();
@@ -151,7 +218,10 @@
       return h;
     }
 
-    setHtml(html) { this.area.innerHTML = html || ''; }
+    setHtml(html) {
+      this.area.innerHTML = html || '';
+      listsToLines(this.area, null);
+    }
 
     isEmpty() { return !this.area.textContent.trim() && !this.area.querySelector('img'); }
 
@@ -788,73 +858,48 @@
       return own.filter((li) => range.intersectsNode(li));
     }
 
-    /** 글머리표 종류를 적용한다 (없으면 목록으로 만들고, 이미 목록이면 모양만 바꾼다) */
+    /** 줄머리의 기호를 떼어낸다 */
+    _stripMarker(el) {
+      const t = firstTextNode(el);
+      if (t) t.nodeValue = t.nodeValue.replace(MARKER_RE, '');
+    }
+
+    /** 줄머리에 기호를 붙인다 */
+    _prependMarker(el, mark) {
+      const t = firstTextNode(el);
+      if (t) t.nodeValue = mark + t.nodeValue;
+      else el.insertBefore(document.createTextNode(mark), el.firstChild);
+    }
+
+    /**
+     * 고른 줄에 글머리표를 넣거나 뺀다.
+     * HTML 목록을 만들지 않고 줄머리에 글자를 붙인다.
+     */
     _applyBullet(kind) {
       const ed = this.getActive();
-      if (!ed) return;
+      if (!ed || ed.readOnly) return;
       ed.area.focus();
       ed.restoreRange();
 
-      let list = this._currentList(ed);
+      const blocks = listsToLines(ed.area, this._selectedBlocks(ed));
+      if (!blocks.length) return;
 
-      if (kind === 'off') {
-        if (list) document.execCommand(list.tagName === 'OL' ? 'insertOrderedList' : 'insertUnorderedList');
-        ed.touch();
-        this.syncState();
-        return;
-      }
+      let no = 1;
+      blocks.forEach((b) => {
+        this._stripMarker(b);
+        if (kind === 'off') return;
+        this._prependMarker(b, kind === 'decimal' ? `${no++}. ` : `${BULLET_CHAR[kind] || '•'} `);
+      });
 
-      const wantOrdered = kind === 'decimal';
-      const ch0 = BULLET_CHAR[kind];
-      const type0 = ch0 ? `'${ch0}  '` : kind;
+      const last = blocks[blocks.length - 1];
+      const range = document.createRange();
+      range.selectNodeContents(last);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
 
-      // 목록이 아닌 줄이면 그 자리에 새 목록을 만든다.
-      // 브라우저 기본 명령은 바로 위에 있는 목록에 끌어다 붙여 버린다.
-      if (!list) {
-        const made = this._makeList(ed, wantOrdered, type0);
-        if (made) { ed.touch(); this.syncState(); }
-        return;
-      }
-
-      // 이미 목록인데 종류(기호↔번호)가 다르면 기본 명령으로 바꾼다
-      if ((list.tagName === 'OL') !== wantOrdered) {
-        try { document.execCommand('styleWithCSS', false, true); } catch (e) { /* noop */ }
-        document.execCommand(wantOrdered ? 'insertOrderedList' : 'insertUnorderedList');
-        list = this._currentList(ed);
-      }
-
-      if (list) {
-        // 기호는 글자로 지정해 본문 글씨와 같은 크기로 보이게 한다
-        const ch = BULLET_CHAR[kind];
-        const type = ch ? `'${ch}  '` : kind;
-        list.style.paddingLeft = '24px';
-
-        // 고른 항목만 바꾼다. 목록 전체(<ul>)에 걸면 옆 줄까지 같이 바뀐다.
-        const all = Array.from(list.children).filter((n) => n.tagName === 'LI');
-        const picked = this._selectedListItems(list);
-
-        if (!picked.length || picked.length === all.length) {
-          // 전부 고른 경우는 목록에 한 번만 걸고 항목별 지정은 지운다
-          list.style.listStyleType = type;
-          list.dataset.mk = type;
-          all.forEach((li) => {
-            li.style.removeProperty('list-style-type');
-            li.removeAttribute('data-mk');
-            if (!li.getAttribute('style')) li.removeAttribute('style');
-          });
-        } else {
-          // 일부만 고른 경우: 나머지 항목은 지금 모양을 그대로 붙잡아 둔다
-          const cur = list.style.listStyleType;
-          if (cur) {
-            all.forEach((li) => {
-              if (!li.style.listStyleType) { li.style.listStyleType = cur; li.dataset.mk = cur; }
-            });
-            list.style.removeProperty('list-style-type');
-            list.removeAttribute('data-mk');
-          }
-          picked.forEach((li) => { li.style.listStyleType = type; li.dataset.mk = type; });
-        }
-      }
+      ed.saveRange();
       ed.touch();
       this.syncState();
     }
