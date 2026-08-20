@@ -109,15 +109,15 @@
     <!-- ==================================================== 저장 버튼 -->
     <div class="panel no-print" id="save-panel">
       <div class="body">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn primary" id="btn-save">저장</button>
+        <!-- 오른쪽 정렬, 주 동작(저장)을 맨 오른쪽에 둔다 -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end">
           <button class="btn" id="btn-print">인쇄 / PDF</button>
-          <button class="btn" id="btn-export-hwpx"
-                  title="아래한글에서 바로 열리는 HWPX 문서로 내려받습니다">한글 다운로드</button>
           <button class="btn" id="btn-export"
                   title="MS Word 문서로 내려받습니다">Word 다운로드</button>
+          <button class="btn" id="btn-export-hwpx"
+                  title="아래한글에서 바로 열리는 HWPX 문서로 내려받습니다">한글 다운로드</button>
+          <button class="btn primary" id="btn-save">저장</button>
         </div>
-      </div>
     </div>
 
     <!-- ================================================= 조회 탭 내용 -->
