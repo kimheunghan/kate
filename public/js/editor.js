@@ -54,8 +54,8 @@
         const mk = li.dataset.mk || li.style.listStyleType || listMk;
         const q = /['"]\s*(\S+)/.exec(mk);
         const mark = ordered
-          ? `${no++}. `
-          : `${q ? q[1] : (BULLET_CHAR[mk] || '•')} `;
+          ? `${no++}.${NB}`
+          : `${q ? q[1] : (BULLET_CHAR[mk] || '•')}${NB}`;
 
         while (li.firstChild) div.appendChild(li.firstChild);
         div.insertBefore(document.createTextNode(mark), div.firstChild);
@@ -71,10 +71,13 @@
   }
 
   /** 다음 줄에 이어 붙일 기호. 번호면 하나 올린다. */
+  const NB = '\u00a0';                    // 줄 끝에서도 지워지지 않는 공백
+
   function nextMarker(mark) {
     const m = /^([\s\u00a0]*)(\d{1,3})([.)])([\s\u00a0]+)$/.exec(mark);
-    if (m) return `${m[1]}${Number(m[2]) + 1}${m[3]}${m[4]}`;
-    return mark;
+    if (m) return `${m[1]}${Number(m[2]) + 1}${m[3]}${NB}`;
+    // 뒤쪽 공백은 줄 끝에서 지워지지 않게 바꿔 둔다
+    return mark.replace(/[\s\u00a0]+$/, NB);
   }
 
   /** 그 칸 안의 첫 글자 노드 (없으면 null) */
@@ -949,7 +952,7 @@
       blocks.forEach((b) => {
         this._stripMarker(b);
         if (kind === 'off') return;
-        this._prependMarker(b, kind === 'decimal' ? `${no++}. ` : `${BULLET_CHAR[kind] || '•'} `);
+        this._prependMarker(b, kind === 'decimal' ? `${no++}.${NB}` : `${BULLET_CHAR[kind] || '•'}${NB}`);
       });
 
       const last = blocks[blocks.length - 1];
