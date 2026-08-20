@@ -4,7 +4,6 @@
    관리자 화면의 엑셀 내려받기
      /api/admin/export/status   등록 현황 (기관별 소계)
      /api/admin/export/matrix   주차별 현황판
-     /api/admin/export/users    사용자 목록
      /api/admin/export/audit    활동 로그
    화면에 걸어 둔 조회 조건을 그대로 받아 같은 내용을 내려받는다.
    ===================================================================== */
@@ -409,69 +408,6 @@ router.get('/export/matrix', async (req, res, next) => {
 
     const name = `주차별현황_최근${n}주.xlsx`;
     await audit.log(req, 'EXPORT_MATRIX', { detail: name });
-    await send(res, wb, name);
-  } catch (err) { next(err); }
-});
-
-// ---------------------------------------------------------------------
-// 사용자 목록
-// ---------------------------------------------------------------------
-router.get('/export/users', async (req, res, next) => {
-  try {
-    const where = [];
-    const params = [];
-    if (req.query.org_id) { params.push(Number(req.query.org_id)); where.push(`u.org_id = $${params.length}`); }
-    if (req.query.q) {
-      params.push(`%${String(req.query.q).trim()}%`);
-      const i = params.length;
-      where.push(`(u.name ILIKE $${i} OR u.username ILIKE $${i} OR u.email ILIKE $${i})`);
-    }
-    const { rows } = await db.query(
-      `SELECT o.name AS org_name, u.name, u.username, u.duty, u.role,
-              u.approval_status, u.is_active, u.last_login_at, u.created_at
-         FROM wr.users u
-         LEFT JOIN wr.organizations o ON o.id = u.org_id
-        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-        ORDER BY o.sort_order, o.name, wr.duty_order(u.duty), u.name, u.username`,
-      params
-    );
-
-    const DUTY = { LEAD: '총괄책임자', MANAGER: '실무책임자', RESEARCHER: '참여연구원' };
-    const ROLE = { ADMIN: '총괄관리자', ORG_ADMIN: '기관관리자', USER: '작성자' };
-
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('사용자 목록');
-    [26, 14, 18, 14, 14, 10, 20, 20].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
-
-    const cond = [`${rows.length}명`];
-    if (req.query.q) cond.push(`검색어 "${String(req.query.q).trim()}"`);
-    let at = putTitle(ws, 8, '사용자 목록', cond.join('  ·  '));
-    at += 1;
-
-    const headAt = at;
-    ws.getRow(at).values = ['기관', '이름', '아이디', '담당 역할', '권한', '상태', '최근 로그인', '가입일'];
-    styleHeader(ws, at);
-    at += 1;
-
-    rows.forEach((u) => {
-      const row = ws.getRow(at);
-      row.values = [
-        u.org_name || '-', u.name, u.username,
-        DUTY[u.duty] || '-', ROLE[u.role] || u.role,
-        u.approval_status === 'PENDING' ? '승인대기'
-          : u.approval_status === 'REJECTED' ? '반려'
-            : (u.is_active ? '활성' : '중지'),
-        stamp(u.last_login_at), stamp(u.created_at),
-      ];
-      [3, 4, 5, 6, 7, 8].forEach((c) => {
-        row.getCell(c).alignment = { horizontal: 'center', vertical: 'middle' };
-      });
-      at += 1;
-    });
-    styleBody(ws, headAt);
-
-    const name = `사용자목록_${rows.length}명.xlsx`;
-    await audit.log(req, 'EXPORT_USERS', { detail: name });
     await send(res, wb, name);
   } catch (err) { next(err); }
 });

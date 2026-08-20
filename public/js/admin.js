@@ -393,19 +393,7 @@
           </tbody>
         </table>
       </div>
-      <div class="pager-row">
-        <div class="pager" id="u-pager"></div>
-        <span class="pager-side">
-          <button class="btn sm dl-btn" id="u-xlsx">⤓ 엑셀 다운로드</button>
-        </span>
-      </div>`;
-
-    $('#u-xlsx').onclick = () => {
-      const p = new URLSearchParams();
-      if ($('#u-q').value.trim()) p.set('q', $('#u-q').value.trim());
-      if ($('#u-forg').value) p.set('org_id', $('#u-forg').value);
-      window.WR.downloadFile(`/api/admin/export/users?${p}`, '사용자목록.xlsx');
-    };
+      <div class="pager" id="u-pager"></div>`;
 
     window.WR.renderPager($('#u-pager'), {
       page: page.users, pages: uPages,
