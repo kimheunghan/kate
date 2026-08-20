@@ -121,6 +121,17 @@
     const role = state.me.role;
     const onlyMine = role !== 'ADMIN' && role !== 'ORG_ADMIN';
 
+    // 등록 내역 조회는 관리자만 본다. 작성자에게는 탭을 감춘다.
+    // (지우지 않고 감추기만 하므로 필요하면 이 줄만 빼면 다시 보인다)
+    const listTab = $$('.tabs button').find((b) => b.dataset.tab === 'list');
+    if (listTab) {
+      listTab.classList.toggle('hidden', onlyMine);
+      // 감춘 탭에 머물러 있으면 작성 화면으로 돌려보낸다
+      if (onlyMine && listTab.classList.contains('active')) {
+        $$('.tabs button').find((b) => b.dataset.tab === 'write').click();
+      }
+    }
+
     // 기관 필터는 전체 관리자만 (기관 관리자는 자기 기관으로 고정되므로 불필요)
     const orgField = $('#f-org-field');
     if (orgField) orgField.classList.toggle('hidden', role !== 'ADMIN');
