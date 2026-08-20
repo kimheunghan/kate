@@ -249,9 +249,14 @@
         if (e.key === 'Enter' && !e.shiftKey) {
           // 빈 글머리표 항목에서 또 엔터를 치면 목록에서 빠져나온다.
           // (한 번째 엔터는 다음 항목을 만들고, 두 번째 엔터로 목록이 끝난다)
+          // 브라우저마다 처리가 달라 직접 옮긴다.
           const li = this._currentListItem();
-          const leaveList = !!li && isBlank(li);
-          setTimeout(() => this._afterEnter(leaveList), 0);
+          if (li && isBlank(li)) {
+            e.preventDefault();
+            this._exitList(li);
+            return;
+          }
+          setTimeout(() => this._afterEnter(), 0);
         }
       });
     }
@@ -267,15 +272,48 @@
       return li && this.area.contains(li) ? li : null;
     }
 
-    /** 엔터를 친 뒤 정리 : 목록 빠져나오기 + 새 줄 들여쓰기 없애기 */
-    _afterEnter(leaveList) {
-      if (leaveList) {
-        const li = this._currentListItem();
-        if (li) {
-          document.execCommand(li.closest('ol') ? 'insertOrderedList' : 'insertUnorderedList');
-        }
-      }
+    /**
+     * 빈 글머리표 항목에서 목록을 끝내고 맨 앞에서 새 줄을 시작한다.
+     * 가운데 항목이면 목록을 둘로 나눠 뒤쪽을 그대로 살린다.
+     */
+    _exitList(li) {
+      const list = li.parentNode;
+      if (!list || !this.area.contains(list)) return;
 
+      // 편집 영역 바로 아래에 놓일 자리를 찾는다 (목록이 중첩돼 있을 수 있다)
+      let top = list;
+      while (top.parentNode && top.parentNode !== this.area) top = top.parentNode;
+      if (top.parentNode !== this.area) return;
+
+      const line = document.createElement('div');
+      line.appendChild(document.createElement('br'));
+
+      // 뒤에 남은 항목이 있으면 새 목록으로 떼어 낸다
+      const after = [];
+      for (let n = li.nextSibling; n; n = n.nextSibling) after.push(n);
+
+      this.area.insertBefore(line, top.nextSibling);
+      if (after.length) {
+        const rest = list.cloneNode(false);
+        after.forEach((n) => rest.appendChild(n));
+        this.area.insertBefore(rest, line.nextSibling);
+      }
+      li.remove();
+      if (!list.querySelector('li')) top.remove();
+
+      const range = document.createRange();
+      range.setStart(line, 0);
+      range.collapse(true);
+      const sel = global.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      this.saveRange();
+      this.touch();
+    }
+
+    /** 엔터를 친 뒤 정리 : 새 줄 들여쓰기 없애기 */
+    _afterEnter() {
       const sel = global.getSelection();
       if (!sel || !sel.rangeCount) return;
       let node = sel.getRangeAt(0).startContainer;
