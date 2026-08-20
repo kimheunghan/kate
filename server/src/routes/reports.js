@@ -233,7 +233,9 @@ router.get('/', async (req, res, next) => {
         JOIN wr.organizations o ON o.id = r.org_id
         LEFT JOIN wr.users    u ON u.id = r.author_id
         ${whereSql}
-       ORDER BY w.start_date DESC, o.sort_order, o.name
+       -- 최신 주차 → 기관 순서 → 담당 역할(총괄책임자·실무책임자·참여연구원) → 이름 가나다
+       ORDER BY w.start_date DESC, o.sort_order, o.name,
+                wr.duty_order(u.duty), u.name, u.username
        LIMIT $${params.length - 1} OFFSET $${params.length}`;
     const { rows } = await db.query(listSql, params);
 
