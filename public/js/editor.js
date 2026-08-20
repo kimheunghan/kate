@@ -76,8 +76,9 @@
   function nextMarker(mark) {
     const m = /^([\s\u00a0]*)(\d{1,3})([.)])([\s\u00a0]+)$/.exec(mark);
     if (m) return `${m[1]}${Number(m[2]) + 1}${m[3]}${NB}`;
-    // 뒤쪽 공백은 줄 끝에서 지워지지 않게 바꿔 둔다
-    return mark.replace(/[\s\u00a0]+$/, NB);
+    // 기호 뒤에는 늘 공백을 붙인다. 줄 끝에서 지워지지 않는 공백을 쓴다.
+    // (공백 없이 '■글자' 로 저장된 줄에서도 다음 줄에 '■ ' 가 나오게 한다)
+    return mark.replace(/[\s\u00a0]*$/, NB);
   }
 
   /** 그 칸 안의 첫 글자 노드 (없으면 null) */
@@ -104,7 +105,10 @@
   // 엔터·복사붙여넣기 어디서도 그대로 남는다.
   const BULLET_CHAR = { disc: '•', square: '■', circle: '○', dash: '−' };
   // 줄머리에 이미 붙어 있는 기호 (바꿀 때 먼저 떼어낸다)
-  const MARKER_RE = /^[\s\u00a0]*(?:[•■○◦▪‣·−–—-]|\d{1,3}[.)])[\s\u00a0]+/;
+  //  ■ • ○ 처럼 글머리표로만 쓰는 기호는 뒤에 공백이 없어도 알아본다.
+  //  (예전에 공백이 지워져 '■글자' 로 저장된 것도 살린다)
+  //  − 나 숫자는 '−5', '1.5' 같은 보통 글과 헷갈리므로 공백을 요구한다.
+  const MARKER_RE = /^[\s\u00a0]*(?:[•■○◦▪‣·][\s\u00a0]*|(?:[−–—-]|\d{1,3}[.)])[\s\u00a0]+)/;
   const BULLETS = [
     ['',        '글머리표'],
     ['disc',    '•  점'],
@@ -987,10 +991,21 @@
         this._prependMarker(b, kind === 'decimal' ? `${no++}.${NB}` : `${BULLET_CHAR[kind] || '•'}${NB}`);
       });
 
+      // 커서는 기호 바로 뒤에 둔다.
+      // 칸 끝에 두면 <br> 뒤로 밀려, 글자가 기호와 공백 사이로 끼어든다.
       const last = blocks[blocks.length - 1];
       const range = document.createRange();
-      range.selectNodeContents(last);
-      range.collapse(false);
+      const head = firstTextNode(last);
+      const onlyMarker = MARKER_RE.test(last.textContent)
+        && last.textContent.replace(MARKER_RE, '').replace(/[\s\u00a0\u200b]/g, '') === '';
+      if (onlyMarker && head) {
+        // 기호만 있는 줄 : 기호 끝에 커서를 둔다
+        range.setStart(head, head.nodeValue.length);
+        range.collapse(true);
+      } else {
+        range.selectNodeContents(last);
+        range.collapse(false);
+      }
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
