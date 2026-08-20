@@ -263,6 +263,10 @@
     $('#btn-add-row').disabled = readOnly;
     $('#btn-del-row').disabled = readOnly;
     $('#btn-save').disabled = readOnly;
+    // 남이 쓴 보고서를 열어 둔 상태에서는 엑셀 일괄등록도 막는다
+    $('#btn-excel-import').disabled = readOnly;
+    $('#btn-excel-import').title = readOnly
+      ? '본인이 작성한 보고서에서만 사용할 수 있습니다.' : '';
     $('#btn-print').disabled = !report;
     $('#btn-export').disabled = !report;
     $('#btn-export-hwpx').disabled = !report;
