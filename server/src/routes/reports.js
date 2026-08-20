@@ -470,8 +470,6 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
   const thisRange = fmtRange(report.start_date, report.end_date);
   const nextRange = nextWeek ? fmtRange(nextWeek.start_date, nextWeek.end_date) : '';
 
-  const n = items.length || 1;
-
   // 들여쓰기는 padding-left 로 저장되는데 Word 는 이 속성을 무시한다.
   // 문서로 내보낼 때는 Word 가 문단 들여쓰기로 인식하는 margin-left 로 바꾼다.
   // (브라우저 인쇄에서도 결과는 같다)
@@ -493,14 +491,21 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
       return `<${tag}${cleaned}>${'&nbsp;'.repeat(spaces)}`;
     });
 
-  const rows = items.map((it, i) => `
+  // 업무를 추가해도 줄이 나뉘지 않게, 한 사람은 한 줄로 두고
+  // 항목들을 각 칸 안에서 이어 쓴다. (셀 병합과 같은 모양)
+  const stack = (key) => items
+    .map((it) => toDoc(it[key]))
+    .filter((h) => String(h).replace(/<[^>]*>|&nbsp;|\s/g, '') !== '')
+    .join('') || '&nbsp;';
+
+  const rows = `
       <tr>
-        ${i === 0 ? `<td class="org" rowspan="${n}">${esc(report.org_name)}</td>
-        <td class="who" rowspan="${n}">${esc(report.author_name || '-')}</td>` : ''}
-        <td class="cell">${toDoc(it.plan_html)}</td>
-        <td class="cell">${toDoc(it.result_html)}</td>
-        <td class="cell">${toDoc(it.next_plan_html)}</td>
-      </tr>`).join('');
+        <td class="org">${esc(report.org_name)}</td>
+        <td class="who">${esc(report.author_name || '-')}</td>
+        <td class="cell">${stack('plan_html')}</td>
+        <td class="cell">${stack('result_html')}</td>
+        <td class="cell">${stack('next_plan_html')}</td>
+      </tr>`;
 
   // 인쇄: @page 여백 0 → 브라우저가 머리글(날짜)/바닥글(URL)을 넣지 않는다
   // Word : WordSection1 으로 가로 방향 A4 지정
@@ -799,16 +804,20 @@ function buildHwpxHtml(report, items, files, nextWeek) {
   const esc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const thisRange = fmtRange(report.start_date, report.end_date);
   const nextRange = nextWeek ? fmtRange(nextWeek.start_date, nextWeek.end_date) : '';
-  const n = items.length || 1;
+  // 한 사람은 한 줄. 항목이 여럿이면 칸 안에서 이어 쓴다.
+  const stack = (key) => items
+    .map((it) => toHwpxCell(it[key]))
+    .filter((h) => String(h).replace(/<[^>]*>|&nbsp;|\s/g, '') !== '')
+    .join('') || '&#8203;';
 
-  const rows = items.map((it, i) => `
+  const rows = `
     <tr>
-      ${i === 0 ? `<td rowspan="${n}">${esc(report.org_name)}</td>
-      <td rowspan="${n}">${esc(report.author_name || '-')}</td>` : ''}
-      <td>${toHwpxCell(it.plan_html)}</td>
-      <td>${toHwpxCell(it.result_html)}</td>
-      <td>${toHwpxCell(it.next_plan_html)}</td>
-    </tr>`).join('');
+      <td>${esc(report.org_name)}</td>
+      <td>${esc(report.author_name || '-')}</td>
+      <td>${stack('plan_html')}</td>
+      <td>${stack('result_html')}</td>
+      <td>${stack('next_plan_html')}</td>
+    </tr>`;
 
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <title>주간 추진실적 보고</title></head><body>
@@ -839,26 +848,24 @@ function buildHwpxWeekHtml(week, nextWeek, groups) {
   const thisRange = fmtRange(week.start_date, week.end_date);
   const nextRange = nextWeek ? fmtRange(nextWeek.start_date, nextWeek.end_date) : '';
 
+  // 한 사람은 한 줄. 항목이 여럿이면 칸 안에서 이어 쓴다.
+  // 기관명은 소속 인원 수만큼 세로로 합친다.
+  const stack = (items, key) => items
+    .map((it) => toHwpxCell(it[key]))
+    .filter((h) => String(h).replace(/<[^>]*>|&nbsp;|\s/g, '') !== '')
+    .join('') || '&#8203;';
+
   const rows = [];
   for (const g of groups) {
-    // 이 기관이 차지할 줄 수 = 소속 인원들의 항목 수 합계 (항목이 없으면 한 줄)
-    const orgSpan = g.members.reduce((sum, m) => sum + Math.max(m.items.length, 1), 0);
-    let orgDone = false;
-
-    for (const m of g.members) {
-      const span = Math.max(m.items.length, 1);
-      const items = m.items.length ? m.items : [{ plan_html: '', result_html: '', next_plan_html: '' }];
-
-      items.forEach((it, i) => {
-        const cells = [];
-        if (!orgDone) { cells.push(`<td rowspan="${orgSpan}">${esc(g.org_name)}</td>`); orgDone = true; }
-        if (i === 0) cells.push(`<td rowspan="${span}">${esc(m.author_name || '-')}</td>`);
-        cells.push(`<td>${toHwpxCell(it.plan_html)}</td>`);
-        cells.push(`<td>${toHwpxCell(it.result_html)}</td>`);
-        cells.push(`<td>${toHwpxCell(it.next_plan_html)}</td>`);
-        rows.push(`<tr>${cells.join('')}</tr>`);
-      });
-    }
+    g.members.forEach((m, i) => {
+      const cells = [];
+      if (i === 0) cells.push(`<td rowspan="${g.members.length}">${esc(g.org_name)}</td>`);
+      cells.push(`<td>${esc(m.author_name || '-')}</td>`);
+      cells.push(`<td>${stack(m.items, 'plan_html')}</td>`);
+      cells.push(`<td>${stack(m.items, 'result_html')}</td>`);
+      cells.push(`<td>${stack(m.items, 'next_plan_html')}</td>`);
+      rows.push(`<tr>${cells.join('')}</tr>`);
+    });
   }
 
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8">
