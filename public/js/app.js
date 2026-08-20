@@ -580,7 +580,7 @@
 
     $('#btn-week-hwpx').onclick = () => {
       const weekId = $('#f-week').value;
-      if (!weekId) toast('주차 전체는 ZIP으로 묶어 다운로드됩니다.');
+      if (!weekId) toast('전체 주차는 ZIP으로 묶어 다운로드됩니다.');
       downloadWeekHwpx(weekId, $('#f-org') ? $('#f-org').value : '');
     };
   }
