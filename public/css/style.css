@@ -293,32 +293,41 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
   font-size: 14px;
   font-weight: 700;
   line-height: 1;
-  box-shadow: 0 1px 0 rgba(20, 34, 51, .12);
-  transition: background .12s, box-shadow .12s, transform .05s;
+  /* 평소에는 눌려 들어간(음각) 모양, 마우스를 올리면 솟아오른다(양각) */
+  box-shadow: inset 0 1px 2px rgba(20, 34, 51, .16), inset 0 -1px 0 rgba(255, 255, 255, .75);
+  transition: background .12s, box-shadow .12s, transform .08s, border-color .12s;
 }
 /* 강한 원색 대신 흰 버튼에 기호 색으로만 구분한다 */
+/* 위가 어둡고 아래가 밝으면 파인 것처럼 보인다 */
 .toolbar-hint .row-ctl .btn.icon:not(.danger) {
-  background: linear-gradient(#ffffff, #f2f6fb);
-  border-color: #b7cde5;
-  color: var(--primary);
+  background: linear-gradient(#e7edf4, #f8fafc);
+  border-color: #c2d2e4;
+  color: #4a7cb5;
 }
+/* 반대로 위가 밝고 아래가 어두우면 솟은 것처럼 보인다 */
 .toolbar-hint .row-ctl .btn.icon:not(.danger):hover:not(:disabled) {
-  background: linear-gradient(#f4f8fc, #e4eef8);
+  background: linear-gradient(#ffffff, #e8f0f9);
   border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 2px 3px rgba(20, 34, 51, .18), inset 0 1px 0 rgba(255, 255, 255, .95);
+  transform: translateY(-1px);
 }
 .toolbar-hint .row-ctl .btn.icon.danger {
-  background: linear-gradient(#ffffff, #faf3f2);
-  border-color: #ddb9b3;
-  color: #b4503f;
+  background: linear-gradient(#f4e9e7, #fdf8f7);
+  border-color: #e0c5c0;
+  color: #b8776b;
 }
 .toolbar-hint .row-ctl .btn.icon.danger:hover:not(:disabled) {
-  background: linear-gradient(#fdf6f5, #f6e6e3);
+  background: linear-gradient(#ffffff, #f8e9e6);
   border-color: #c9796c;
+  color: #b4503f;
+  box-shadow: 0 2px 3px rgba(51, 20, 20, .18), inset 0 1px 0 rgba(255, 255, 255, .95);
+  transform: translateY(-1px);
 }
-/* 누를 때 살짝 들어가는 느낌 */
+/* 누를 때는 다시 깊이 들어간다 */
 .toolbar-hint .row-ctl .btn.icon:active:not(:disabled) {
   transform: translateY(1px);
-  box-shadow: inset 0 1px 2px rgba(20, 34, 51, .18);
+  box-shadow: inset 0 2px 3px rgba(20, 34, 51, .25);
 }
 .editor-toolbar .sep { width: 1px; height: 18px; background: var(--border-dk); margin: 0 4px; }
 .editor-toolbar button {
