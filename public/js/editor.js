@@ -70,6 +70,13 @@
     return out;
   }
 
+  /** 다음 줄에 이어 붙일 기호. 번호면 하나 올린다. */
+  function nextMarker(mark) {
+    const m = /^([\s\u00a0]*)(\d{1,3})([.)])([\s\u00a0]+)$/.exec(mark);
+    if (m) return `${m[1]}${Number(m[2]) + 1}${m[3]}${m[4]}`;
+    return mark;
+  }
+
   /** 그 칸 안의 첫 글자 노드 (없으면 null) */
   function firstTextNode(el) {
     for (const n of el.childNodes) {
@@ -321,14 +328,22 @@
         // 들여쓴 줄 끝에서 엔터를 치고 붙여넣으면 통째로 밀려 들어가기 때문이다.
         // 줄 가운데서 엔터를 쳐 글이 나뉘는 경우는 그대로 둔다.
         if (e.key === 'Enter' && !e.shiftKey) {
-          // 빈 글머리표 항목에서 또 엔터를 치면 목록에서 빠져나온다.
-          // (한 번째 엔터는 다음 항목을 만들고, 두 번째 엔터로 목록이 끝난다)
-          // 브라우저마다 처리가 달라 직접 옮긴다.
-          const li = this._currentListItem();
-          if (li && isBlank(li)) {
-            e.preventDefault();
-            this._exitList(li);
-            return;
+          // 글머리표 줄에서 엔터를 치면 다음 줄에도 같은 기호를 이어 붙인다.
+          // 기호만 있고 내용이 없는 줄이면 기호를 떼어 목록을 끝낸다.
+          const block = this._currentBlock();
+          if (block) {
+            const m = MARKER_RE.exec(block.textContent);
+            if (m) {
+              const rest = block.textContent.slice(m[0].length);
+              if (rest.replace(/[\s\u00a0\u200b]/g, '') === '') {
+                // 기호만 남은 줄 → 기호와 들여쓰기를 떼고 그 자리에 선다
+                e.preventDefault();
+                this._clearLine(block);
+                return;
+              }
+              setTimeout(() => this._afterEnter(nextMarker(m[0]), block.style.paddingLeft), 0);
+              return;
+            }
           }
           setTimeout(() => this._afterEnter(), 0);
         }
@@ -399,7 +414,7 @@
     }
 
     /** 엔터를 친 뒤 정리 : 목록 빠져나오기(보조) + 새 줄 들여쓰기 없애기 */
-    _afterEnter() {
+    _afterEnter(carry, pad) {
       const sel = global.getSelection();
       if (!sel || !sel.rangeCount) return;
       let node = sel.getRangeAt(0).startContainer;
@@ -427,10 +442,56 @@
       // 글이 들어 있는 줄(가운데서 나뉜 경우)은 그대로 둔다
       if (!isBlank(node)) return;
 
+      if (carry) {
+        // 앞 줄의 기호와 들여쓰기를 이어받는다
+        if (pad) node.style.paddingLeft = pad;
+        const t = document.createTextNode(carry);
+        node.insertBefore(t, node.firstChild);
+        const range = document.createRange();
+        range.setStart(t, carry.length);
+        range.collapse(true);
+        const s2 = global.getSelection();
+        s2.removeAllRanges();
+        s2.addRange(range);
+        this.saveRange();
+        this.touch();
+        return;
+      }
+
       node.style.removeProperty('padding-left');
       node.style.removeProperty('margin-left');
       if (!node.getAttribute('style')) node.removeAttribute('style');
       this.saveRange();
+    }
+
+    /** 커서가 놓인 줄 (편집 영역 바로 아래 칸) */
+    _currentBlock() {
+      const sel = global.getSelection();
+      if (!sel || !sel.rangeCount) return null;
+      let n = sel.getRangeAt(0).startContainer;
+      if (n.nodeType === 3) n = n.parentNode;
+      while (n && n !== this.area && n.parentNode !== this.area) n = n.parentNode;
+      return n && n !== this.area && n.parentNode === this.area ? n : null;
+    }
+
+    /** 줄머리 기호와 들여쓰기를 떼어 빈 줄로 만든다 */
+    _clearLine(block) {
+      const t = firstTextNode(block);
+      if (t) t.nodeValue = t.nodeValue.replace(MARKER_RE, '');
+      block.style.removeProperty('padding-left');
+      block.style.removeProperty('margin-left');
+      if (!block.getAttribute('style')) block.removeAttribute('style');
+      if (block.textContent === '' && !block.querySelector('br')) {
+        block.appendChild(document.createElement('br'));
+      }
+      const range = document.createRange();
+      range.setStart(block, 0);
+      range.collapse(true);
+      const sel = global.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      this.saveRange();
+      this.touch();
     }
   }
 
