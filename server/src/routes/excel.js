@@ -202,6 +202,32 @@ async function parseItems(buffer) {
 // POST /api/reports/excel/import  — 선택한 주차에 바로 등록
 //   multipart: file, week_id
 // ---------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// POST /api/reports/excel/preview
+//   엑셀을 읽어 화면에 채울 내용만 돌려준다. 저장하지 않는다.
+//   사용자가 확인한 뒤 [저장] 을 눌러야 등록된다.
+// ---------------------------------------------------------------------
+router.post('/preview', (req, res, next) => {
+  upload.single('file')(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'Excel 파일을 선택하세요.' });
+
+    try {
+      const items = await parseItems(req.file.buffer);
+      if (!items.length) {
+        return res.status(400).json({ error: '읽을 내용이 없습니다. 세 칸을 모두 채워주세요.' });
+      }
+      const missing = require('./reports').findEmptyCell(items);
+      if (missing) return res.status(400).json({ error: `엑셀 ${missing}` });
+
+      await audit.log(req, 'EXCEL_PREVIEW', {
+        detail: `${req.file.originalname} → ${items.length}건`,
+      });
+      res.json({ items, count: items.length, filename: req.file.originalname });
+    } catch (e) { next(e); }
+  });
+});
+
 router.post('/import', (req, res, next) => {
   upload.single('file')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });

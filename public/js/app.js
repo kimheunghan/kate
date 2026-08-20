@@ -434,30 +434,25 @@
       const weekLabel = $('#sel-week').selectedOptions[0]?.textContent.trim() || '';
       if (!weekId) { toast('보고 주차를 먼저 선택하세요.', true); return; }
 
-      // 화면에 실제 작성된 내용이 있을 때만 덮어쓰기를 확인받는다.
-      // 비어 있으면(보고서 껍데기만 있어도) 그냥 등록한다.
+      // 화면에 쓰던 내용이 있으면 지워도 되는지 먼저 묻는다
       const strip = (h) => String(h || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
       const hasContent = collectItems()
         .some((it) => strip(it.plan_html) || strip(it.result_html) || strip(it.next_plan_html));
       if (hasContent
-          && !confirm(`${weekLabel} 주간보고 내용이 있습니다.\n덮어쓸까요?`)) return;
+          && !confirm(`${weekLabel} 화면에 작성한 내용이 있습니다.\n엑셀 내용으로 바꿀까요?\n\n(저장을 눌러야 실제로 등록됩니다)`)) return;
 
       const form = new FormData();
       form.append('file', file);
-      form.append('week_id', String(weekId));
-      // 전체 관리자는 기관을 골라 등록할 수 있다 (그 외 권한에서는 서버가 무시)
-      if (state.me.role === 'ADMIN' && $('#sel-org').value) {
-        form.append('org_id', String(Number($('#sel-org').value)));
-      }
 
       const btn = $('#btn-excel-import');
       btn.disabled = true;
-      btn.textContent = '등록 중...';
+      btn.textContent = '읽는 중...';
       try {
-        const res = await api.post('/api/reports/excel/import', form);
-        state.dirty = false;
-        await loadCurrent();                 // 등록된 내용을 화면에 바로 반영
-        toast(res.message);
+        // 엑셀은 화면으로 불러오기만 한다. 등록은 [저장] 을 눌러야 이뤄진다.
+        const res = await api.post('/api/reports/excel/preview', form);
+        renderItems(res.items, false);
+        state.dirty = true;
+        toast(`엑셀에서 ${res.count}건을 불러왔습니다. 확인 후 [저장]을 누르세요.`);
       } catch (err) {
         toast(err.message, true);
       } finally {
