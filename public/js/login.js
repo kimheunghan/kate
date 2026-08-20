@@ -104,16 +104,19 @@
   $('#link-find-id').onclick = (e) => {
     e.preventDefault();
     modal('아이디 찾기', `
-      <p class="small muted">가입할 때 등록한 <b>이름과 이메일</b>로 찾습니다.</p>
+      <p class="small muted">가입할 때 등록한 <b>소속과 이름</b>으로 찾습니다.</p>
+      <label class="field"><span>소속</span>
+        <select id="fi-org"><option value="">불러오는 중...</option></select>
+      </label>
       <label class="field"><span>이름</span><input type="text" id="fi-name"></label>
-      <label class="field"><span>이메일</span><input type="email" id="fi-email"></label>
     `, async (ctx) => {
+      const orgId = ctx.back.querySelector('#fi-org').value;
       const name = ctx.back.querySelector('#fi-name').value.trim();
-      const email = ctx.back.querySelector('#fi-email').value.trim();
-      if (!name || !email) return ctx.fail('이름과 이메일을 모두 입력하세요.');
+      if (!orgId) return ctx.fail('소속을 선택하세요.');
+      if (!name) return ctx.fail('이름을 입력하세요.');
 
       try {
-        const res = await api.post('/api/auth/find-id', { name, email }, { allowAnonymous: true });
+        const res = await api.post('/api/auth/find-id', { name, org_id: Number(orgId) }, { allowAnonymous: true });
         ctx.succeed(
           '<b>찾은 아이디</b><br>' +
           res.accounts.map((a) =>
@@ -124,6 +127,19 @@
         );
       } catch (e2) { ctx.fail(e2.message); }
     }, '찾기');
+
+    // 소속 목록을 채운다 (회원가입 화면과 같은 목록)
+    api.get('/api/auth/signup-orgs', { allowAnonymous: true })
+      .then((r) => {
+        const sel = document.querySelector('#fi-org');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">선택하세요</option>'
+          + r.orgs.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+      })
+      .catch(() => {
+        const sel = document.querySelector('#fi-org');
+        if (sel) sel.innerHTML = '<option value="">소속 목록을 불러오지 못했습니다</option>';
+      });
   };
 
   // ------------------------------------------------------------------

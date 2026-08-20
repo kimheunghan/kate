@@ -381,22 +381,22 @@ router.post('/signup', rateLimit(5, 10 * 60 * 1000), async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------
-// POST /api/auth/find-id  — 이름 + 이메일로 아이디 찾기 (일부 마스킹)
+// POST /api/auth/find-id  — 이름 + 소속 기관으로 아이디 찾기 (일부 마스킹)
 // ---------------------------------------------------------------------
 router.post('/find-id', rateLimit(10, 10 * 60 * 1000), async (req, res, next) => {
   try {
     const name = String(req.body?.name || '').trim();
-    const email = String(req.body?.email || '').trim();
-    if (!name || !email) return res.status(400).json({ error: '이름과 이메일을 모두 입력하세요.' });
+    const orgId = Number(req.body?.org_id) || null;
+    if (!name || !orgId) return res.status(400).json({ error: '이름과 소속을 모두 선택하세요.' });
 
     const { rows } = await db.query(
       `SELECT username, created_at, approval_status
          FROM wr.users
-        WHERE name = $1 AND lower(email) = lower($2)
+        WHERE name = $1 AND org_id = $2
         ORDER BY id`,
-      [name, email]
+      [name, orgId]
     );
-    await audit.log(req, 'FIND_ID', { detail: `${name} / ${email} → ${rows.length}건` });
+    await audit.log(req, 'FIND_ID', { detail: `${name} / 기관 ${orgId} → ${rows.length}건` });
 
     if (!rows.length) {
       return res.status(404).json({ error: '일치하는 가입 정보가 없습니다. 관리자에게 문의하세요.' });
