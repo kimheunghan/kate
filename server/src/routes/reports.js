@@ -213,7 +213,8 @@ router.get('/', async (req, res, next) => {
              (SELECT count(*)::int FROM wr.report_items ri WHERE ri.report_id = r.id) AS item_count,
              -- 항목별로 한 줄씩 보여주도록 배열로 넘긴다. (화면에서 줄바꿈 + 말줄임 처리)
              -- 실적 보고이므로 ② 추진 실적을 우선 쓰고, 비어 있으면 ① 당초 계획으로 대체.
-             (SELECT array_agg(t.rn || '. ' || left(t.txt, 300) ORDER BY t.rn)
+             -- 본문에 사용자가 붙인 번호가 이미 있으므로 따로 번호를 붙이지 않는다.
+             (SELECT array_agg(left(t.txt, 300) ORDER BY t.rn)
                 FROM (
                   SELECT row_number() OVER (ORDER BY x.sort_order, x.id) AS rn,
                          btrim(regexp_replace(
