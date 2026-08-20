@@ -210,7 +210,18 @@ router.post('/import', (req, res, next) => {
     try {
       const weekId = Number(req.body?.week_id);
       if (!weekId) return res.status(400).json({ error: '보고 주차를 먼저 선택하세요.' });
-      if (!req.user.org_id) {
+      // 전체 관리자는 요청한 기관으로, 그 외는 본인 소속으로 저장한다
+      let orgId = req.user.org_id;
+      if (req.user.role === 'ADMIN' && req.body?.org_id) {
+        const { rows: o } = await db.query(
+          `SELECT id FROM wr.organizations WHERE id = $1 AND is_active = TRUE`,
+          [Number(req.body.org_id)]
+        );
+        if (!o[0]) return res.status(400).json({ error: '선택할 수 없는 기관입니다.' });
+        orgId = o[0].id;
+      }
+
+      if (!orgId) {
         return res.status(400).json({ error: '소속 기관이 없습니다. 내 정보에서 소속을 지정하세요.' });
       }
 
@@ -235,7 +246,7 @@ router.post('/import', (req, res, next) => {
               SET org_id = EXCLUDED.org_id, status = 'SUBMITTED',
                   submitted_at = COALESCE(reports.submitted_at, now())
            RETURNING id`,
-          [weekId, req.user.org_id, req.user.id]
+          [weekId, orgId, req.user.id]
         );
         const id = rows[0].id;
 

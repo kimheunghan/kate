@@ -13,6 +13,22 @@ router.use(auth.requireAuth);
 // 헬퍼
 // ---------------------------------------------------------------------
 
+/**
+ * 저장할 보고서의 기관을 정한다.
+ *   전체 관리자 : 화면에서 고른 기관을 그대로 사용 (없으면 본인 소속)
+ *   그 외      : 항상 본인 소속 (요청값을 신뢰하지 않음)
+ */
+async function resolveOrgId(user, requested) {
+  if (user.role === 'ADMIN' && requested) {
+    const { rows } = await db.query(
+      `SELECT id FROM wr.organizations WHERE id = $1 AND is_active = TRUE`, [Number(requested)]
+    );
+    if (!rows[0]) return { error: '선택할 수 없는 기관입니다.' };
+    return { orgId: rows[0].id };
+  }
+  return { orgId: user.org_id };
+}
+
 /** 보고서를 편집할 수 있는가 — 본인 것이거나 전체 관리자 */
 function canEditReport(user, report) {
   if (user.role === 'ADMIN') return true;
@@ -266,10 +282,13 @@ router.get('/:id(\\d+)', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const weekId = Number(req.body?.week_id);
-    // 보고서는 항상 "본인 것" 으로 만들어진다. 기관은 작성 시점 소속을 기록한다.
-    const orgId = req.user.org_id;
     if (!weekId) return res.status(400).json({ error: '주차를 선택하세요.' });
-    if (!orgId)  return res.status(400).json({ error: '소속 기관이 없습니다. 내 정보에서 소속을 지정하세요.' });
+
+    // 보고서 소유자는 항상 본인. 기관은 관리자만 지정할 수 있다.
+    const resolved = await resolveOrgId(req.user, req.body?.org_id);
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+    const orgId = resolved.orgId;
+    if (!orgId) return res.status(400).json({ error: '소속 기관이 없습니다. 내 정보에서 소속을 지정하세요.' });
 
     const { rows: wrows } = await db.query(`SELECT is_open FROM wr.report_weeks WHERE id = $1`, [weekId]);
     if (!wrows[0]) return res.status(400).json({ error: '존재하지 않는 주차입니다.' });
@@ -327,6 +346,17 @@ router.put('/:id(\\d+)', async (req, res, next) => {
     const items = normalizeItems(req.body?.items);
     const note = String(req.body?.note || '').slice(0, 5000);
     const status = req.body?.status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT';
+
+    // 전체 관리자는 수정 시 기관도 바꿀 수 있다
+    if (req.user.role === 'ADMIN' && req.body?.org_id
+        && Number(req.body.org_id) !== Number(existing.org_id)) {
+      const resolved = await resolveOrgId(req.user, req.body.org_id);
+      if (resolved.error) return res.status(400).json({ error: resolved.error });
+      await db.query(`UPDATE wr.reports SET org_id = $1 WHERE id = $2`, [resolved.orgId, id]);
+      await audit.log(req, 'REPORT_ORG_CHANGE', {
+        targetType: 'report', targetId: id, detail: `기관 변경 → ${resolved.orgId}`,
+      });
+    }
 
     await db.tx(async (client) => {
       await client.query(

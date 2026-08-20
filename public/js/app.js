@@ -83,11 +83,19 @@
     $('#sel-org').innerHTML = opts;
     $('#f-org').innerHTML = '<option value="">전체</option>' + opts;
 
-    if (state.me.role !== 'ADMIN') {
-      $('#sel-org').value = state.me.org_id || '';
-      $('#sel-org').disabled = true;
-    } else if (state.me.org_id) {
-      $('#sel-org').value = state.me.org_id;
+    const orgSel = $('#sel-org');
+    const orgLabel = document.querySelector('#org-field > span');
+    if (state.me.role === 'ADMIN') {
+      // 전체 관리자만 기관을 골라 저장할 수 있다
+      orgSel.disabled = false;
+      if (state.me.org_id) orgSel.value = state.me.org_id;
+      orgSel.title = '저장·엑셀 일괄등록 시 이 기관으로 기록됩니다.';
+      if (orgLabel) orgLabel.textContent = '기관 (선택 가능)';
+    } else {
+      orgSel.value = state.me.org_id || '';
+      orgSel.disabled = true;
+      orgSel.title = '소속 기관은 [내 정보]에서 변경할 수 있습니다.';
+      if (orgLabel) orgLabel.textContent = '기관';
     }
   }
 
@@ -408,6 +416,10 @@
       const form = new FormData();
       form.append('file', file);
       form.append('week_id', String(weekId));
+      // 전체 관리자는 기관을 골라 등록할 수 있다 (그 외 권한에서는 서버가 무시)
+      if (state.me.role === 'ADMIN' && $('#sel-org').value) {
+        form.append('org_id', String(Number($('#sel-org').value)));
+      }
 
       const btn = $('#btn-excel-import');
       btn.disabled = true;
