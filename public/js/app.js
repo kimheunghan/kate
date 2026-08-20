@@ -317,6 +317,30 @@
     })).filter((it) => it.plan_html || it.result_html || it.next_plan_html);
   }
 
+  /**
+   * 비어 있는 첫 칸을 찾는다. 다 채워져 있으면 null.
+   * 화면에 보이는 글자가 없으면 비어 있는 것으로 본다.
+   */
+  function findEmptyCell() {
+    const blank = (html) => String(html || '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;|[\s\u00a0\u200b]/g, '') === '';
+
+    for (let i = 0; i < state.rows.length; i++) {
+      const r = state.rows[i];
+      const cells = [
+        ['① 당초 계획', r.planEd],
+        ['② 추진 실적', r.resultEd],
+        ['③ 향후 계획', r.nextEd],
+      ];
+      // 아무것도 안 쓴 줄은 저장에서 빠지므로 검사하지 않는다
+      if (cells.every(([, ed]) => blank(ed.getHtml()))) continue;
+      const empty = cells.find(([, ed]) => blank(ed.getHtml()));
+      if (empty) return { no: i + 1, label: empty[0], editor: empty[1] };
+    }
+    return null;
+  }
+
   function bindEditorPanel() {
     $('#btn-load').onclick = () => {
       if (state.dirty && !confirm('저장하지 않은 변경사항이 있습니다. 그래도 불러올까요?')) return;
@@ -423,6 +447,14 @@
     $('#btn-save').onclick = () => {
       const items = collectItems();
       if (!items.length) { toast('내용을 하나 이상 입력하세요.', true); return; }
+
+      // 세 칸(당초 계획·추진 실적·향후 계획)을 모두 채워야 한다
+      const missing = findEmptyCell();
+      if (missing) {
+        toast(`${missing.no}번 항목의 ${missing.label} 을(를) 입력하세요.`, true);
+        missing.editor.area.focus();
+        return;
+      }
       save('SUBMITTED');
     };
     $('#btn-print').onclick = () => {

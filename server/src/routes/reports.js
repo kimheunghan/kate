@@ -125,6 +125,28 @@ function normalizeItems(raw) {
   }));
 }
 
+/**
+ * 세 칸(① 당초 계획 · ② 추진 실적 · ③ 향후 계획)이 모두 채워졌는지 본다.
+ * 비어 있으면 어느 항목의 어느 칸인지 알려주는 문구를 돌려준다.
+ */
+function findEmptyCell(items) {
+  const blank = (h) => String(h || '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;|[\s\u00a0\u200b]/g, '') === '';
+
+  for (let i = 0; i < items.length; i++) {
+    const cells = [
+      ['① 당초 계획', items[i].plan_html],
+      ['② 추진 실적', items[i].result_html],
+      ['③ 향후 계획', items[i].next_plan_html],
+    ];
+    if (cells.every(([, h]) => blank(h))) continue;      // 빈 줄은 저장에서 빠진다
+    const empty = cells.find(([, h]) => blank(h));
+    if (empty) return `${i + 1}번 항목의 ${empty[0]} 을(를) 입력하세요.`;
+  }
+  return null;
+}
+
 /** 기존 항목과 비교해 INSERT / UPDATE / DELETE 를 수행 (첨부 연결 유지) */
 async function saveItems(client, reportId, items) {
   const { rows: existing } = await client.query(
@@ -305,6 +327,8 @@ router.post('/', async (req, res, next) => {
     if (!wrows[0]) return res.status(400).json({ error: '존재하지 않는 주차입니다.' });
 
     const items = normalizeItems(req.body?.items);
+    const missing = findEmptyCell(items);
+    if (missing) return res.status(400).json({ error: missing });
     const note = String(req.body?.note || '').slice(0, 5000);
     const status = req.body?.status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT';
 
@@ -349,6 +373,8 @@ router.put('/:id(\\d+)', async (req, res, next) => {
     if (!canEditReport(req.user, existing)) return res.status(403).json({ error: '본인이 작성한 보고서만 수정할 수 있습니다.' });
 
     const items = normalizeItems(req.body?.items);
+    const missing = findEmptyCell(items);
+    if (missing) return res.status(400).json({ error: missing });
     const note = String(req.body?.note || '').slice(0, 5000);
     const status = req.body?.status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT';
 
@@ -1140,3 +1166,4 @@ router.get('/export-hwpx-week', async (req, res, next) => {
 
 module.exports = router;
 module.exports.canViewReport = canViewReport;
+module.exports.findEmptyCell = findEmptyCell;

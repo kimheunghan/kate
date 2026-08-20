@@ -232,8 +232,11 @@ router.post('/import', (req, res, next) => {
 
       const items = await parseItems(req.file.buffer);
       if (!items.length) {
-        return res.status(400).json({ error: '등록할 내용이 없습니다. 세 칸 중 하나 이상을 채워주세요.' });
+        return res.status(400).json({ error: '등록할 내용이 없습니다. 세 칸을 모두 채워주세요.' });
       }
+      // 화면에서 저장할 때와 같은 규칙 : 세 칸을 모두 채워야 등록된다
+      const missing = require('./reports').findEmptyCell(items);
+      if (missing) return res.status(400).json({ error: `엑셀 ${missing}` });
 
       const reportId = await db.tx(async (client) => {
         const { rows } = await client.query(
