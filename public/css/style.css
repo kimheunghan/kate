@@ -731,12 +731,21 @@ body.brush-armed .editor-area { cursor: cell; }
   padding: 1px 7px; border-radius: 9px; margin-left: 3px;
 }
 
+/* 너비를 지정한 대로 지키는 표.
+   이렇게 하지 않으면 긴 요약글이 열을 밀어내 다른 열이 눌리고 말줄임도 듣지 않는다. */
+table.grid.fixed { table-layout: fixed; min-width: 1320px; }
+table.grid.fixed td { overflow: hidden; text-overflow: ellipsis; }
+/* 기관·참여인력처럼 좁은 칸에서 글자가 한 자씩 끊기지 않게 */
+table.grid.fixed td.col-org, table.grid.fixed td.col-author { word-break: keep-all; }
+
 /* 조회 목록의 내용 요약 — 항목마다 한 줄, 길면 말줄임(…) */
 table.grid td.summary { color: var(--text-dim); line-height: 1.6; }
 table.grid td.summary .sum-line {
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  min-width: 0;
 }
 table.grid td.summary .sum-more { color: var(--text-dim); font-size: 12px; opacity: .8; }
