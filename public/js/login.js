@@ -117,9 +117,14 @@
 
       try {
         const res = await api.post('/api/auth/find-id', { name, org_id: Number(orgId) }, { allowAnonymous: true });
+        const many = res.accounts.length > 1;
         ctx.succeed(
-          '<b>찾은 아이디</b><br>' +
+          (many
+            ? `<b>같은 이름이 ${res.accounts.length}명 있습니다.</b>`
+              + '<div class="small muted" style="margin:2px 0 8px">본인 이름을 확인하세요.</div>'
+            : '<b>찾은 아이디</b><br>') +
           res.accounts.map((a) =>
+            (many ? `<span style="display:inline-block;min-width:96px">${esc(a.name)}</span>` : '') +
             `<span style="font-size:16px;letter-spacing:1px">${esc(a.username)}</span>` +
             (a.pending ? ' <span class="badge draft">승인대기</span>' : '')
           ).join('<br>') +

@@ -389,12 +389,15 @@ router.post('/find-id', rateLimit(10, 10 * 60 * 1000), async (req, res, next) =>
     const orgId = Number(req.body?.org_id) || null;
     if (!name || !orgId) return res.status(400).json({ error: '이름과 소속을 모두 선택하세요.' });
 
+    // 같은 기관에 동명이인이 있으면 이름 뒤에 -A, -B 를 붙여 등록한다.
+    // '홍길동' 으로 찾아도 '홍길동-A' 가 나오도록 함께 뒤진다.
+    const base = name.replace(/[.^$*+?()[\]{}|\\-]/g, '\\$&');
     const { rows } = await db.query(
-      `SELECT username, created_at, approval_status
+      `SELECT username, name, created_at, approval_status
          FROM wr.users
-        WHERE name = $1 AND org_id = $2
-        ORDER BY id`,
-      [name, orgId]
+        WHERE (name = $1 OR name ~ ('^' || $3 || '-[A-Z]$')) AND org_id = $2
+        ORDER BY name, id`,
+      [name, orgId, base]
     );
     await audit.log(req, 'FIND_ID', { detail: `${name} / 기관 ${orgId} → ${rows.length}건` });
 
@@ -403,10 +406,13 @@ router.post('/find-id', rateLimit(10, 10 * 60 * 1000), async (req, res, next) =>
     }
     res.json({
       accounts: rows.map((r) => ({
+        name: r.name,
         username: maskUsername(r.username),
         created_at: r.created_at,
         pending: r.approval_status === 'PENDING',
       })),
+      // 동명이인이 있으면 화면에서 이름을 함께 보여준다
+      duplicated: rows.length > 1,
     });
   } catch (err) { next(err); }
 });
