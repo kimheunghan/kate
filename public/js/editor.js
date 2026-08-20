@@ -330,6 +330,13 @@
         // 엔터로 새 줄을 만들면 들여쓰기를 물려받지 않고 맨 앞에서 시작한다.
         // 들여쓴 줄 끝에서 엔터를 치고 붙여넣으면 통째로 밀려 들어가기 때문이다.
         // 줄 가운데서 엔터를 쳐 글이 나뉘는 경우는 그대로 둔다.
+        // 줄 맨 앞에서 백스페이스를 누르면 윗줄과 붙지 않고
+        // 그 줄의 들여쓰기를 한 칸 되돌린다. 커서는 그 자리에 남는다.
+        if (e.key === 'Backspace' && this._atLineStartWithIndent()) {
+          e.preventDefault();
+          if (this.opts.onIndent) this.opts.onIndent(this, -1);
+          return;
+        }
         if (e.key === 'Enter' && !e.shiftKey) {
           // 글머리표 줄에서 엔터를 치면 다음 줄에도 같은 기호를 이어 붙인다.
           // 기호만 있고 내용이 없는 줄이면 기호를 떼어 목록을 끝낸다.
@@ -465,6 +472,25 @@
       node.style.removeProperty('margin-left');
       if (!node.getAttribute('style')) node.removeAttribute('style');
       this.saveRange();
+    }
+
+    /** 커서가 줄 맨 앞에 있고 그 줄에 들여쓰기가 있는가 */
+    _atLineStartWithIndent() {
+      const sel = global.getSelection();
+      if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+      const range = sel.getRangeAt(0);
+      if (range.startOffset !== 0) return false;
+
+      const block = this._currentBlock();
+      if (!block || !block.style) return false;
+      const pad = parseFloat(block.style.paddingLeft) || parseFloat(block.style.marginLeft) || 0;
+      if (!pad) return false;
+
+      // 커서 앞에 글자가 하나도 없어야 '줄 맨 앞' 이다
+      const before = range.cloneRange();
+      before.selectNodeContents(block);
+      before.setEnd(range.startContainer, range.startOffset);
+      return before.toString().replace(/[\s\u00a0\u200b]/g, '') === '';
     }
 
     /** 커서가 놓인 줄 (편집 영역 바로 아래 칸) */
