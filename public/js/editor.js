@@ -470,6 +470,7 @@
         s2.removeAllRanges();
         s2.addRange(range);
         this.saveRange();
+        this._renumber();
         this.touch();
         return;
       }
@@ -512,6 +513,55 @@
       });
     }
 
+    /**
+     * 번호 매긴 줄을 다시 세어 붙인다.
+     * 들여쓰기가 같은 줄끼리 한 묶음으로 보고, 사이에 글머리표 줄이 끼어도
+     * 이어서 센다. 1. 2. 4. 5. 처럼 어긋난 번호가 1. 2. 3. 4. 로 정리된다.
+     */
+    _renumber() {
+      const NUM_RE = /^([\s\u00a0]*)(\d{1,3})([.)])([\s\u00a0]+)/;
+      const sel = global.getSelection();
+      const saved = sel && sel.rangeCount
+        ? { node: sel.getRangeAt(0).startContainer, offset: sel.getRangeAt(0).startOffset }
+        : null;
+
+      const counters = new Map();          // 들여쓰기 → 다음 번호
+      let moved = false;
+
+      Array.from(this.area.children).forEach((el) => {
+        const t = firstTextNode(el);
+        if (!t) return;
+        const m = NUM_RE.exec(t.nodeValue);
+        if (!m) return;
+
+        const level = Math.round(parseFloat(el.style.paddingLeft) || 0);
+        const next = (counters.get(level) || 0) + 1;
+        counters.set(level, next);
+        if (String(next) === m[2]) return;
+
+        t.nodeValue = `${m[1]}${next}${m[3]}${m[4]}` + t.nodeValue.slice(m[0].length);
+        moved = true;
+
+        // 커서가 이 줄에 있으면 늘거나 준 만큼 자리를 맞춘다
+        if (saved && saved.node === t) {
+          saved.offset = Math.max(0, saved.offset + (String(next).length - m[2].length));
+        }
+      });
+
+      if (moved && saved && saved.node && saved.node.parentNode) {
+        try {
+          const range = document.createRange();
+          const max = saved.node.nodeType === 3
+            ? saved.node.nodeValue.length : saved.node.childNodes.length;
+          range.setStart(saved.node, Math.min(saved.offset, max));
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch (err) { /* 자리를 못 잡으면 그대로 둔다 */ }
+        this.saveRange();
+      }
+    }
+
     /** 커서가 놓인 줄 (편집 영역 바로 아래 칸) */
     _currentBlock() {
       const sel = global.getSelection();
@@ -545,6 +595,7 @@
       sel.removeAllRanges();
       sel.addRange(range);
       this.saveRange();
+      this._renumber();
       this.touch();
     }
   }
@@ -1027,6 +1078,7 @@
       sel.addRange(range);
 
       ed.saveRange();
+      ed._renumber();
       ed.touch();
       this.syncState();
     }
