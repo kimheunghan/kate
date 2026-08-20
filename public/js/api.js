@@ -173,11 +173,17 @@
     downloadFile(`/api/reports/${reportId}/export-hwpx`, '주간보고.hwpx');
   }
 
-  /** 선택한 주차의 보고서를 한 문서로 묶어 내려받는다 (보이는 범위만) */
+  /**
+   * 주간보고를 한글 문서로 내려받는다 (보이는 범위만).
+   *   주차를 고르면  → 그 주차 한 파일(.hwpx)
+   *   고르지 않으면  → 주차마다 한 파일씩 묶은 ZIP
+   */
   function downloadWeekHwpx(weekId, orgId) {
-    const q = new URLSearchParams({ week_id: String(weekId) });
-    if (orgId) q.set('org_id', String(orgId));
-    downloadFile(`/api/reports/export-hwpx-week?${q}`, '주간보고_전체.hwpx');
+    const q = new URLSearchParams();
+    if (weekId) q.set('week_id', String(weekId));
+    if (orgId)  q.set('org_id', String(orgId));
+    downloadFile(`/api/reports/export-hwpx-week?${q}`,
+      weekId ? '주간보고.hwpx' : '주간보고_전체.zip');
   }
 
   /**

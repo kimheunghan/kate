@@ -561,18 +561,26 @@
   // ==================================================================
   // 조회 탭
   // ==================================================================
+  // 주차를 고르면 그 주차 한 파일, 안 고르면 주차마다 한 파일씩 묶은 ZIP
+  function updateWeekDownloadButton() {
+    const btn = $('#btn-week-hwpx');
+    if (!btn) return;
+    const one = !!$('#f-week').value;
+    btn.textContent = one ? '해당 주차 한글 다운로드(HWPX)' : '주차 전체 ZIP 다운로드';
+    btn.title = one
+      ? '선택한 주차의 보고서를 한글 문서 한 개로 내려받습니다.'
+      : '주차마다 한글 문서를 만들어 ZIP 한 개로 묶어 내려받습니다.';
+  }
+
   function bindListTab() {
     $('#btn-search').onclick = () => searchList(1);
     ['#f-week', '#f-org'].forEach((s) => { $(s).onchange = () => searchList(1); });
+    $('#f-week').addEventListener('change', updateWeekDownloadButton);
+    updateWeekDownloadButton();
 
-    // 주차를 골라야 무엇을 묶을지 정해진다
     $('#btn-week-hwpx').onclick = () => {
       const weekId = $('#f-week').value;
-      if (!weekId) {
-        toast('먼저 보고 주차를 선택하세요.', true);
-        $('#f-week').focus();
-        return;
-      }
+      if (!weekId) toast('주차 전체는 ZIP으로 묶어 다운로드됩니다.');
       downloadWeekHwpx(weekId, $('#f-org') ? $('#f-org').value : '');
     };
   }

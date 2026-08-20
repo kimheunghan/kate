@@ -969,80 +969,129 @@ router.get('/:id(\\d+)/export-hwpx', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------
+// 한 주차 분량을 한글 문서(HWPX) 버퍼로 만든다. 보고서가 없으면 null.
+// ---------------------------------------------------------------------
+async function renderWeekHwpx(user, week, orgId) {
+  const where = ['r.week_id = $1'];
+  const params = [week.id];
+  addViewScope(user, where, params);
+  if (user.role === 'ADMIN' && orgId) {
+    params.push(Number(orgId));
+    where.push(`r.org_id = $${params.length}`);
+  }
+
+  // 목록 화면과 같은 차례: 기관 순서 → 담당 역할 → 이름 가나다
+  const { rows: reports } = await db.query(
+    `SELECT r.id, r.org_id, o.name AS org_name,
+            u.name AS author_name, u.username
+       FROM wr.reports r
+       JOIN wr.organizations o ON o.id = r.org_id
+       LEFT JOIN wr.users    u ON u.id = r.author_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY o.sort_order, o.name, wr.duty_order(u.duty), u.name, u.username`,
+    params
+  );
+  if (!reports.length) return null;
+
+  // 기관별로 묶는다
+  const groups = [];
+  for (const r of reports) {
+    let g = groups.find((x) => x.org_id === r.org_id);
+    if (!g) { g = { org_id: r.org_id, org_name: r.org_name, members: [] }; groups.push(g); }
+    g.members.push({ author_name: r.author_name, items: await loadItems(r.id) });
+  }
+
+  const nextWeek = await loadNextWeek(week.start_date);
+  const { htmlToHwpx } = await import('hwp-convert');
+  const out = await htmlToHwpx(buildHwpxWeekHtml(week, nextWeek, groups), {
+    page: {
+      size: 'A4',
+      orientation: 'portrait',
+      margins: { left: 10, right: 10, top: 10, bottom: 10, header: 5, footer: 5, gutter: 0 },
+    },
+  });
+  // 기관명 12% / 참여인력 8% / 당초 26% / 실적 27% / 향후 27%
+  const buf = await fixHwpxLayout(
+    Buffer.isBuffer(out) ? out : Buffer.from(out),
+    [0.12, 0.08, 0.26, 0.27, 0.27]
+  );
+  return { buf, count: reports.length };
+}
+
+/** safeFileName 이 '/' 를 지워 날짜가 붙어 읽히므로 미리 '.' 로 바꾼다 */
+function weekFileBase(label) {
+  return safeFileName(`주간보고_${String(label).replace(/\//g, '.')}`);
+}
+
+// ---------------------------------------------------------------------
 // GET /api/reports/export-hwpx-week?week_id=&org_id=
-//   선택한 주차의 보고서를 한 문서로 묶어 한글(HWPX)로 내려받는다.
+//   week_id 가 있으면 그 주차 한글 문서 하나,
+//   없으면 보고서가 있는 주차를 각각 만들어 ZIP 하나로 묶어 내려준다.
 //   보이는 범위는 목록과 같다. (작성자=본인, 기관관리자=자기 기관, 총괄관리자=전체)
 // ---------------------------------------------------------------------
 router.get('/export-hwpx-week', async (req, res, next) => {
   try {
+    const orgId = req.user.role === 'ADMIN' ? req.query.org_id : null;
     const weekId = Number(req.query.week_id);
-    if (!weekId) return res.status(400).json({ error: '보고 주차를 선택하세요.' });
 
-    const { rows: wrows } = await db.query(
-      `SELECT id, label, start_date, end_date FROM wr.report_weeks WHERE id = $1`, [weekId]
-    );
-    const week = wrows[0];
-    if (!week) return res.status(404).json({ error: '존재하지 않는 주차입니다.' });
-
-    const where = ['r.week_id = $1'];
-    const params = [weekId];
+    // 대상 주차 목록 (보고서가 있는 주차만, 최신 주차부터)
+    const where = [];
+    const params = [];
     addViewScope(req.user, where, params);
-    if (req.user.role === 'ADMIN' && req.query.org_id) {
-      params.push(Number(req.query.org_id));
-      where.push(`r.org_id = $${params.length}`);
-    }
+    if (orgId) { params.push(Number(orgId)); where.push(`r.org_id = $${params.length}`); }
+    if (weekId) { params.push(weekId); where.push(`r.week_id = $${params.length}`); }
 
-    // 목록 화면과 같은 차례: 기관 순서 → 담당 역할 → 이름 가나다
-    const { rows: reports } = await db.query(
-      `SELECT r.id, r.org_id, o.name AS org_name, o.sort_order,
-              u.name AS author_name, u.username
-         FROM wr.reports r
-         JOIN wr.organizations o ON o.id = r.org_id
-         LEFT JOIN wr.users    u ON u.id = r.author_id
-        WHERE ${where.join(' AND ')}
-        ORDER BY o.sort_order, o.name, wr.duty_order(u.duty), u.name, u.username`,
+    const { rows: weeks } = await db.query(
+      `SELECT DISTINCT w.id, w.label, w.start_date, w.end_date
+         FROM wr.reports r JOIN wr.report_weeks w ON w.id = r.week_id
+        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+        ORDER BY w.start_date DESC`,
       params
     );
-    if (!reports.length) {
-      return res.status(404).json({ error: '해당 주차에 등록된 보고서가 없습니다.' });
+    if (!weeks.length) {
+      return res.status(404).json({
+        error: weekId ? '해당 주차에 등록된 보고서가 없습니다.' : '내려받을 보고서가 없습니다.',
+      });
     }
 
-    // 기관별로 묶는다
-    const groups = [];
-    for (const r of reports) {
-      let g = groups.find((x) => x.org_id === r.org_id);
-      if (!g) { g = { org_id: r.org_id, org_name: r.org_name, members: [] }; groups.push(g); }
-      g.members.push({ author_name: r.author_name, items: await loadItems(r.id) });
+    // ── 주차 하나 : 한글 문서 그대로 ──────────────────────────────
+    if (weekId) {
+      const made = await renderWeekHwpx(req.user, weeks[0], orgId);
+      const name = weekFileBase(weeks[0].label) + '.hwpx';
+      await audit.log(req, 'REPORT_EXPORT_HWPX_WEEK', {
+        targetType: 'week', targetId: weeks[0].id, detail: `${name} (${made.count}건)`,
+      });
+      res.setHeader('Content-Type', 'application/hwp+zip');
+      res.setHeader('Cache-Control', 'no-store, must-revalidate');
+      res.setHeader('Content-Disposition',
+        `attachment; filename="report.hwpx"; filename*=UTF-8''${encodeURIComponent(name)}`);
+      return res.end(made.buf);
     }
 
-    const nextWeek = await loadNextWeek(week.start_date);
+    // ── 여러 주차 : 주차마다 한 파일씩 만들어 ZIP 으로 ─────────────
+    const JSZip = require('jszip');
+    const zip = new JSZip();
+    let total = 0;
+    for (const w of weeks) {
+      const made = await renderWeekHwpx(req.user, w, orgId);
+      if (!made) continue;
+      zip.file(weekFileBase(w.label) + '.hwpx', made.buf);
+      total += made.count;
+    }
 
-    const { htmlToHwpx } = await import('hwp-convert');
-    const out = await htmlToHwpx(buildHwpxWeekHtml(week, nextWeek, groups), {
-      page: {
-        size: 'A4',
-        orientation: 'portrait',
-        margins: { left: 10, right: 10, top: 10, bottom: 10, header: 5, footer: 5, gutter: 0 },
-      },
-    });
-    const buf = await fixHwpxLayout(
-      Buffer.isBuffer(out) ? out : Buffer.from(out),
-      [0.12, 0.08, 0.26, 0.27, 0.27]
-    );
-
-    // safeFileName 이 '/' 를 지워버려 날짜가 붙어 읽히므로 미리 '.' 로 바꾼다
-    const name = safeFileName(`주간보고_${String(week.label).replace(/\//g, '.')}_전체`) + '.hwpx';
-    await audit.log(req, 'REPORT_EXPORT_HWPX_WEEK', {
-      targetType: 'week', targetId: week.id, detail: `${name} (${reports.length}건)`,
+    const zipBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const name = safeFileName(`주간보고_전체(${weeks.length}개 주차)`) + '.zip';
+    await audit.log(req, 'REPORT_EXPORT_HWPX_ALL', {
+      targetType: 'week', targetId: null, detail: `${name} (주차 ${weeks.length}개 / 보고서 ${total}건)`,
     });
 
-    res.setHeader('Content-Type', 'application/hwp+zip');
+    res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Cache-Control', 'no-store, must-revalidate');
     res.setHeader('Content-Disposition',
-      `attachment; filename="report.hwpx"; filename*=UTF-8''${encodeURIComponent(name)}`);
-    res.end(buf);
+      `attachment; filename="reports.zip"; filename*=UTF-8''${encodeURIComponent(name)}`);
+    res.end(zipBuf);
   } catch (err) {
-    console.error('[hwpx] 주차 전체 변환 실패:', err.message);
+    console.error('[hwpx] 주차 내보내기 실패:', err.message);
     res.status(500).json({ error: '한글 문서로 변환하지 못했습니다. 잠시 후 다시 시도해 주세요.' });
   }
 });
