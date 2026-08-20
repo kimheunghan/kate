@@ -132,9 +132,9 @@
         <table class="grid">
           <thead>
             <tr>
-              <th style="width:130px">아이디</th>
-              <th style="width:110px">이름</th>
               <th style="width:170px">기관</th>
+              <th style="width:110px">이름</th>
+              <th style="width:130px">아이디</th>
               <th class="center" style="width:100px">상태</th>
               <th class="center" style="width:60px">항목</th>
               <th class="center" style="width:60px">첨부</th>
@@ -145,9 +145,9 @@
           <tbody>
             ${rows.length ? rows.map((r) => `
               <tr>
-                <td class="small muted">${esc(r.username)}</td>
-                <td><b>${esc(r.user_name)}</b></td>
                 <td>${esc(r.org_name || '-')}</td>
+                <td><b>${esc(r.user_name)}</b></td>
+                <td class="small muted">${esc(r.username)}</td>
                 <td class="center">${statusBadge(r.status)}</td>
                 <td class="center">${r.item_count}</td>
                 <td class="center">${r.file_count}</td>
@@ -289,17 +289,17 @@
       <div class="table-scroll mt8">
         <table class="grid">
           <thead><tr>
-            <th style="width:130px">아이디</th><th style="width:110px">이름</th>
-            <th style="width:180px">기관</th><th class="center" style="width:80px">권한</th>
+            <th style="width:180px">기관</th><th style="width:110px">이름</th>
+            <th style="width:130px">아이디</th><th class="center" style="width:80px">권한</th>
             <th class="center" style="width:80px">상태</th><th style="width:150px">최근 로그인</th>
             <th class="center" style="width:170px">사용자 권한 및 삭제</th>
           </tr></thead>
           <tbody>
             ${usersRes.users.map((u) => `
               <tr>
-                <td><b>${esc(u.username)}</b></td>
-                <td>${esc(u.name)}</td>
                 <td>${esc(u.org_name || '-')}</td>
+                <td><b>${esc(u.name)}</b></td>
+                <td class="small muted">${esc(u.username)}</td>
                 <td class="center">${
                   u.role === 'ADMIN'     ? '<span class="badge draft">총괄관리자</span>' :
                   u.role === 'ORG_ADMIN' ? '<span class="badge submitted">기관관리자</span>' :

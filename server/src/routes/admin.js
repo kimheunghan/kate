@@ -225,7 +225,7 @@ router.get('/users', async (req, res, next) => {
                OR u.name ILIKE '%' || $2 || '%'
                OR u.username ILIKE '%' || $2 || '%'
                OR u.email ILIKE '%' || $2 || '%')
-        ORDER BY u.role DESC, o.sort_order NULLS LAST, u.name, u.username`,
+        ORDER BY o.sort_order NULLS LAST, o.name, u.name, u.username`,
       [auth.scopeOrg(req.user, req.query.org_id),
        req.query.q ? String(req.query.q).trim() : null]
     );
