@@ -29,7 +29,9 @@
           </label>
           <label class="sb-field" id="org-field" style="flex:1 1 220px">
             <span>기관</span>
-            <select id="sel-org"></select>
+            <!-- 전체 관리자만 선택 가능. 그 외에는 소속을 글자로만 보여준다. -->
+            <select id="sel-org" class="hidden"></select>
+            <div id="sel-org-text" class="sb-static"></div>
           </label>
           <button class="btn primary sb-btn" id="btn-load">검색</button>
         </div>

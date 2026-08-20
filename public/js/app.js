@@ -84,17 +84,26 @@
     $('#f-org').innerHTML = '<option value="">전체</option>' + opts;
 
     const orgSel = $('#sel-org');
+    const orgText = $('#sel-org-text');
     const orgLabel = document.querySelector('#org-field > span');
+
     if (state.me.role === 'ADMIN') {
       // 전체 관리자만 기관을 골라 저장할 수 있다
+      orgSel.classList.remove('hidden');
       orgSel.disabled = false;
       if (state.me.org_id) orgSel.value = state.me.org_id;
       orgSel.title = '저장·엑셀 일괄등록 시 이 기관으로 기록됩니다.';
+      if (orgText) orgText.classList.add('hidden');
       if (orgLabel) orgLabel.textContent = '기관 (선택 가능)';
     } else {
+      // 소속이 하나로 고정이므로 선택박스 대신 글자로만 보여준다
       orgSel.value = state.me.org_id || '';
-      orgSel.disabled = true;
-      orgSel.title = '소속 기관은 [내 정보]에서 변경할 수 있습니다.';
+      orgSel.classList.add('hidden');
+      if (orgText) {
+        orgText.textContent = state.me.org_name || '소속 없음';
+        orgText.title = '소속 기관은 상단 [내 정보]에서 변경할 수 있습니다.';
+        orgText.classList.remove('hidden');
+      }
       if (orgLabel) orgLabel.textContent = '기관';
     }
   }

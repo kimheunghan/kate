@@ -697,3 +697,17 @@ table.grid td.summary {
 
 /* 패널 제목 옆 건수 표시 (예: 증적자료 첨부 (2건)) */
 .title-count { color: var(--primary); font-weight: 700; font-size: 14px; margin-left: 2px; }
+
+/* 검색줄에서 값이 고정된 항목을 글자로만 보여줄 때 (예: 작성자의 소속 기관) */
+.search-bar .sb-static {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
