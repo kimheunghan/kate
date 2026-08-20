@@ -220,16 +220,43 @@ router.get('/export/status', async (req, res, next) => {
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('등록 현황');
-    [28, 12, 10, 10, 10].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    [28, 12, 12, 12, 12].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
-    let at = putTitle(ws, 5, '해당 주차 주간보고 실적현황', week.label);
-    at = putSummary(ws, at + 1, [
-      ['대상 인원', tot.t],
-      ['제출완료', tot.s],
-      ['미등록', tot.t - tot.s],
-      ['제출률', tot.t ? `${Math.round((tot.s / tot.t) * 100)}%` : '0%'],
-    ]);
+    // '18주차 (2026/08/20목~08/26수)' → 제목은 '18주차', 부제는 괄호 안
+    const m = /^(\S+)\s*(\(.*\))?$/.exec(week.label) || [];
+    let at = putTitle(ws, 5, `${m[1] || week.label} 주간보고 실적현황`, m[2] || '');
 
+    // ── 보고서 제출현황 ──────────────────────────────────────────
+    at = putSectionTitle(ws, at, '보고서 제출현황');
+
+    ws.mergeCells(`A${at}:B${at}`);
+    ws.mergeCells(`A${at + 1}:B${at + 1}`);
+    const sumHead = ws.getRow(at);
+    const sumBody = ws.getRow(at + 1);
+    [['대상 인원', tot.t], ['제출완료', tot.s], ['미등록', tot.t - tot.s],
+     ['제출률', tot.t ? `${Math.round((tot.s / tot.t) * 100)}%` : '0%']]
+      .forEach(([k, v], i) => {
+        const col = i === 0 ? 1 : i + 2;           // 첫 칸은 A:B 를 합쳐 쓴다
+        const hc = sumHead.getCell(col);
+        hc.value = k;
+        hc.font = { bold: true, size: 11 };
+        hc.alignment = { horizontal: 'center', vertical: 'middle' };
+        hc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBDD' } };
+        hc.border = BORDER;
+
+        const bc = sumBody.getCell(col);
+        bc.value = v;
+        bc.font = { bold: true, size: 13 };
+        bc.alignment = { horizontal: 'center', vertical: 'middle' };
+        bc.border = BORDER;
+      });
+    // 합친 칸의 테두리가 끊기지 않게 B 칸에도 선을 넣는다
+    [sumHead, sumBody].forEach((r) => { r.getCell(2).border = BORDER; });
+    sumHead.height = 20;
+    sumBody.height = 24;
+    at += 3;                                        // 한 줄 띄운다
+
+    // ── 기관별 소계 ──────────────────────────────────────────────
     at = putSectionTitle(ws, at, '기관별 소계');
     const headAt = at;
     ws.getRow(at).values = ['기관', '대상 인원', '제출', '미등록', '제출률'];
@@ -254,7 +281,6 @@ router.get('/export/status', async (req, res, next) => {
       c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F6FA' } };
     });
 
-    // 숫자 칸은 가운데로
     for (let r = headAt; r <= at; r++) {
       for (let c = 2; c <= 5; c++) {
         ws.getRow(r).getCell(c).alignment = { horizontal: 'center', vertical: 'middle' };
