@@ -711,3 +711,9 @@ table.grid td.summary {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 검색줄에서 오른쪽 끝으로 밀어 붙이는 항목 (예: 기관) */
+.search-bar .sb-right { margin-left: auto; text-align: right; }
+.search-bar .sb-right > span { text-align: right; }
+.search-bar .sb-right .sb-static { justify-content: flex-end; }
+.search-bar .sb-right > select { min-width: 200px; }
