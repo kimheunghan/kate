@@ -669,6 +669,45 @@
       ed.touch();
     }
 
+    /**
+     * 고른 줄들을 그 자리에서 목록으로 만든다.
+     * 위아래에 있는 다른 목록과 합치지 않는다.
+     */
+    _makeList(ed, wantOrdered, type) {
+      const blocks = this._selectedBlocks(ed)
+        .filter((el) => el.tagName !== 'UL' && el.tagName !== 'OL');
+      if (!blocks.length) return false;
+
+      const list = document.createElement(wantOrdered ? 'ol' : 'ul');
+      list.style.paddingLeft = '24px';
+      if (!wantOrdered && type) list.style.listStyleType = type;
+      ed.area.insertBefore(list, blocks[0]);
+
+      let last = null;
+      blocks.forEach((b) => {
+        const li = document.createElement('li');
+        // 줄에 준 들여쓰기는 항목 여백으로 옮겨 자리를 지킨다
+        const pad = parseFloat(b.style.paddingLeft) || parseFloat(b.style.marginLeft) || 0;
+        if (pad) li.style.marginLeft = `${pad}px`;
+        if (b.textContent === '') li.appendChild(document.createElement('br'));
+        while (b.firstChild) li.appendChild(b.firstChild);
+        list.appendChild(li);
+        b.remove();
+        last = li;
+      });
+
+      if (last) {
+        const range = document.createRange();
+        range.selectNodeContents(last);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        ed.saveRange();
+      }
+      return true;
+    }
+
     /** 선택 영역이 들어 있는 목록(UL/OL) 노드를 찾는다 */
     _currentList(ed) {
       const sel = window.getSelection();
@@ -739,12 +778,21 @@
       }
 
       const wantOrdered = kind === 'decimal';
-      const cmd = wantOrdered ? 'insertOrderedList' : 'insertUnorderedList';
+      const ch0 = BULLET_CHAR[kind];
+      const type0 = ch0 ? `'${ch0}  '` : kind;
 
-      // 목록이 아니거나 종류(순서/기호)가 다르면 해당 명령으로 만든다
-      if (!list || (list.tagName === 'OL') !== wantOrdered) {
+      // 목록이 아닌 줄이면 그 자리에 새 목록을 만든다.
+      // 브라우저 기본 명령은 바로 위에 있는 목록에 끌어다 붙여 버린다.
+      if (!list) {
+        const made = this._makeList(ed, wantOrdered, type0);
+        if (made) { ed.touch(); this.syncState(); }
+        return;
+      }
+
+      // 이미 목록인데 종류(기호↔번호)가 다르면 기본 명령으로 바꾼다
+      if ((list.tagName === 'OL') !== wantOrdered) {
         try { document.execCommand('styleWithCSS', false, true); } catch (e) { /* noop */ }
-        document.execCommand(cmd);
+        document.execCommand(wantOrdered ? 'insertOrderedList' : 'insertUnorderedList');
         list = this._currentList(ed);
       }
 
