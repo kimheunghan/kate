@@ -588,19 +588,55 @@
     WEEK_TOGGLE: '주차 마감 전환',
   };
 
+  // 활동 로그 검색 조건 (화면을 다시 그려도 유지된다)
+  const auditFilter = { from: '', to: '', action: '', q: '' };
+
   async function renderAudit() {
-    const res = await api.get('/api/admin/audit?limit=200');
-    const { part: aRows, pages: aPages } = slicePage(res.logs, 'audit');
+    const q = new URLSearchParams({ page: page.audit, size: PAGE_SIZE });
+    ['from', 'to', 'action', 'q'].forEach((k) => { if (auditFilter[k]) q.set(k, auditFilter[k]); });
+
+    const res = await api.get(`/api/admin/audit?${q}`);
+    const aRows = res.logs;
+    const aPages = Math.max(1, Math.ceil(res.total / res.size));
 
     body().innerHTML = `
+      <div class="search-bar">
+        <label class="sb-field" style="flex:0 0 165px">
+          <span>시작일</span>
+          <input type="date" id="al-from" value="${esc(auditFilter.from)}">
+        </label>
+        <label class="sb-field" style="flex:0 0 165px">
+          <span>종료일</span>
+          <input type="date" id="al-to" value="${esc(auditFilter.to)}">
+        </label>
+        <label class="sb-field" style="flex:0 0 190px">
+          <span>행위</span>
+          <select id="al-action">
+            <option value="">전체</option>
+            ${res.actions.map((code) =>
+              `<option value="${esc(code)}" ${auditFilter.action === code ? 'selected' : ''}>${
+                esc(ACTION_TEXT[code] || code)}</option>`).join('')}
+          </select>
+        </label>
+        <label class="sb-field" style="flex:1 1 200px">
+          <span>검색어</span>
+          <input type="text" id="al-q" value="${esc(auditFilter.q)}"
+                 placeholder="사용자ID·이름·내용·IP">
+        </label>
+        <button class="btn primary sb-btn" id="al-search">조회</button>
+        <button class="btn sb-btn" id="al-reset">초기화</button>
+      </div>
+
+      <h3 class="sec-title">활동 로그 (총 ${res.total}건)</h3>
+
       <div class="table-scroll">
         <table class="grid fixed">
           <thead><tr>
             <th style="width:11%">일시</th>
-            <th style="width:11%">사용자ID</th>
+            <th style="width:10%">사용자ID</th>
             <th style="width:9%">사용자</th>
             <th style="width:12%">동작</th>
-            <th style="width:11%">행위</th>
+            <th style="width:12%">행위</th>
             <th>내용</th><th style="width:11%">IP</th>
           </tr></thead>
           <tbody>
@@ -620,9 +656,27 @@
       <div class="pager" id="a-pager"></div>`;
 
     window.WR.renderPager($('#a-pager'), {
-      page: page.audit, pages: aPages,
+      page: res.page, pages: aPages,
       onGo: (n) => { page.audit = n; renderAudit(); },
     });
+
+    const runSearch = () => {
+      auditFilter.from = $('#al-from').value;
+      auditFilter.to = $('#al-to').value;
+      auditFilter.action = $('#al-action').value;
+      auditFilter.q = $('#al-q').value.trim();
+      page.audit = 1;
+      renderAudit();
+    };
+    $('#al-search').onclick = runSearch;
+    $('#al-action').onchange = runSearch;
+    ['#al-from', '#al-to'].forEach((s) => { $(s).onchange = runSearch; });
+    $('#al-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+    $('#al-reset').onclick = () => {
+      Object.keys(auditFilter).forEach((k) => { auditFilter[k] = ''; });
+      page.audit = 1;
+      renderAudit();
+    };
   }
 
   init();

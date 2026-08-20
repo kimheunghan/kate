@@ -631,18 +631,54 @@ router.get('/weeks', async (req, res, next) => {
 // =====================================================================
 //  감사 로그
 // =====================================================================
+// GET /api/admin/audit?page=&size=&from=&to=&action=&q=
+//   from/to : 날짜 (YYYY-MM-DD). to 는 그날 끝까지 포함한다.
+//   action  : 동작 코드 (LOGIN, REPORT_SAVE …)
+//   q       : 사용자ID·이름·내용·IP 를 한 번에 훑는다
 router.get('/audit', adminOnly, async (req, res, next) => {
   try {
-    const limit = Math.min(Number(req.query.limit) || 100, 500);
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const size = Math.min(Math.max(Number(req.query.size) || 10, 1), 200);
+
+    const where = [];
+    const params = [];
+    const add = (sql, v) => { params.push(v); where.push(sql.replace('$$', `$${params.length}`)); };
+
+    if (req.query.from) add('a.created_at >= $$::date', String(req.query.from));
+    if (req.query.to)   add('a.created_at < ($$::date + 1)', String(req.query.to));
+    if (req.query.action) add('a.action = $$', String(req.query.action));
+    if (req.query.q) {
+      const kw = `%${String(req.query.q).trim()}%`;
+      params.push(kw);
+      const n = params.length;
+      where.push(`(a.username ILIKE $${n} OR u.name ILIKE $${n} OR a.detail ILIKE $${n} OR a.ip ILIKE $${n})`);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const { rows: cnt } = await db.query(
+      `SELECT count(*)::int AS total
+         FROM wr.audit_logs a LEFT JOIN wr.users u ON u.id = a.user_id ${whereSql}`,
+      params
+    );
+
+    params.push(size, (page - 1) * size);
     const { rows } = await db.query(
       `SELECT a.id, a.username, u.name AS user_name,
               a.action, a.target_type, a.target_id, a.detail, a.ip, a.created_at
          FROM wr.audit_logs a
          LEFT JOIN wr.users u ON u.id = a.user_id
-        ORDER BY a.id DESC LIMIT $1`,
-      [limit]
+        ${whereSql}
+        ORDER BY a.id DESC
+        LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
     );
-    res.json({ logs: rows });
+
+    // 선택 상자에 채울 동작 목록 (기록에 실제로 남은 것만)
+    const { rows: acts } = await db.query(
+      `SELECT DISTINCT action FROM wr.audit_logs ORDER BY action`
+    );
+
+    res.json({ logs: rows, total: cnt[0].total, page, size, actions: acts.map((a) => a.action) });
   } catch (err) { next(err); }
 });
 
