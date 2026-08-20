@@ -121,12 +121,16 @@
     const role = state.me.role;
     const onlyMine = role !== 'ADMIN' && role !== 'ORG_ADMIN';
 
-    // 인쇄·한글·Word 내려받기는 관리자만 쓴다. 작성자에게는 저장만 남긴다.
-    // (지우지 않고 감추기만 하므로 필요하면 이 줄만 빼면 다시 보인다)
-    ['#btn-print', '#btn-export-hwpx', '#btn-export'].forEach((sel) => {
+    // 내려받기 단추 정리 (지우지 않고 감추기만 한다)
+    //   작성자   : 저장만
+    //   관리자   : 저장 + 한글 다운로드
+    //   인쇄/PDF, Word 다운로드는 아무에게도 보이지 않는다
+    ['#btn-print', '#btn-export'].forEach((sel) => {
       const b = $(sel);
-      if (b) b.classList.toggle('hidden', onlyMine);
+      if (b) b.classList.add('hidden');
     });
+    const hwpxBtn = $('#btn-export-hwpx');
+    if (hwpxBtn) hwpxBtn.classList.toggle('hidden', onlyMine);
 
     // 등록 내역 조회는 관리자만 본다. 작성자에게는 탭을 감춘다.
     // (지우지 않고 감추기만 하므로 필요하면 이 줄만 빼면 다시 보인다)
