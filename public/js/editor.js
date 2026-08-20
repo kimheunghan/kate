@@ -635,10 +635,26 @@
       ed.area.focus();
       ed.restoreRange();
 
+      const step = this._spaceWidth(ed);
+
+      // 글머리표 목록 안이면 고른 항목만 민다.
+      // 목록(<ul>) 을 밀면 그 안의 줄이 전부 같이 움직인다.
+      const items = this._selectedListItemsIn(ed);
+      if (items.length) {
+        items.forEach((li) => {
+          const cur = parseFloat(li.style.marginLeft) || 0;
+          const next = Math.max(0, Math.round((cur + delta * step) * 100) / 100);
+          if (next) li.style.marginLeft = `${next}px`;
+          else li.style.removeProperty('margin-left');
+          if (!li.getAttribute('style')) li.removeAttribute('style');
+        });
+        ed.saveRange();
+        ed.touch();
+        return;
+      }
+
       const blocks = this._selectedBlocks(ed);
       if (!blocks.length) return;
-
-      const step = this._spaceWidth(ed);
 
       blocks.forEach((el) => {
         // 목록은 padding-left 가 글머리표 위치를 결정하므로 margin 으로 민다
@@ -665,6 +681,17 @@
         n = n.parentElement;
       }
       return null;
+    }
+
+    /** 편집 영역 안에서 선택 범위에 걸린 글머리표 항목 전부 */
+    _selectedListItemsIn(ed) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return [];
+      const range = sel.getRangeAt(0);
+      return Array.from(ed.area.querySelectorAll('li'))
+        .filter((li) => range.intersectsNode(li))
+        // 안쪽 목록이 함께 걸린 경우 바깥 항목은 빼서 두 번 밀리지 않게 한다
+        .filter((li, i, all) => !all.some((o) => o !== li && o.contains(li)));
     }
 
     /** 선택 범위에 걸린 글머리표 항목들 */
