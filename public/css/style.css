@@ -583,6 +583,7 @@ h3.sec-title:first-child { margin-top: 4px; }
   margin: 22px 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--primary);
 }
 .list-head h3.sec-title { margin: 0; padding: 0; border-bottom: 0; }
+.list-head .list-tools { display: flex; gap: 10px; align-items: center; }
 .list-head #list-pager { display: flex; gap: 6px; align-items: center; }
 
 /* 체크박스 한 줄 */

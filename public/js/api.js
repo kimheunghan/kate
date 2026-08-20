@@ -173,6 +173,13 @@
     downloadFile(`/api/reports/${reportId}/export-hwpx`, '주간보고.hwpx');
   }
 
+  /** 선택한 주차의 보고서를 한 문서로 묶어 내려받는다 (보이는 범위만) */
+  function downloadWeekHwpx(weekId, orgId) {
+    const q = new URLSearchParams({ week_id: String(weekId) });
+    if (orgId) q.set('org_id', String(orgId));
+    downloadFile(`/api/reports/export-hwpx-week?${q}`, '주간보고_전체.hwpx');
+  }
+
   /**
    * 권한 명칭 (화면 전체에서 이 표기를 쓴다)
    *   ADMIN     총괄관리자 — 전체 기관
@@ -395,5 +402,5 @@
     $('#pw-cur', back).focus();
   }
 
-  global.WR = { api, toast, esc, roleLabel, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
+  global.WR = { api, toast, esc, roleLabel, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
 })(window);

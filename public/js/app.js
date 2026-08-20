@@ -3,7 +3,7 @@
    ===================================================================== */
 (function () {
   'use strict';
-  const { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, $, $$ } = window.WR;
+  const { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, $, $$ } = window.WR;
 
   const state = {
     me: null,
@@ -564,6 +564,17 @@
   function bindListTab() {
     $('#btn-search').onclick = () => searchList(1);
     ['#f-week', '#f-org'].forEach((s) => { $(s).onchange = () => searchList(1); });
+
+    // 주차를 골라야 무엇을 묶을지 정해진다
+    $('#btn-week-hwpx').onclick = () => {
+      const weekId = $('#f-week').value;
+      if (!weekId) {
+        toast('먼저 보고 주차를 선택하세요.', true);
+        $('#f-week').focus();
+        return;
+      }
+      downloadWeekHwpx(weekId, $('#f-org') ? $('#f-org').value : '');
+    };
   }
 
   async function searchList(page) {

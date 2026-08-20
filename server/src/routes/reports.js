@@ -829,6 +829,54 @@ ${files.length ? `<p>&#8203;</p><p><b>증적자료 (${files.length}건)</b></p>$
 </body></html>`;
 }
 
+// ---------------------------------------------------------------------
+// 주차 전체(여러 기관·여러 참여인력)를 표 하나로 묶은 한글 문서 HTML
+//   기관명은 그 기관에 속한 모든 항목 수만큼, 참여인력은 본인 항목 수만큼
+//   세로로 합쳐서 첨부해 주신 양식과 같은 모양이 되게 한다.
+// ---------------------------------------------------------------------
+function buildHwpxWeekHtml(week, nextWeek, groups) {
+  const esc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const thisRange = fmtRange(week.start_date, week.end_date);
+  const nextRange = nextWeek ? fmtRange(nextWeek.start_date, nextWeek.end_date) : '';
+
+  const rows = [];
+  for (const g of groups) {
+    // 이 기관이 차지할 줄 수 = 소속 인원들의 항목 수 합계 (항목이 없으면 한 줄)
+    const orgSpan = g.members.reduce((sum, m) => sum + Math.max(m.items.length, 1), 0);
+    let orgDone = false;
+
+    for (const m of g.members) {
+      const span = Math.max(m.items.length, 1);
+      const items = m.items.length ? m.items : [{ plan_html: '', result_html: '', next_plan_html: '' }];
+
+      items.forEach((it, i) => {
+        const cells = [];
+        if (!orgDone) { cells.push(`<td rowspan="${orgSpan}">${esc(g.org_name)}</td>`); orgDone = true; }
+        if (i === 0) cells.push(`<td rowspan="${span}">${esc(m.author_name || '-')}</td>`);
+        cells.push(`<td>${toHwpxCell(it.plan_html)}</td>`);
+        cells.push(`<td>${toHwpxCell(it.result_html)}</td>`);
+        cells.push(`<td>${toHwpxCell(it.next_plan_html)}</td>`);
+        rows.push(`<tr>${cells.join('')}</tr>`);
+      });
+    }
+  }
+
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<title>주간 추진실적 보고</title></head><body>
+<h1>주간 추진실적 보고</h1>
+<p>${esc(week.label)}</p>
+<table border="1">
+  <thead><tr>
+    <th>기관명</th><th>참여인력</th>
+    <th>① 당초 계획${thisRange ? `(${thisRange})` : ''}</th>
+    <th>② 추진 실적${thisRange ? `(${thisRange})` : ''}</th>
+    <th>향후 계획${nextRange ? `(${nextRange})` : ''}</th>
+  </tr></thead>
+  <tbody>${rows.join('') || '<tr><td>등록된 보고서가 없습니다.</td></tr>'}</tbody>
+</table>
+</body></html>`;
+}
+
 /** 파일명에 쓸 수 없는 문자 정리 */
 function safeFileName(v) {
   return String(v || '').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120);
@@ -917,6 +965,85 @@ router.get('/:id(\\d+)/export-hwpx', async (req, res, next) => {
   } catch (err) {
     console.error('[hwpx] 변환 실패:', err.message);
     res.status(500).json({ error: '한글 문서로 변환하지 못했습니다. Word 다운로드를 이용해 주세요.' });
+  }
+});
+
+// ---------------------------------------------------------------------
+// GET /api/reports/export-hwpx-week?week_id=&org_id=
+//   선택한 주차의 보고서를 한 문서로 묶어 한글(HWPX)로 내려받는다.
+//   보이는 범위는 목록과 같다. (작성자=본인, 기관관리자=자기 기관, 총괄관리자=전체)
+// ---------------------------------------------------------------------
+router.get('/export-hwpx-week', async (req, res, next) => {
+  try {
+    const weekId = Number(req.query.week_id);
+    if (!weekId) return res.status(400).json({ error: '보고 주차를 선택하세요.' });
+
+    const { rows: wrows } = await db.query(
+      `SELECT id, label, start_date, end_date FROM wr.report_weeks WHERE id = $1`, [weekId]
+    );
+    const week = wrows[0];
+    if (!week) return res.status(404).json({ error: '존재하지 않는 주차입니다.' });
+
+    const where = ['r.week_id = $1'];
+    const params = [weekId];
+    addViewScope(req.user, where, params);
+    if (req.user.role === 'ADMIN' && req.query.org_id) {
+      params.push(Number(req.query.org_id));
+      where.push(`r.org_id = $${params.length}`);
+    }
+
+    // 목록 화면과 같은 차례: 기관 순서 → 담당 역할 → 이름 가나다
+    const { rows: reports } = await db.query(
+      `SELECT r.id, r.org_id, o.name AS org_name, o.sort_order,
+              u.name AS author_name, u.username
+         FROM wr.reports r
+         JOIN wr.organizations o ON o.id = r.org_id
+         LEFT JOIN wr.users    u ON u.id = r.author_id
+        WHERE ${where.join(' AND ')}
+        ORDER BY o.sort_order, o.name, wr.duty_order(u.duty), u.name, u.username`,
+      params
+    );
+    if (!reports.length) {
+      return res.status(404).json({ error: '해당 주차에 등록된 보고서가 없습니다.' });
+    }
+
+    // 기관별로 묶는다
+    const groups = [];
+    for (const r of reports) {
+      let g = groups.find((x) => x.org_id === r.org_id);
+      if (!g) { g = { org_id: r.org_id, org_name: r.org_name, members: [] }; groups.push(g); }
+      g.members.push({ author_name: r.author_name, items: await loadItems(r.id) });
+    }
+
+    const nextWeek = await loadNextWeek(week.start_date);
+
+    const { htmlToHwpx } = await import('hwp-convert');
+    const out = await htmlToHwpx(buildHwpxWeekHtml(week, nextWeek, groups), {
+      page: {
+        size: 'A4',
+        orientation: 'portrait',
+        margins: { left: 10, right: 10, top: 10, bottom: 10, header: 5, footer: 5, gutter: 0 },
+      },
+    });
+    const buf = await fixHwpxLayout(
+      Buffer.isBuffer(out) ? out : Buffer.from(out),
+      [0.12, 0.08, 0.26, 0.27, 0.27]
+    );
+
+    // safeFileName 이 '/' 를 지워버려 날짜가 붙어 읽히므로 미리 '.' 로 바꾼다
+    const name = safeFileName(`주간보고_${String(week.label).replace(/\//g, '.')}_전체`) + '.hwpx';
+    await audit.log(req, 'REPORT_EXPORT_HWPX_WEEK', {
+      targetType: 'week', targetId: week.id, detail: `${name} (${reports.length}건)`,
+    });
+
+    res.setHeader('Content-Type', 'application/hwp+zip');
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    res.setHeader('Content-Disposition',
+      `attachment; filename="report.hwpx"; filename*=UTF-8''${encodeURIComponent(name)}`);
+    res.end(buf);
+  } catch (err) {
+    console.error('[hwpx] 주차 전체 변환 실패:', err.message);
+    res.status(500).json({ error: '한글 문서로 변환하지 못했습니다. 잠시 후 다시 시도해 주세요.' });
   }
 });
 
