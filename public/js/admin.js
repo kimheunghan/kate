@@ -286,8 +286,9 @@
     body().innerHTML = `
       <p class="small muted">최근 몇 주간 <b>기관별로 몇 명이 제출했는지</b> 흐름을 봅니다.
         칸의 숫자는 <b>제출 인원 / 대상 인원</b> 이며, 대상 인원은 그 기관에 가입한 작성자 수입니다.</p>
-      <div class="row">
-        <label class="field narrow" style="flex:0 0 180px"><span>표시 주차 수</span>
+      <div class="search-bar">
+        <label class="sb-field" style="flex:0 0 180px">
+          <span>표시 주차 수</span>
           <select id="mx-n">
             ${[4, 8, 12, 16, 26].map((k) => `<option value="${k}" ${k === weeks ? 'selected' : ''}>최근 ${k}주</option>`).join('')}
           </select>
@@ -331,13 +332,16 @@
     state.orgs = res.orgs;
 
     body().innerHTML = `
-      <div class="row">
-        <label class="field" style="flex:2 1 260px"><span>기관명</span><input type="text" id="o-name" placeholder="예) ㈜비아이매트릭스"></label>
-        <label class="field narrow" style="flex:0 0 120px"><span>정렬순서</span><input type="number" id="o-sort" value="0"></label>
-        <div class="field narrow">
-          <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
-          <button class="btn primary" id="o-add">기관 추가</button>
-        </div>
+      <div class="search-bar">
+        <label class="sb-field" style="flex:2 1 260px">
+          <span>기관명</span>
+          <input type="text" id="o-name" placeholder="예) ㈜비아이매트릭스">
+        </label>
+        <label class="sb-field" style="flex:0 0 120px">
+          <span>정렬순서</span>
+          <input type="number" id="o-sort" value="0">
+        </label>
+        <button class="btn primary sb-btn" id="o-add">기관 추가</button>
       </div>
 
       <div class="table-scroll mt8">
@@ -577,24 +581,29 @@
     const orgOpts = orgsRes.orgs.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
 
     body().innerHTML = `
-      <div class="row">
-        <label class="field" style="flex:1 1 140px"><span>아이디</span><input type="text" id="u-username" placeholder="영문/숫자"></label>
-        <label class="field" style="flex:1 1 120px"><span>이름</span><input type="text" id="u-name"></label>
-        <label class="field" style="flex:1 1 160px"><span>초기 비밀번호</span><input type="text" id="u-pw" placeholder="8자 이상"></label>
-        <label class="field" style="flex:1 1 160px"><span>기관</span><select id="u-org">${orgOpts}</select></label>
-        <label class="field narrow" style="flex:0 0 120px"><span>권한</span>
+      <div class="search-bar">
+        <label class="sb-field" style="flex:1 1 140px">
+          <span>아이디</span><input type="text" id="u-username" placeholder="영문/숫자">
+        </label>
+        <label class="sb-field" style="flex:1 1 120px">
+          <span>이름</span><input type="text" id="u-name">
+        </label>
+        <label class="sb-field" style="flex:1 1 160px">
+          <span>초기 비밀번호</span><input type="text" id="u-pw" placeholder="8자 이상">
+        </label>
+        <label class="sb-field" style="flex:1 1 160px">
+          <span>기관</span><select id="u-org">${orgOpts}</select>
+        </label>
+        <label class="sb-field" style="flex:0 0 130px">
+          <span>권한</span>
           <select id="u-role">
             <option value="USER">작성자</option>
             <option value="ORG_ADMIN">기관관리자</option>
             <option value="ADMIN">총괄관리자</option>
           </select>
         </label>
-        <div class="field narrow">
-          <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
-          <button class="btn primary" id="u-add">사용자 추가</button>
-        </div>
+        <button class="btn primary sb-btn" id="u-add">사용자 추가</button>
       </div>
-      <p class="small muted">추가된 계정은 최초 로그인 시 비밀번호 변경 안내가 표시됩니다.</p>
 
       <div class="table-scroll mt8">
         <table class="grid">
@@ -602,7 +611,7 @@
             <th style="width:130px">아이디</th><th style="width:110px">이름</th>
             <th style="width:180px">기관</th><th class="center" style="width:80px">권한</th>
             <th class="center" style="width:80px">상태</th><th style="width:150px">최근 로그인</th>
-            <th class="center" style="width:150px">권한 관리</th>
+            <th class="center" style="width:170px">사용자 권한 및 삭제</th>
           </tr></thead>
           <tbody>
             ${usersRes.users.map((u) => `
