@@ -69,6 +69,15 @@ app.use('/api/admin', require('./routes/admin'));
 const publicDir = path.resolve(__dirname, '../../public');
 // maxAge 를 두면 CSS/JS 수정이 브라우저 캐시에 막혀 반영되지 않는다.
 // ETag 로 재검증만 하게 두면(변경 없을 때 304) 성능 손해 없이 즉시 반영된다.
+// .html 을 정적 파일로 그냥 내보내면 __V__ 자리가 그대로 나간다.
+// 주소로 /app.html 을 직접 쳐도 아래 sendPage 를 타도록 넘긴다.
+app.use((req, res, next) => {
+  if (!/\.html$/i.test(req.path)) return next();
+  const file = path.basename(req.path);
+  if (!fs.existsSync(path.join(publicDir, file))) return next();
+  return sendPage(res, file);
+});
+
 app.use(express.static(publicDir, {
   index: false,
   etag: true,
