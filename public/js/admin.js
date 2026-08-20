@@ -538,6 +538,9 @@
   // ==================================================================
   // 5. 활동 로그
   // ==================================================================
+  // 활동 로그의 '#숫자' 가 무엇의 번호인지 알 수 있게 붙인다
+  const TARGET_LABEL = { report: '보고서 ', user: '사용자 ', org: '기관 ', week: '주차 ' };
+
   async function renderAudit() {
     const res = await api.get('/api/admin/audit?limit=200');
     body().innerHTML = `
@@ -556,7 +559,8 @@
                 <td>${esc(l.username || '-')}</td>
                 <td>${esc(l.user_name || '-')}</td>
                 <td class="small">${esc(l.action)}</td>
-                <td class="small">${esc(l.detail || '')}${l.target_id ? ` <span class="muted">#${l.target_id}</span>` : ''}</td>
+                <td class="small">${esc(l.detail || '')}${
+                  l.target_id ? ` <span class="muted">${TARGET_LABEL[l.target_type] || ''}#${l.target_id}</span>` : ''}</td>
                 <td class="small muted">${esc(l.ip || '-')}</td>
               </tr>`).join('') : '<tr><td colspan="6" class="empty">기록이 없습니다.</td></tr>'}
           </tbody>
