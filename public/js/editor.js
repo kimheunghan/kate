@@ -687,19 +687,39 @@
       const sel = window.getSelection();
       if (!sel || !sel.rangeCount) return [];
       const range = sel.getRangeAt(0);
+
+      // 드래그 없이 커서만 둔 경우에는 그 줄 하나만 고른다.
+      // (범위가 비어 있으면 옆 줄까지 걸린 것으로 잡히는 브라우저가 있다)
+      if (range.collapsed) {
+        let n = range.startContainer;
+        if (n.nodeType === 3) n = n.parentElement;
+        const li = n && n.closest ? n.closest('li') : null;
+        return li && ed.area.contains(li) ? [li] : [];
+      }
+
       return Array.from(ed.area.querySelectorAll('li'))
         .filter((li) => range.intersectsNode(li))
-        // 안쪽 목록이 함께 걸린 경우 바깥 항목은 빼서 두 번 밀리지 않게 한다
-        .filter((li, i, all) => !all.some((o) => o !== li && o.contains(li)));
+        // 목록이 겹쳐 있으면 안쪽 항목만 남긴다.
+        // 바깥 항목을 밀면 그 안에 든 줄이 전부 따라 움직인다.
+        .filter((li, i, all) => !all.some((o) => o !== li && li.contains(o)));
     }
 
-    /** 선택 범위에 걸린 글머리표 항목들 */
+    /** 선택 범위에 걸린 글머리표 항목들 (그 목록의 바로 아래 항목만) */
     _selectedListItems(list) {
       const sel = window.getSelection();
       if (!sel || !sel.rangeCount || !list) return [];
       const range = sel.getRangeAt(0);
-      return Array.from(list.children)
-        .filter((li) => li.tagName === 'LI' && range.intersectsNode(li));
+      const own = Array.from(list.children).filter((n) => n.tagName === 'LI');
+
+      // 커서만 둔 경우에는 그 줄 하나만 (옆 줄까지 걸리는 브라우저가 있다)
+      if (range.collapsed) {
+        let n = range.startContainer;
+        if (n.nodeType === 3) n = n.parentElement;
+        const li = n && n.closest ? n.closest('li') : null;
+        const mine = own.find((o) => o === li || o.contains(li));
+        return mine ? [mine] : [];
+      }
+      return own.filter((li) => range.intersectsNode(li));
     }
 
     /** 글머리표 종류를 적용한다 (없으면 목록으로 만들고, 이미 목록이면 모양만 바꾼다) */
