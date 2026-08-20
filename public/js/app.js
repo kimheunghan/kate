@@ -501,9 +501,9 @@
   }
 
   async function uploadFiles(fileList) {
-    // 아직 저장 전이면 임시저장부터 수행 (첨부는 보고서 id 가 필요)
+    // 아직 저장 전이면 먼저 저장한다 (첨부는 보고서 id 가 필요)
     if (!state.report) {
-      toast('보고서를 먼저 임시저장합니다...');
+      toast('보고서를 먼저 저장합니다...');
       const saved = await save('DRAFT', { silent: true });
       if (!saved) return;
     }

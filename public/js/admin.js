@@ -81,7 +81,6 @@
           <select id="st-status">
             <option value="">전체</option>
             <option value="NONE"      ${f.status === 'NONE' ? 'selected' : ''}>미등록만</option>
-            <option value="DRAFT"     ${f.status === 'DRAFT' ? 'selected' : ''}>임시저장만</option>
             <option value="SUBMITTED" ${f.status === 'SUBMITTED' ? 'selected' : ''}>제출완료만</option>
           </select>
         </label>
@@ -104,7 +103,6 @@
       <div class="stat-row mt8">
         <div class="stat"><div class="k">대상 인원</div><div class="v">${summary.total}</div></div>
         <div class="stat ok"><div class="k">제출완료</div><div class="v">${summary.submitted}</div></div>
-        <div class="stat warn"><div class="k">임시저장</div><div class="v">${summary.draft}</div></div>
         <div class="stat bad"><div class="k">미등록</div><div class="v">${summary.none}</div></div>
         <div class="stat"><div class="k">제출률</div><div class="v">${summary.rate}%</div></div>
       </div>
@@ -114,7 +112,7 @@
       <div class="table-scroll">
         <table class="grid">
           <thead><tr><th>기관</th><th class="center" style="width:90px">대상</th>
-            <th class="center" style="width:90px">제출</th><th class="center" style="width:90px">임시</th>
+            <th class="center" style="width:90px">제출</th>
             <th class="center" style="width:90px">미등록</th><th class="center" style="width:90px">제출률</th></tr></thead>
           <tbody>
             ${byOrg.map((o) => `
@@ -122,7 +120,6 @@
                 <td><b>${esc(o.org_name || '(소속없음)')}</b></td>
                 <td class="center">${o.total_users}</td>
                 <td class="center">${o.submitted}</td>
-                <td class="center">${o.draft}</td>
                 <td class="center">${o.none_cnt}</td>
                 <td class="center"><b>${o.total_users ? Math.round((o.submitted / o.total_users) * 100) : 0}%</b></td>
               </tr>`).join('')}
@@ -264,7 +261,7 @@
       if (!c || !c.total_users) return '<td class="cell-n">·</td>';
       const rate = Math.round((c.submitted / c.total_users) * 100);
       const cls = rate >= 100 ? 'cell-s' : (rate > 0 ? 'cell-d' : 'cell-n');
-      return `<td class="${cls}" title="제출 ${c.submitted} / 임시 ${c.draft} / 미등록 ${c.none_cnt}">
+      return `<td class="${cls}" title="제출 ${c.submitted} / 미등록 ${c.none_cnt}">
                 <b>${c.submitted}</b><span class="muted">/${c.total_users}</span>
                 <div class="rate">${rate}%</div></td>`;
     };
