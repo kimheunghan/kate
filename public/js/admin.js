@@ -48,16 +48,26 @@
   }
 
   function render() {
-    body().innerHTML = '<div class="empty">불러오는 중...</div>';
     const fn = {
       status: renderStatus,
       matrix: renderMatrix,
       users: renderUsers,
       audit: renderAudit,
     }[state.tab];
-    Promise.resolve().then(fn).catch((e) => {
-      body().innerHTML = `<div class="alert error">불러오지 못했습니다: ${esc(e.message)}</div>`;
-    });
+
+    // 자료가 금방 오면 '불러오는 중' 을 아예 보여주지 않는다.
+    // 곧바로 지웠다 그리면 글자가 한 번 깜빡여 느리게 느껴진다.
+    let shown = false;
+    const timer = setTimeout(() => {
+      shown = true;
+      body().innerHTML = '<div class="empty">불러오는 중...</div>';
+    }, 250);
+
+    Promise.resolve().then(fn)
+      .catch((e) => {
+        body().innerHTML = `<div class="alert error">불러오지 못했습니다: ${esc(e.message)}</div>`;
+      })
+      .finally(() => { clearTimeout(timer); void shown; });
   }
 
   // ==================================================================
@@ -875,7 +885,12 @@
         },
       });
     };
-    $('#al-pick').onclick = () => openCal($('#al-pick'));
+    $('#al-pick').onclick = () => {
+      // 누르는 즉시 표시를 옮긴다 (달력을 닫아도 이 상태가 유지된다)
+      body().querySelectorAll('.quick-range button').forEach((x) => x.classList.remove('on'));
+      $('#al-pick').classList.add('on');
+      openCal($('#al-pick'));
+    };
     $('#al-range').onclick = () => openCal($('#al-range'));
 
     $('#al-reset').onclick = () => {
