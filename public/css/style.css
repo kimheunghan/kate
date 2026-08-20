@@ -271,8 +271,8 @@ table.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .toolbar-hint .row-ctl b {
   font-size: 12.5px;
   /* 안내에 가까운 글자라 본문보다 옅게 둔다 */
-  color: var(--text-dim);
-  font-weight: 700;
+  color: #98a4b3;
+  font-weight: 600;
   letter-spacing: -.2px;
   margin-right: 1px;
 }
