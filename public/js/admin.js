@@ -8,6 +8,17 @@
   const state = { me: null, orgs: [], tab: 'status' };
 
   /** 담당 역할 표기 */
+  const PAGE_SIZE = 10;                  // 목록 한 쪽에 보여 줄 건수
+  const page = { status: 1, users: 1, audit: 1 };   // 화면별 현재 쪽
+
+  /** 배열에서 현재 쪽에 해당하는 부분만 잘라 낸다 */
+  function slicePage(rows, which) {
+    const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+    if (page[which] > pages) page[which] = pages;
+    const from = (page[which] - 1) * PAGE_SIZE;
+    return { part: rows.slice(from, from + PAGE_SIZE), pages };
+  }
+
   const DUTY_LABEL = { LEAD: '총괄책임자', MANAGER: '실무책임자', RESEARCHER: '참여연구원' };
   // 담당 역할은 반드시 선택해야 한다. 빈 항목은 고르라는 안내일 뿐 저장되지 않는다.
   const dutyOptions = (sel) => ['', 'LEAD', 'MANAGER', 'RESEARCHER']
@@ -69,6 +80,8 @@
     if (!week) { body().innerHTML = '<div class="empty">등록된 주차가 없습니다.</div>'; return; }
 
     const orgLocked = !!scopedOrgId && state.me.role === 'ORG_ADMIN';
+
+    const { part: stRows, pages: stPages } = slicePage(rows, 'status');
 
     body().innerHTML = `
       <p class="small muted">선택한 주차에 <b>가입한 작성자 전원</b>이 나옵니다. 아직 안 낸 사람도 <b>미등록</b> 으로 표시됩니다.</p>
@@ -149,7 +162,7 @@
             </tr>
           </thead>
           <tbody>
-            ${rows.length ? rows.map((r) => `
+            ${stRows.length ? stRows.map((r) => `
               <tr>
                 <td>${esc(r.org_name || '-')}</td>
                 <td><b>${esc(r.user_name)}</b></td>
@@ -162,18 +175,24 @@
               </tr>`).join('') : '<tr><td colspan="8" class="empty">조건에 맞는 작성자가 없습니다.</td></tr>'}
           </tbody>
         </table>
-      </div>`;
+      </div>
+      <div class="pager" id="st-pager"></div>`;
+
+    window.WR.renderPager($('#st-pager'), {
+      page: page.status, pages: stPages,
+      onGo: (n) => { page.status = n; renderStatus(weekId, f); },
+    });
 
     const readFilters = () => ({
       org: $('#st-org').value, status: $('#st-status').value, q: $('#st-q').value.trim(),
     });
-    $('#st-week').onchange = () => renderStatus(Number($('#st-week').value), readFilters());
-    $('#st-refresh').onclick = () => renderStatus(Number($('#st-week').value), readFilters());
+    $('#st-week').onchange = () => { page.status = 1; renderStatus(Number($('#st-week').value), readFilters()); };
+    $('#st-refresh').onclick = () => { page.status = 1; renderStatus(Number($('#st-week').value), readFilters()); };
     ['#st-org', '#st-status'].forEach((sel) => {
-      $(sel).onchange = () => renderStatus(Number($('#st-week').value), readFilters());
+      $(sel).onchange = () => { page.status = 1; renderStatus(Number($('#st-week').value), readFilters()); };
     });
     $('#st-q').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') renderStatus(Number($('#st-week').value), readFilters());
+      if (e.key === 'Enter') { page.status = 1; renderStatus(Number($('#st-week').value), readFilters()); }
     });
   }
 
@@ -250,6 +269,8 @@
     ]);
     const orgOpts = orgsRes.orgs.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
 
+    const { part: uRows, pages: uPages } = slicePage(usersRes.users, 'users');
+
     body().innerHTML = `
       <h3 class="sec-title">사용자 추가</h3>
       <div class="search-bar">
@@ -308,7 +329,7 @@
             <th class="center" style="width:14%">사용자 권한 및 삭제</th>
           </tr></thead>
           <tbody>
-            ${usersRes.users.map((u) => `
+            ${uRows.map((u) => `
               <tr>
                 <td>${esc(u.org_name || '-')}</td>
                 <td><b>${esc(u.name)}</b></td>
@@ -332,12 +353,18 @@
               </tr>`).join('')}
           </tbody>
         </table>
-      </div>`;
+      </div>
+      <div class="pager" id="u-pager"></div>`;
+
+    window.WR.renderPager($('#u-pager'), {
+      page: page.users, pages: uPages,
+      onGo: (n) => { page.users = n; renderUsers(f); },
+    });
 
     const readUserFilters = () => ({ q: $('#u-q').value.trim(), org: $('#u-forg').value });
-    $('#u-search').onclick = () => renderUsers(readUserFilters());
-    $('#u-forg').onchange = () => renderUsers(readUserFilters());
-    $('#u-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') renderUsers(readUserFilters()); });
+    $('#u-search').onclick = () => { page.users = 1; renderUsers(readUserFilters()); };
+    $('#u-forg').onchange = () => { page.users = 1; renderUsers(readUserFilters()); };
+    $('#u-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { page.users = 1; renderUsers(readUserFilters()); } });
 
     $('#u-add').onclick = async () => {
       const payload = {
@@ -563,19 +590,21 @@
 
   async function renderAudit() {
     const res = await api.get('/api/admin/audit?limit=200');
+    const { part: aRows, pages: aPages } = slicePage(res.logs, 'audit');
+
     body().innerHTML = `
       <div class="table-scroll">
         <table class="grid fixed">
           <thead><tr>
-            <th style="width:14%">일시</th>
+            <th style="width:11%">일시</th>
             <th style="width:11%">사용자ID</th>
             <th style="width:9%">사용자</th>
-            <th style="width:16%">동작</th>
-            <th style="width:13%">행위</th>
-            <th>내용</th><th style="width:12%">IP</th>
+            <th style="width:12%">동작</th>
+            <th style="width:11%">행위</th>
+            <th>내용</th><th style="width:11%">IP</th>
           </tr></thead>
           <tbody>
-            ${res.logs.length ? res.logs.map((l) => `
+            ${aRows.length ? aRows.map((l) => `
               <tr>
                 <td class="small">${fmtDateTime(l.created_at)}</td>
                 <td>${esc(l.username || '-')}</td>
@@ -587,7 +616,13 @@
               </tr>`).join('') : '<tr><td colspan="7" class="empty">기록이 없습니다.</td></tr>'}
           </tbody>
         </table>
-      </div>`;
+      </div>
+      <div class="pager" id="a-pager"></div>`;
+
+    window.WR.renderPager($('#a-pager'), {
+      page: page.audit, pages: aPages,
+      onGo: (n) => { page.audit = n; renderAudit(); },
+    });
   }
 
   init();

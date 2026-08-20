@@ -195,6 +195,35 @@
   const ROLE_LABEL = { ADMIN: '총괄관리자', ORG_ADMIN: '기관관리자', USER: '작성자' };
   function roleLabel(role) { return ROLE_LABEL[role] || '작성자'; }
 
+  /**
+   * 쪽 이동을 그린다. 한 쪽이면 아무것도 그리지 않는다.
+   * @param {HTMLElement} host  그릴 자리
+   * @param {{page:number, pages:number, onGo:(n:number)=>void}} opt
+   */
+  function renderPager(host, { page, pages, onGo }) {
+    if (!host) return;
+    if (!pages || pages <= 1) { host.innerHTML = ''; return; }
+
+    // 현재 쪽 둘레만 보여 준다 (앞뒤 두 개씩)
+    const from = Math.max(1, Math.min(page - 2, pages - 4));
+    const to = Math.min(pages, Math.max(page + 2, 5));
+    const nums = [];
+    for (let i = from; i <= to; i++) nums.push(i);
+
+    host.innerHTML =
+      `<button class="btn sm" data-go="1" ${page <= 1 ? 'disabled' : ''}>«</button>` +
+      `<button class="btn sm" data-go="${page - 1}" ${page <= 1 ? 'disabled' : ''}>이전</button>` +
+      (from > 1 ? '<span class="pg-gap">…</span>' : '') +
+      nums.map((n) => `<button class="btn sm pg-num${n === page ? ' on' : ''}" data-go="${n}">${n}</button>`).join('') +
+      (to < pages ? '<span class="pg-gap">…</span>' : '') +
+      `<button class="btn sm" data-go="${page + 1}" ${page >= pages ? 'disabled' : ''}>다음</button>` +
+      `<button class="btn sm" data-go="${pages}" ${page >= pages ? 'disabled' : ''}>»</button>`;
+
+    host.querySelectorAll('[data-go]').forEach((b) => {
+      b.onclick = () => { const n = Number(b.dataset.go); if (n !== page) onGo(n); };
+    });
+  }
+
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
 
@@ -409,5 +438,5 @@
     $('#pw-cur', back).focus();
   }
 
-  global.WR = { api, toast, esc, roleLabel, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
+  global.WR = { api, toast, esc, roleLabel, renderPager, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
 })(window);

@@ -5,6 +5,8 @@
   'use strict';
   const { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, $, $$ } = window.WR;
 
+  const PAGE_SIZE = 10;                  // 목록 한 쪽에 보여 줄 건수
+
   const state = {
     me: null,
     weeks: [],
@@ -636,7 +638,7 @@
 
   async function searchList(page) {
     state.listPage = page || 1;
-    const p = new URLSearchParams({ page: state.listPage, size: 20 });
+    const p = new URLSearchParams({ page: state.listPage, size: PAGE_SIZE });
     if ($('#f-week').value)   p.set('week_id', $('#f-week').value);
     if ($('#f-org').value)    p.set('org_id', $('#f-org').value);
 
@@ -656,6 +658,7 @@
       tbody.innerHTML = `<tr><td colspan="${cols}" class="empty">조회된 보고서가 없습니다.</td></tr>`;
       $('#list-count').textContent = '보고서 목록 (총 0건)';
       $('#list-pager').innerHTML = '';
+      $('#list-pager-bottom').innerHTML = '';
       return;
     }
 
@@ -696,12 +699,11 @@
 
     const pages = Math.ceil(res.total / res.size);
     $('#list-count').textContent = `보고서 목록 (총 ${res.total}건)`;
-    $('#list-pager').innerHTML = pages <= 1 ? '' : `
-      <button class="btn sm" ${res.page <= 1 ? 'disabled' : ''} id="pg-prev">이전</button>
-      <span class="small muted">${res.page} / ${pages}</span>
-      <button class="btn sm" ${res.page >= pages ? 'disabled' : ''} id="pg-next">다음</button>`;
-    if ($('#pg-prev')) $('#pg-prev').onclick = () => searchList(res.page - 1);
-    if ($('#pg-next')) $('#pg-next').onclick = () => searchList(res.page + 1);
+    $('#list-pager').innerHTML = pages <= 1 ? '' : `<span class="small muted">${res.page} / ${pages}</span>`;
+    // 쪽 이동은 표 아래 가운데
+    window.WR.renderPager($('#list-pager-bottom'), {
+      page: res.page, pages, onGo: (n) => searchList(n),
+    });
   }
 
   init();
