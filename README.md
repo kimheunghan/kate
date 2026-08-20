@@ -103,7 +103,7 @@ Compose 파일 3종을 용도에 따라 사용합니다.
 | APP 호스트 포트 | `8080` → 컨테이너 `8080` |
 | DB 호스트 포트 | `15432` → 컨테이너 `5432` |
 | DB 컨테이너 내부 접속 | `db:5432` |
-| DB 이름 / 사용자 / 스키마 | `weekly_report` / `wruser` / `GKgBIXbPHNGxZqDHc6Pap5FQ` | `wr` |
+| DB 이름 / 사용자 / 스키마 | `weekly_report` / `wruser` / `GKgBIXbPHNGxZqDHc6Pap5FQ` / `wr` |
 | 실행 컨테이너 | `wr-app`, `wr-db` |
 | Compose 파일 | `docker-compose.yml` (APP + DB 올인원) |
 
