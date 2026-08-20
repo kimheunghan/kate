@@ -877,3 +877,6 @@ table.grid td.summary .sum-more { color: var(--text-dim); font-size: 12px; opaci
 .legend .sw.cell-s { background: #e6f6ec; border-color: #a9d9bd; }
 .legend .sw.cell-d { background: #fff5e0; border-color: #e2cb96; }
 .legend .sw.cell-n { background: #fafafa; border-color: #d5d9de; }
+
+/* 범례 줄 — 배경 없이 오른쪽에 붙인다 */
+.legend-row { display: flex; justify-content: flex-end; margin: 8px 2px 0; }
