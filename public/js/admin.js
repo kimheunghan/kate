@@ -42,7 +42,6 @@
       status: renderStatus,
       matrix: renderMatrix,
       users: renderUsers,
-      weeks: renderWeeks,
       audit: renderAudit,
     }[state.tab];
     Promise.resolve().then(fn).catch((e) => {
@@ -78,7 +77,7 @@
           <span>보고 주차</span>
           <select id="st-week">
             ${weeksRes.weeks.map((w) =>
-              `<option value="${w.id}" ${w.id === week.id ? 'selected' : ''}>${esc(w.label)}${w.is_open ? '' : ' [마감]'}</option>`).join('')}
+              `<option value="${w.id}" ${w.id === week.id ? 'selected' : ''}>${esc(w.label)}</option>`).join('')}
           </select>
         </label>
         <button class="btn primary sb-btn" id="st-refresh">조회</button>
@@ -537,45 +536,7 @@
   }
 
   // ==================================================================
-  // 5. 주차 / 마감 관리
-  // ==================================================================
-  async function renderWeeks() {
-    const res = await api.get('/api/admin/weeks');
-    body().innerHTML = `
-      <p class="small muted">주차를 <b>마감</b>하면 해당 주차의 보고서는 일반 사용자가 등록·수정할 수 없습니다. (관리자는 계속 수정 가능)</p>
-      <div class="table-scroll mt8">
-        <table class="grid">
-          <thead><tr>
-            <th style="width:280px">주차</th><th style="width:120px">시작</th><th style="width:120px">종료</th>
-            <th class="center" style="width:100px">등록건수</th><th class="center" style="width:100px">상태</th>
-            <th class="center" style="width:120px">관리</th>
-          </tr></thead>
-          <tbody>
-            ${res.weeks.map((w) => `
-              <tr>
-                <td><b>${esc(w.label)}</b></td>
-                <td class="small">${w.start_date}</td>
-                <td class="small">${w.end_date}</td>
-                <td class="center">${w.report_count}</td>
-                <td class="center">${w.is_open ? '<span class="badge submitted">진행중</span>' : '<span class="badge closed">마감</span>'}</td>
-                <td class="center"><button class="btn sm" data-w="${w.id}" data-open="${w.is_open}">${w.is_open ? '마감하기' : '마감해제'}</button></td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
-
-    body().querySelectorAll('[data-w]').forEach((b) => {
-      b.onclick = async () => {
-        try {
-          await api.put(`/api/admin/weeks/${b.dataset.w}`, { is_open: b.dataset.open !== 'true' });
-          renderWeeks();
-        } catch (e) { toast(e.message, true); }
-      };
-    });
-  }
-
-  // ==================================================================
-  // 6. 활동 로그
+  // 5. 활동 로그
   // ==================================================================
   async function renderAudit() {
     const res = await api.get('/api/admin/audit?limit=200');

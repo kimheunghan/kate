@@ -226,12 +226,9 @@ router.post('/import', (req, res, next) => {
       }
 
       const { rows: wk } = await db.query(
-        `SELECT id, label, is_open FROM wr.report_weeks WHERE id = $1`, [weekId]
+        `SELECT id, label FROM wr.report_weeks WHERE id = $1`, [weekId]
       );
       if (!wk[0]) return res.status(400).json({ error: '존재하지 않는 주차입니다.' });
-      if (!wk[0].is_open && req.user.role !== 'ADMIN') {
-        return res.status(403).json({ error: '마감된 주차입니다. 관리자에게 문의하세요.' });
-      }
 
       const items = await parseItems(req.file.buffer);
       if (!items.length) {

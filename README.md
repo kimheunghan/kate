@@ -87,7 +87,69 @@ Compose 파일 3종을 용도에 따라 사용합니다.
 
 ---
 
-## 2. 서버 구성
+## 2. 현재 GCP 개발 서버
+
+현재 소스를 개발·검증하고 있는 서버는 아래 GCP Compute Engine 인스턴스입니다.
+이 환경은 향후 이관할 사내 APP/RDB 서버와 별개의 **개발 환경**입니다.
+
+| 항목 | 현재 값 |
+|---|---|
+| GCP 인스턴스 | `instance-20260814-050936` |
+| 리전/존 | `asia-northeast3-b` |
+| GCP 내부 IP | `10.178.0.2` |
+| GCP 외부 IP | `34.158.212.199` |
+| 애플리케이션 접속 | `http://34.158.212.199:8080` |
+| 상태 확인 | `http://34.158.212.199:8080/api/health` |
+| APP 호스트 포트 | `8080` → 컨테이너 `8080` |
+| DB 호스트 포트 | `15432` → 컨테이너 `5432` |
+| DB 컨테이너 내부 접속 | `db:5432` |
+| DB 이름 / 사용자 / 스키마 | `weekly_report` / `wruser` / `wr` |
+| 실행 컨테이너 | `wr-app`, `wr-db` |
+| Compose 파일 | `docker-compose.yml` (APP + DB 올인원) |
+
+> 외부 IP가 임시(Ephemeral) 주소이면 인스턴스 재생성 시 바뀔 수 있습니다. 운영 접속에
+> 사용할 경우 GCP에서 고정(Static) 외부 IP로 예약하세요. 포트 `8080`은 GCP VPC 방화벽에서
+> 필요한 접속 대역에만 허용하고, DB 호스트 포트 `15432`는 인터넷 전체에 공개하지 마세요.
+
+현재 GCP 개발 서버의 `.env` 핵심 설정은 다음과 같습니다. 실제 비밀번호와 세션 키는
+보안상 Git에 올리지 않으며 서버의 `.env`에만 보관합니다.
+
+```ini
+APP_PORT=8080
+DB_HOST=db
+DB_PORT=5432
+DB_EXPOSE_PORT=15432
+DB_NAME=weekly_report
+DB_USER=wruser
+DB_PASSWORD=<서버 .env에서 관리>
+```
+
+현재 상태 확인 명령:
+
+```bash
+cd ~/weekly-report
+podman ps
+podman port wr-app                 # 0.0.0.0:8080
+podman port wr-db                  # 0.0.0.0:15432
+curl http://127.0.0.1:8080/api/health
+podman exec wr-db psql -U wruser -d weekly_report
+```
+
+소스 파일을 수정했다고 컨테이너나 사내 서버에 자동 동기화되지는 않습니다. GCP 개발
+환경에 반영하려면 이미지를 다시 빌드하고 APP 컨테이너를 교체해야 합니다.
+
+```bash
+podman-compose -f docker-compose.yml build app
+podman rm -f wr-app
+podman-compose -f docker-compose.yml up -d app
+```
+
+`192.168.200.115:16000`은 현재 GCP 개발 서버와 연결되거나 자동 동기화된 주소가 아닙니다.
+사내 서버 배포는 아래 운영 이관 절차를 별도로 수행해야 합니다.
+
+---
+
+## 3. 향후 사내 운영 서버 구성
 
 | 역할 | 주소 | 사양 | OS | podman |
 |---|---|---|---|---|
@@ -119,7 +181,7 @@ Compose 파일 3종을 용도에 따라 사용합니다.
 
 ---
 
-## 3. 기능
+## 4. 기능
 
 ### 사용자 (작성자)
 - **로그인 / 비밀번호 변경** (세션 12시간, 로그인 10회 실패 시 5분 잠금)
@@ -142,7 +204,6 @@ Compose 파일 3종을 용도에 따라 사용합니다.
 - **사용자 관리** — 계정 생성·수정·비밀번호 초기화·정지·삭제 (마지막 관리자 강등 방지)
 - **가입 승인** — 승인제로 운영할 경우 신청 승인·반려, 비밀번호 재설정 요청 처리
 - **보고서 소속변경** — 잘못된 기관으로 등록된 보고서를 올바른 기관으로 이관
-- **주차 마감** — 마감 시 일반 사용자는 수정 불가, 관리자는 계속 수정 가능
 - **활동 로그** — 로그인·저장·삭제·업로드 이력
 
 ### 권한 체계
@@ -160,7 +221,7 @@ Compose 파일 3종을 용도에 따라 사용합니다.
 
 ---
 
-## 4. 빠른 시작 (개발 서버)
+## 5. 빠른 시작 (신규 개발 서버)
 
 ```bash
 cd weekly-report
@@ -172,7 +233,7 @@ bash scripts/gen-secrets.sh
 podman-compose up -d --build
 
 # 3) 확인
-curl http://127.0.0.1:16080/api/health     # APP_PORT 기본값 16080
+curl http://127.0.0.1:16080/api/health     # .env.example의 APP_PORT 기본값 16080
 podman logs -f wr-app
 ```
 
@@ -193,7 +254,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ---
 
-## 5. 운영 이관 절차 (소스·이미지)
+## 6. 운영 이관 절차 (소스·이미지)
 
 이관 대상은 세 묶음입니다.
 
@@ -203,7 +264,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 `.env`, DB 데이터, 첨부파일은 보안과 데이터 보호를 위해 소스 패키지에 포함하지 않습니다.
 
-### 5-1. 이관 패키지 만들기 (개발 서버에서)
+### 6-1. 이관 패키지 만들기 (개발 서버에서)
 
 ```bash
 bash scripts/deploy.sh package
@@ -220,7 +281,7 @@ bash scripts/deploy.sh package
 > 대상 서버가 인터넷이 되면 이미지 tar 없이 소스를 옮긴 뒤
 > `bash scripts/deploy.sh build`로 APP 이미지를 만들 수 있습니다.
 
-### 5-2. DB 서버 (192.168.200.116, Rocky Linux)
+### 6-2. DB 서버 (192.168.200.116, Rocky Linux)
 
 ```bash
 scp dist/postgres-16-alpine.tar dist/weekly-report-deploy-*.tar.gz  user@192.168.200.116:~/
@@ -245,7 +306,7 @@ sudo firewall-cmd --reload
 최초 기동 시 `db/init/01_schema.sql`, `02_seed.sql` 이 **자동 실행**되어
 스키마 · 기관 · 주차(2025~2027, 수요일~화요일 주기 157주)가 그대로 생성됩니다.
 
-### 5-3. APP 서버 (192.168.200.115, Ubuntu 22.04)
+### 6-3. APP 서버 (192.168.200.115, Ubuntu 22.04)
 
 ```bash
 scp dist/weekly-report-*.tar dist/weekly-report-deploy-*.tar.gz  user@192.168.200.115:~/
@@ -279,7 +340,7 @@ bash scripts/deploy.sh logs
 
 접속: `http://192.168.200.115:16080` → 외부 `http://183.101.26.137:16080`
 
-### 5-4. 포트가 확정되면
+### 6-4. 포트가 확정되면
 
 `.env` 의 `APP_PORT` 만 바꾸고 재기동하면 됩니다. 코드 수정 불필요.
 
@@ -298,7 +359,7 @@ bash scripts/deploy.sh down && bash scripts/deploy.sh up
 > sudo sysctl --system
 > ```
 
-### 5-5. 서버 재부팅 시 자동 기동
+### 6-5. 서버 재부팅 시 자동 기동
 
 ```bash
 podman generate systemd --new --name wr-app --files --restart-policy=always
@@ -312,7 +373,7 @@ DB 서버(`wr-db`)도 동일하게 등록하세요.
 
 ---
 
-## 6. 환경변수 (`.env`)
+## 7. 환경변수 (`.env`)
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
@@ -330,7 +391,7 @@ DB 서버(`wr-db`)도 동일하게 등록하세요.
 
 ---
 
-## 7. DB 스키마 및 이관
+## 8. DB 스키마 및 이관
 
 스키마 이름은 **`wr`** 입니다. 전체 정의는 `db/init/01_schema.sql`.
 
@@ -338,7 +399,7 @@ DB 서버(`wr-db`)도 동일하게 등록하세요.
 |---|---|
 | `wr.organizations` | 기관 (보고 작성 단위) |
 | `wr.users` | 사용자 (`USER` / `ORG_ADMIN` / `ADMIN`, scrypt 해시) |
-| `wr.report_weeks` | 주차 마스터. `is_open=false` 면 마감 |
+| `wr.report_weeks` | 주차 마스터 |
 | `wr.reports` | 주간보고 헤더. **(주차 × 작성자) 유니크**, `org_id`는 작성 당시 소속 |
 | `wr.report_items` | 업무별 `task_title` / `plan_html` / `result_html`<br>+ `progress_rate`, `next_plan_html` (향후 확장용, 현재 미사용) |
 | `wr.attachments` | 증적자료. 원본 파일명은 DB, 실제 파일은 `uploads/<report_id>/<uuid><확장자>` |
@@ -358,7 +419,7 @@ SELECT r.id, w.label, u.name AS author_name,
  ORDER BY r.id, i.sort_order;
 ```
 
-### 7-1. 신규 DB 서버에 빈 스키마 생성
+### 8-1. 신규 DB 서버에 빈 스키마 생성
 
 `docker-compose.db.yml`로 빈 데이터 디렉터리를 최초 기동하면 `db/init/*.sql`이 자동 실행됩니다.
 
@@ -371,7 +432,7 @@ podman logs -f wr-db
 
 `db/init` 자동 실행은 **PGDATA가 비어 있는 최초 1회만** 수행됩니다.
 
-### 7-2. 기존 DB를 최신 스키마로 갱신
+### 8-2. 기존 DB를 최신 스키마로 갱신
 
 ```bash
 DB_HOST=192.168.200.116 bash scripts/apply-schema.sh
@@ -386,7 +447,7 @@ DB_HOST=192.168.200.116 bash scripts/apply-schema.sh
 마이그레이션 적용 전에는 반드시 `scripts/backup.sh`로 백업하십시오.
 `psql`이 없으면 PostgreSQL 컨테이너를 이용합니다.
 
-### 7-3. 기존 데이터까지 다른 DB 서버로 이관
+### 8-3. 기존 데이터까지 다른 DB 서버로 이관
 
 원본 서버:
 
@@ -411,7 +472,7 @@ bash scripts/deploy.sh restart
 
 복원은 대상 DB의 기존 데이터를 교체하는 작업이므로 스크립트가 `yes` 확인을 요구합니다.
 
-### 7-4. 스키마 버전 파일
+### 8-4. 스키마 버전 파일
 
 - 신규 설치 기준: `db/init/01_schema.sql`, `db/init/02_seed.sql`
 - 기존 설치 변경 이력: `db/migrations/001_*.sql`부터 번호 순서대로 적용
@@ -431,7 +492,7 @@ bash scripts/deploy.sh restart
 
 ---
 
-## 8. 백업 / 복원
+## 9. 백업 / 복원
 
 ```bash
 # 백업 (DB 덤프 + 증적자료). 30일 지난 백업은 자동 삭제
@@ -446,7 +507,7 @@ bash scripts/restore.sh /backup/wr-20260818-020000.sql.gz /backup/wr-20260818-02
 
 ---
 
-## 9. 보안
+## 10. 보안
 
 적용된 항목:
 
@@ -469,7 +530,7 @@ bash scripts/restore.sh /backup/wr-20260818-020000.sql.gz /backup/wr-20260818-02
 
 ---
 
-## 10. 디렉터리 구조
+## 11. 디렉터리 구조
 
 ```
 weekly-report/
@@ -503,7 +564,7 @@ weekly-report/
 
 ---
 
-## 11. 트러블슈팅
+## 12. 트러블슈팅
 
 | 증상 | 확인 |
 |---|---|

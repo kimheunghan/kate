@@ -61,7 +61,7 @@ function canViewReport(user, report) {
 
 async function loadReport(id) {
   const { rows } = await db.query(
-    `SELECT r.*, w.label AS week_label, w.start_date, w.end_date, w.is_open,
+    `SELECT r.*, w.label AS week_label, w.start_date, w.end_date,
             o.name AS org_name, u.name AS author_name
        FROM wr.reports r
        JOIN wr.report_weeks  w ON w.id = r.week_id
@@ -207,7 +207,7 @@ router.get('/', async (req, res, next) => {
     params.push(size, (page - 1) * size);
     const listSql = `
       SELECT r.id, r.week_id, r.org_id, r.status, r.submitted_at, r.updated_at, r.note,
-             w.label AS week_label, w.start_date, w.end_date, w.is_open,
+             w.label AS week_label, w.start_date, w.end_date,
              o.name  AS org_name,
              u.name  AS author_name,
              (SELECT count(*)::int FROM wr.report_items ri WHERE ri.report_id = r.id) AS item_count,
@@ -261,7 +261,7 @@ router.get('/lookup', async (req, res, next) => {
     const report = await loadReport(rows[0].id);
     report.items = await loadItems(report.id);
     report.attachments = await loadAttachments(report.id);
-    report.can_edit = canEditReport(req.user, report) && (report.is_open || req.user.role === 'ADMIN');
+    report.can_edit = canEditReport(req.user, report);
     res.json({ report });
   } catch (err) { next(err); }
 });
@@ -280,7 +280,7 @@ router.get('/:id(\\d+)', async (req, res, next) => {
 
     report.items = await loadItems(report.id);
     report.attachments = await loadAttachments(report.id);
-    report.can_edit = canEditReport(req.user, report) && (report.is_open || req.user.role === 'ADMIN');
+    report.can_edit = canEditReport(req.user, report);
     res.json({ report });
   } catch (err) { next(err); }
 });
@@ -299,11 +299,8 @@ router.post('/', async (req, res, next) => {
     const orgId = resolved.orgId;
     if (!orgId) return res.status(400).json({ error: '소속 기관이 없습니다. 내 정보에서 소속을 지정하세요.' });
 
-    const { rows: wrows } = await db.query(`SELECT is_open FROM wr.report_weeks WHERE id = $1`, [weekId]);
+    const { rows: wrows } = await db.query(`SELECT id FROM wr.report_weeks WHERE id = $1`, [weekId]);
     if (!wrows[0]) return res.status(400).json({ error: '존재하지 않는 주차입니다.' });
-    if (!wrows[0].is_open && req.user.role !== 'ADMIN') {
-      return res.status(403).json({ error: '마감된 주차입니다. 관리자에게 문의하세요.' });
-    }
 
     const items = normalizeItems(req.body?.items);
     const note = String(req.body?.note || '').slice(0, 5000);
@@ -348,9 +345,6 @@ router.put('/:id(\\d+)', async (req, res, next) => {
     const existing = await loadReport(id);
     if (!existing) return res.status(404).json({ error: '보고서를 찾을 수 없습니다.' });
     if (!canEditReport(req.user, existing)) return res.status(403).json({ error: '본인이 작성한 보고서만 수정할 수 있습니다.' });
-    if (!existing.is_open && req.user.role !== 'ADMIN') {
-      return res.status(403).json({ error: '마감된 주차입니다. 관리자에게 문의하세요.' });
-    }
 
     const items = normalizeItems(req.body?.items);
     const note = String(req.body?.note || '').slice(0, 5000);
@@ -401,9 +395,6 @@ router.post('/:id(\\d+)/status', async (req, res, next) => {
     const existing = await loadReport(id);
     if (!existing) return res.status(404).json({ error: '보고서를 찾을 수 없습니다.' });
     if (!canEditReport(req.user, existing)) return res.status(403).json({ error: '본인이 작성한 보고서만 변경할 수 있습니다.' });
-    if (!existing.is_open && req.user.role !== 'ADMIN') {
-      return res.status(403).json({ error: '마감된 주차입니다.' });
-    }
 
     await db.query(
       `UPDATE wr.reports
@@ -427,9 +418,6 @@ router.delete('/:id(\\d+)', async (req, res, next) => {
     const existing = await loadReport(id);
     if (!existing) return res.status(404).json({ error: '보고서를 찾을 수 없습니다.' });
     if (!canEditReport(req.user, existing)) return res.status(403).json({ error: '본인이 작성한 보고서만 삭제할 수 있습니다.' });
-    if (!existing.is_open && req.user.role !== 'ADMIN') {
-      return res.status(403).json({ error: '마감된 주차입니다.' });
-    }
 
     // 물리 파일 정리는 files 라우터의 헬퍼를 재사용
     const { removeFilesOfReport } = require('./files');

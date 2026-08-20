@@ -35,7 +35,7 @@ router.get('/status', async (req, res, next) => {
     }
 
     const { rows: wrows } = await db.query(
-      `SELECT id, label, start_date, end_date, is_open FROM wr.report_weeks WHERE id = $1`, [weekId]
+      `SELECT id, label, start_date, end_date FROM wr.report_weeks WHERE id = $1`, [weekId]
     );
 
     const orgId = auth.scopeOrg(req.user, req.query.org_id);
@@ -98,7 +98,7 @@ router.get('/overview', async (req, res, next) => {
   try {
     const n = Math.min(Math.max(Number(req.query.weeks) || 8, 1), 26);
     const { rows: weeks } = await db.query(
-      `SELECT id, label, start_date, is_open
+      `SELECT id, label, start_date
          FROM wr.report_weeks
         WHERE start_date <= CURRENT_DATE
         ORDER BY start_date DESC
@@ -611,11 +611,11 @@ router.put('/reports/:id(\\d+)/org', async (req, res, next) => {
 });
 
 // =====================================================================
-//  주차 관리 (마감 제어 / 임의 주차 추가)
+//  주차 목록
 // =====================================================================
 router.get('/weeks', async (req, res, next) => {
   try {
-    // 당해 연도 12월 말까지 전부 보여준다 (마감 처리를 미리 해둘 수 있어야 하므로)
+    // 당해 연도 12월 말까지 전부 보여준다
     const { rows } = await db.query(
       `SELECT w.*, (SELECT count(*)::int FROM wr.reports r WHERE r.week_id = w.id) AS report_count
          FROM wr.report_weeks w
@@ -627,19 +627,6 @@ router.get('/weeks', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/weeks/:id(\\d+)', adminOnly, async (req, res, next) => {
-  try {
-    const { rows } = await db.query(
-      `UPDATE wr.report_weeks SET is_open = $1 WHERE id = $2 RETURNING *`,
-      [Boolean(req.body?.is_open), Number(req.params.id)]
-    );
-    if (!rows[0]) return res.status(404).json({ error: '주차를 찾을 수 없습니다.' });
-    await audit.log(req, 'WEEK_TOGGLE', {
-      targetType: 'week', targetId: rows[0].id, detail: `${rows[0].label} is_open=${rows[0].is_open}`,
-    });
-    res.json({ week: rows[0] });
-  } catch (err) { next(err); }
-});
 
 // =====================================================================
 //  감사 로그

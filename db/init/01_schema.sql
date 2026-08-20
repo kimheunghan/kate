@@ -96,11 +96,11 @@ CREATE TABLE wr.report_weeks (
     start_date  DATE        NOT NULL UNIQUE,
     end_date    DATE        NOT NULL,
     label       VARCHAR(80) NOT NULL,             -- '17주차 (2026/08/13목~08/19수)'
-    is_open     BOOLEAN     NOT NULL DEFAULT TRUE,-- FALSE = 마감(작성/수정 불가)
+    is_open     BOOLEAN     NOT NULL DEFAULT TRUE,-- 사용하지 않음 (마감 기능 제거)
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT report_weeks_range_chk CHECK (end_date >= start_date)
 );
-COMMENT ON TABLE  wr.report_weeks         IS '주차 마스터. 관리자가 is_open 으로 마감 제어';
+COMMENT ON TABLE  wr.report_weeks         IS '주차 마스터';
 
 CREATE INDEX idx_report_weeks_start ON wr.report_weeks(start_date DESC);
 

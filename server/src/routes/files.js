@@ -60,9 +60,7 @@ const upload = multer({
 // ---------------------------------------------------------------------
 async function loadReportForFiles(reportId) {
   const { rows } = await db.query(
-    `SELECT r.id, r.org_id, r.author_id, w.is_open
-       FROM wr.reports r JOIN wr.report_weeks w ON w.id = r.week_id
-      WHERE r.id = $1`,
+    `SELECT r.id, r.org_id, r.author_id FROM wr.reports r WHERE r.id = $1`,
     [reportId]
   );
   return rows[0] || null;
@@ -78,7 +76,6 @@ function canView(user, report) {
 /** 첨부 등록·삭제는 보고서 소유자 본인만 (전체 관리자는 예외) */
 function canEdit(user, report) {
   if (user.role === 'ADMIN') return true;
-  if (!report.is_open) return false;
   return report.author_id != null && Number(report.author_id) === Number(user.id);
 }
 
@@ -163,10 +160,9 @@ router.get('/attachments/:id(\\d+)/download', auth.requireAuth, async (req, res,
 router.delete('/attachments/:id(\\d+)', auth.requireAuth, async (req, res, next) => {
   try {
     const { rows } = await db.query(
-      `SELECT a.*, r.org_id, r.author_id, w.is_open
+      `SELECT a.*, r.org_id, r.author_id
          FROM wr.attachments a
-         JOIN wr.reports r      ON r.id = a.report_id
-         JOIN wr.report_weeks w ON w.id = r.week_id
+         JOIN wr.reports r ON r.id = a.report_id
         WHERE a.id = $1`,
       [Number(req.params.id)]
     );

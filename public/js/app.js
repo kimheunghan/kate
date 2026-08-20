@@ -67,7 +67,7 @@
 
   function fillWeekSelects() {
     const opts = state.weeks.map((w) =>
-      `<option value="${w.id}"${w.is_open ? '' : ' data-closed="1"'}>${esc(w.label)}${w.is_open ? '' : ' [마감]'}</option>`
+      `<option value="${w.id}">${esc(w.label)}</option>`
     ).join('');
     $('#sel-week').innerHTML = opts;
     $('#f-week').innerHTML = '<option value="">전체</option>' + opts;
@@ -222,24 +222,16 @@
 
     const week = state.weeks.find((w) => w.id === weekId);
     const org = state.orgs.find((o) => o.id === orgId);
-    const closed = week && !week.is_open;
-    const readOnly = report ? !report.can_edit : (closed && state.me.role !== 'ADMIN');
+    const readOnly = report ? !report.can_edit : false;
 
     $('#editor-title').textContent = `${org ? org.name : ''} · ${week ? week.label : ''}`;
     updateTableHeads(week);
-    $('#editor-badge').innerHTML =
-      (report ? statusBadge(report.status) : statusBadge('NONE')) +
-      (closed ? ' <span class="badge closed">마감</span>' : '');
+    $('#editor-badge').innerHTML = report ? statusBadge(report.status) : statusBadge('NONE');
 
     const msgs = [];
-    if (closed) {
-      msgs.push(state.me.role === 'ADMIN'
-        ? '<div class="alert info">마감된 주차입니다. 관리자 권한으로 수정할 수 있습니다.</div>'
-        : '<div class="alert error">마감된 주차입니다. 조회만 가능합니다.</div>');
-    }
     if (report) {
       msgs.push(`<div class="alert success">등록된 보고서입니다. (작성자 ${esc(report.author_name || '-')} · 최종수정 ${fmtDateTime(report.updated_at)})</div>`);
-    } else if (!closed) {
+    } else {
       msgs.push('<div class="alert info">해당 주차에 등록된 보고서가 없습니다. 아래에서 새로 작성하세요.</div>');
     }
     $('#write-status').innerHTML = msgs.join('');
@@ -602,7 +594,7 @@
       <tr>
         <td class="col-org">${esc(r.org_name)}</td>
         <td class="col-author">${esc(r.author_name || '-')}</td>
-        <td>${esc(r.week_label)}${r.is_open ? '' : ' <span class="badge closed">마감</span>'}</td>
+        <td>${esc(r.week_label)}</td>
         <td class="small summary">${
           (r.summary_lines || []).slice(0, MAX_SUMMARY_LINES)
             .map((line) => `<div class="sum-line">${esc(line)}</div>`).join('')

@@ -19,7 +19,7 @@ router.get('/weeks', auth.requireAuth, async (req, res, next) => {
     // 당해 연도 전체 + 내년 1월까지 보여준다.
     // (연말·연초 주차를 미리 선택해 작성할 수 있어야 한다)
     const { rows } = await db.query(
-      `SELECT id, year, week_no, start_date, end_date, label, is_open
+      `SELECT id, year, week_no, start_date, end_date, label
          FROM wr.report_weeks
         WHERE start_date < (date_trunc('year', CURRENT_DATE) + INTERVAL '13 months')
         ORDER BY start_date DESC
@@ -36,7 +36,7 @@ router.get('/weeks', auth.requireAuth, async (req, res, next) => {
 router.get('/weeks/current', auth.requireAuth, async (req, res, next) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, year, week_no, start_date, end_date, label, is_open
+      `SELECT id, year, week_no, start_date, end_date, label
          FROM wr.report_weeks
         WHERE start_date <= CURRENT_DATE
         ORDER BY start_date DESC
