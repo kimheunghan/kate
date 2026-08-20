@@ -128,15 +128,15 @@
         </label>
       </div>
 
-      <div class="toolbar-hint">
-        <span><span class="mark">※</span> 해당 주차에 소속된 작성자 전원이 표시되며, 미제출자는 <b>미등록</b>으로 표시됩니다.</span>
-      </div>
-
       <div class="stat-row mt8">
         <div class="stat"><div class="k">대상 인원</div><div class="v">${summary.total}</div></div>
         <div class="stat ok"><div class="k">제출완료</div><div class="v">${summary.submitted}</div></div>
         <div class="stat bad"><div class="k">미등록</div><div class="v">${summary.none}</div></div>
         <div class="stat"><div class="k">제출률</div><div class="v">${summary.rate}%</div></div>
+      </div>
+
+      <div class="toolbar-hint">
+        <span><span class="mark">※</span> 해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.</span>
       </div>
 
       ${byOrg.length ? `
@@ -238,12 +238,12 @@
       </div>
 
       <div class="toolbar-hint">
-        <span><span class="mark">※</span> 칸의 숫자는 <b>제출 인원 / 대상 인원</b>입니다.</span>
         <span class="legend">
           <span><i class="sw cell-s"></i>전원 제출</span>
           <span><i class="sw cell-d"></i>일부 제출</span>
           <span><i class="sw cell-n"></i>제출 없음</span>
         </span>
+        <span><span class="mark">※</span> 칸의 숫자는 <b>제출 인원 / 대상 인원</b>입니다.</span>
       </div>
 
       <div class="table-scroll mt8">
