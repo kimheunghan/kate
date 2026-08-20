@@ -3,7 +3,7 @@
    ===================================================================== */
 (function () {
   'use strict';
-  const { api, toast, esc, roleLabel, fmtDateTime, statusBadge, $, $$ } = window.WR;
+  const { api, toast, esc, fmtDateTime, statusBadge, $, $$ } = window.WR;
 
   const state = { me: null, orgs: [], tab: 'status' };
   const body = () => $('#tab-body');
@@ -132,8 +132,8 @@
         <table class="grid">
           <thead>
             <tr>
+              <th style="width:130px">아이디</th>
               <th style="width:110px">이름</th>
-              <th style="width:120px">아이디</th>
               <th style="width:170px">기관</th>
               <th class="center" style="width:100px">상태</th>
               <th class="center" style="width:60px">항목</th>
@@ -145,10 +145,8 @@
           <tbody>
             ${rows.length ? rows.map((r) => `
               <tr>
-                <td><b>${esc(r.user_name)}</b>${
-                  r.role === 'USER' ? '' : ` <span class="badge draft">${roleLabel(r.role)}</span>`
-                }</td>
                 <td class="small muted">${esc(r.username)}</td>
+                <td><b>${esc(r.user_name)}</b></td>
                 <td>${esc(r.org_name || '-')}</td>
                 <td class="center">${statusBadge(r.status)}</td>
                 <td class="center">${r.item_count}</td>
