@@ -586,6 +586,9 @@
     } catch (e) { toast(e.message, true); }
   }
 
+  /** 내용 요약에서 한 번에 보여줄 항목 줄 수 (넘치면 '외 N건') */
+  const MAX_SUMMARY_LINES = 5;
+
   function renderList(res) {
     const tbody = $('#list-body');
     if (!res.reports.length) {
@@ -600,7 +603,12 @@
         <td class="col-org">${esc(r.org_name)}</td>
         <td class="col-author">${esc(r.author_name || '-')}</td>
         <td>${esc(r.week_label)}${r.is_open ? '' : ' <span class="badge closed">마감</span>'}</td>
-        <td class="small summary"><div class="summary-text">${esc(r.summary || '')}</div></td>
+        <td class="small summary">${
+          (r.summary_lines || []).slice(0, MAX_SUMMARY_LINES)
+            .map((line) => `<div class="sum-line">${esc(line)}</div>`).join('')
+          + ((r.summary_lines || []).length > MAX_SUMMARY_LINES
+              ? `<div class="sum-more">… 외 ${(r.summary_lines || []).length - MAX_SUMMARY_LINES}건</div>` : '')
+        }</td>
         <td class="center">${statusBadge(r.status)}</td>
         <td class="center">${r.item_count}</td>
         <td class="center">${r.file_count}</td>
