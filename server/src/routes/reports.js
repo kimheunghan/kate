@@ -570,7 +570,7 @@ ${forWord ? `<!--[if gte mso 9]><xml>
   th { background: #fffbcc; text-align: center; font-weight: 700; font-size: 10pt; }
   td { font-size: 9pt; line-height: 1.45; }
   td.org, td.who {
-    background: #fcfcf0; text-align: center; vertical-align: middle;
+    background: #ffffff; text-align: center; vertical-align: middle;
     font-weight: 600; font-size: 9.5pt;
   }
 
