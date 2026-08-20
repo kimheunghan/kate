@@ -448,7 +448,8 @@
             <input type="text" id="e-pw" autocomplete="off" data-lpignore="true"
                    placeholder="변경할 때만 입력 (8자 이상)">
           </label>
-          <p class="small muted" style="margin:-6px 0 12px">비워 두면 기존 비밀번호가 유지됩니다.</p>
+          <p class="small muted" style="margin:-6px 0 12px">
+            <span class="mark">※</span> 비워 두면 기존 비밀번호가 유지됩니다.</p>
           <label class="field"><span>권한</span>
             <select id="e-role">
               <option value="USER"      ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
