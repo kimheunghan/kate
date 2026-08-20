@@ -734,20 +734,20 @@
     draw();
   }
 
-  // 빠른 선택 단추 (은행·포털의 로그 조회에서 쓰는 방식)
+  // 빠른 선택 단추. 어느 것이든 '시작일 00:00 ~ 종료일 23:59' 로 잡는다.
+  // 그 밖의 기간은 [직접입력] 에서 달력으로 고른다.
   const QUICK = {
-    today:     { label: '오늘',      days: 0 },
-    d7:        { label: '1주일',     days: 6 },
-    m1:        { label: '1개월',     months: 1 },
-    m3:        { label: '3개월',     months: 3 },
+    '':   { label: '전체' },
+    m1:   { label: '1개월', months: 1 },
+    d7:   { label: '1주',   days: 6 },
   };
 
   /** 빠른 선택에 맞는 시작·종료를 만든다 */
   function quickRange(kind) {
+    const q = QUICK[kind];
+    if (!q || (!q.months && q.days === undefined)) return { from: '', to: '' };
     const now = new Date();
     const start = new Date(now);
-    const q = QUICK[kind];
-    if (!q) return { from: '', to: '' };
     if (q.months) start.setMonth(start.getMonth() - q.months);
     else start.setDate(start.getDate() - q.days);
     return { from: `${ymd(start)}T00:00`, to: `${ymd(now)}T23:59` };
@@ -778,8 +778,8 @@
           <div class="range-box">
             <span class="quick-range">
               ${Object.entries(QUICK).map(([k, v]) =>
-                `<button type="button" data-q="${k}" class="${auditFilter.quick === k ? 'on' : ''}">${v.label}</button>`).join('')}
-              <button type="button" data-q="" class="${auditFilter.quick ? '' : 'on'}">전체</button>
+                `<button type="button" data-q="${k}" class="${(auditFilter.quick || '') === k ? 'on' : ''}">${v.label}</button>`).join('')}
+              <button type="button" id="al-pick" class="${auditFilter.quick === 'custom' ? 'on' : ''}">직접입력</button>
             </span>
             <button type="button" class="range-display" id="al-range">
               <span class="cal-ico">📅</span>
@@ -863,18 +863,20 @@
     });
 
     // 달력에서 시작일·종료일을 집는다 (타자 없이 클릭만으로)
-    $('#al-range').onclick = () => {
-      openRangeCalendar($('#al-range'), {
+    const openCal = (anchor) => {
+      openRangeCalendar(anchor, {
         from: auditFilter.from,
         to: auditFilter.to,
         onApply: (from, to) => {
-          auditFilter.quick = '';
+          auditFilter.quick = 'custom';
           auditFilter.from = from;
           auditFilter.to = to;
           runSearch();
         },
       });
     };
+    $('#al-pick').onclick = () => openCal($('#al-pick'));
+    $('#al-range').onclick = () => openCal($('#al-range'));
 
     $('#al-reset').onclick = () => {
       Object.keys(auditFilter).forEach((k) => { auditFilter[k] = ''; });
