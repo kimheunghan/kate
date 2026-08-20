@@ -248,7 +248,8 @@
         <div class="body">
           <div class="alert error hidden" id="pf-err"></div>
           <label class="field"><span>아이디</span>
-            <input type="text" value="${esc(u.username)}" disabled></label>
+            <input type="text" id="pf-username" name="username" autocomplete="username"
+                   value="${esc(u.username)}" disabled></label>
           <label class="field"><span>이름</span>
             <input type="text" id="pf-name" value="${esc(u.name)}"></label>
           <label class="field"><span>이메일</span>
