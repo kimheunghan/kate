@@ -94,7 +94,6 @@
     const { part: stRows, pages: stPages } = slicePage(rows, 'status');
 
     body().innerHTML = `
-      <p class="small muted">선택한 주차에 <b>가입한 작성자 전원</b>이 나옵니다. 아직 안 낸 사람도 <b>미등록</b> 으로 표시됩니다.</p>
       <div class="search-bar">
         <label class="sb-field sb-week" style="flex:1 1 300px">
           <span>보고 주차</span>
@@ -127,6 +126,10 @@
               `<option value="${o.id}" ${String(f.org) === String(o.id) || scopedOrgId === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
           </select>
         </label>
+      </div>
+
+      <div class="toolbar-hint">
+        <span><span class="mark">※</span> 해당 주차에 소속된 작성자 전원이 표시되며, 미제출자는 <b>미등록</b>으로 표시됩니다.</span>
       </div>
 
       <div class="stat-row mt8">
@@ -225,8 +228,6 @@
     };
 
     body().innerHTML = `
-      <p class="small muted">최근 몇 주간 <b>기관별로 몇 명이 제출했는지</b> 흐름을 봅니다.
-        칸의 숫자는 <b>제출 인원 / 대상 인원</b> 이며, 대상 인원은 그 기관에 가입한 작성자 수입니다.</p>
       <div class="search-bar">
         <label class="sb-field" style="flex:0 0 180px">
           <span>표시 주차 수</span>
@@ -235,6 +236,11 @@
           </select>
         </label>
       </div>
+
+      <div class="toolbar-hint">
+        <span><span class="mark">※</span> 칸의 숫자는 <b>제출 인원 / 대상 인원</b>입니다.</span>
+      </div>
+
       <div class="table-scroll mt8">
         <table class="matrix">
           <thead>

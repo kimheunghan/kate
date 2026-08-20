@@ -678,7 +678,7 @@
         <td class="small">${fmtDateTime(r.updated_at)}</td>
         <td class="center nowrap">
           <button class="btn sm" data-open="${r.id}">열기</button>
-          <button class="btn sm" data-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받습니다">한글</button>
+          <button class="btn sm" data-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받기">한글</button>
         </td>
       </tr>`).join('');
 
