@@ -83,28 +83,16 @@
     $('#sel-org').innerHTML = opts;
     $('#f-org').innerHTML = '<option value="">전체</option>' + opts;
 
+    // 보고서는 언제나 "본인 소속 기관" 으로 저장된다.
+    // 총괄관리자도 마찬가지이므로 선택박스 없이 기관명만 보여준다.
     const orgSel = $('#sel-org');
     const orgText = $('#sel-org-text');
-    const orgLabel = document.querySelector('#org-field > span');
-
-    if (state.me.role === 'ADMIN') {
-      // 전체 관리자만 기관을 골라 저장할 수 있다
-      orgSel.classList.remove('hidden');
-      orgSel.disabled = false;
-      if (state.me.org_id) orgSel.value = state.me.org_id;
-      orgSel.title = '저장·엑셀 일괄등록 시 이 기관으로 기록됩니다.';
-      if (orgText) orgText.classList.add('hidden');
-      if (orgLabel) orgLabel.textContent = '기관 (선택 가능)';
-    } else {
-      // 소속이 하나로 고정이므로 선택박스 대신 글자로만 보여준다
-      orgSel.value = state.me.org_id || '';
-      orgSel.classList.add('hidden');
-      if (orgText) {
-        orgText.textContent = state.me.org_name || '소속 없음';
-        orgText.title = '소속 기관은 상단 [내 정보]에서 변경할 수 있습니다.';
-        orgText.classList.remove('hidden');
-      }
-      if (orgLabel) orgLabel.textContent = '기관';
+    orgSel.value = state.me.org_id || '';
+    orgSel.classList.add('hidden');
+    if (orgText) {
+      orgText.textContent = state.me.org_name || '소속 없음';
+      orgText.title = '기관은 상단 [내 정보]에서 변경할 수 있습니다.';
+      orgText.classList.remove('hidden');
     }
   }
 
@@ -150,7 +138,7 @@
         ? '본인이 작성한 보고서만 표시됩니다.'
         : (role === 'ORG_ADMIN'
             ? `${state.me.org_name || '소속 기관'} 소속 전체 보고서가 표시됩니다.`
-            : '전체 기관의 보고서가 표시됩니다.');
+            : '전체 기관의 보고서가 표시됩니다. (총괄관리자)');
     }
     // 소속·참여인력 열은 권한과 무관하게 항상 표시한다
     document.querySelectorAll('.col-org, .col-author').forEach((el) => {

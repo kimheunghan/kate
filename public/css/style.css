@@ -722,3 +722,10 @@ table.grid td.summary {
 .search-bar .sb-right > span { text-align: left; }
 .search-bar .sb-right .sb-static { justify-content: flex-start; }
 .search-bar .sb-right > select { min-width: 200px; }
+
+/* 상단바의 권한 표시 */
+.topbar .role-tag {
+  font-size: 11px; font-weight: 700;
+  background: rgba(255, 255, 255, .22); color: #fff;
+  padding: 1px 7px; border-radius: 9px; margin-left: 3px;
+}

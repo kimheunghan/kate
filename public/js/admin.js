@@ -3,7 +3,7 @@
    ===================================================================== */
 (function () {
   'use strict';
-  const { api, toast, esc, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, $, $$ } = window.WR;
+  const { api, toast, esc, roleLabel, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, $, $$ } = window.WR;
 
   const state = { me: null, orgs: [], tab: 'status' };
   const body = () => $('#tab-body');
@@ -163,8 +163,7 @@
             ${rows.length ? rows.map((r) => `
               <tr>
                 <td><b>${esc(r.user_name)}</b>${
-                  r.role === 'ADMIN' ? ' <span class="badge draft">관리자</span>'
-                  : (r.role === 'ORG_ADMIN' ? ' <span class="badge none">기관관리</span>' : '')
+                  r.role === 'USER' ? '' : ` <span class="badge draft">${roleLabel(r.role)}</span>`
                 }</td>
                 <td class="small muted">${esc(r.username)}</td>
                 <td>${esc(r.org_name || '-')}</td>
@@ -584,7 +583,11 @@
         <label class="field" style="flex:1 1 160px"><span>초기 비밀번호</span><input type="text" id="u-pw" placeholder="8자 이상"></label>
         <label class="field" style="flex:1 1 160px"><span>기관</span><select id="u-org">${orgOpts}</select></label>
         <label class="field narrow" style="flex:0 0 120px"><span>권한</span>
-          <select id="u-role"><option value="USER">작성자</option><option value="ADMIN">관리자</option></select>
+          <select id="u-role">
+            <option value="USER">작성자</option>
+            <option value="ORG_ADMIN">기관관리자</option>
+            <option value="ADMIN">총괄관리자</option>
+          </select>
         </label>
         <div class="field narrow">
           <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
@@ -607,7 +610,11 @@
                 <td><b>${esc(u.username)}</b></td>
                 <td>${esc(u.name)}</td>
                 <td>${esc(u.org_name || '-')}</td>
-                <td class="center">${u.role === 'ADMIN' ? '<span class="badge draft">관리자</span>' : '<span class="badge none">작성자</span>'}</td>
+                <td class="center">${
+                  u.role === 'ADMIN'     ? '<span class="badge draft">총괄관리자</span>' :
+                  u.role === 'ORG_ADMIN' ? '<span class="badge submitted">기관관리자</span>' :
+                                           '<span class="badge none">작성자</span>'
+                }</td>
                 <td class="center">${
                   u.approval_status === 'PENDING'  ? '<span class="badge draft">승인대기</span>' :
                   u.approval_status === 'REJECTED' ? '<span class="badge closed">반려</span>'   :
@@ -696,8 +703,9 @@
           </label>
           <label class="field"><span>권한</span>
             <select id="e-role">
-              <option value="USER"  ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
-              <option value="ADMIN" ${u.role === 'ADMIN' ? 'selected' : ''}>관리자</option>
+              <option value="USER"      ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
+              <option value="ORG_ADMIN" ${u.role === 'ORG_ADMIN' ? 'selected' : ''}>기관관리자</option>
+              <option value="ADMIN"     ${u.role === 'ADMIN' ? 'selected' : ''}>총괄관리자</option>
             </select>
           </label>
         </div>

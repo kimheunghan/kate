@@ -172,6 +172,15 @@
     downloadFile(`/api/reports/${reportId}/export-hwpx`, '주간보고.hwpx');
   }
 
+  /**
+   * 권한 명칭 (화면 전체에서 이 표기를 쓴다)
+   *   ADMIN     총괄관리자 — 전체 기관
+   *   ORG_ADMIN 기관관리자 — 자기 기관만
+   *   USER      작성자     — 자기가 속한 기관
+   */
+  const ROLE_LABEL = { ADMIN: '총괄관리자', ORG_ADMIN: '기관관리자', USER: '작성자' };
+  function roleLabel(role) { return ROLE_LABEL[role] || '작성자'; }
+
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
 
@@ -186,8 +195,8 @@
         `<a href="${n.href}" class="${n.key === active ? 'active' : ''}">${esc(n.label)}</a>`).join('')}</nav>
       <div class="spacer"></div>
       <button class="who" id="btn-profile" type="button" title="내 정보 수정">
-        ${esc(user.org_name || (user.role === 'ADMIN' ? '전체' : '소속없음'))} ·
-        <b>${esc(user.name)}</b>${user.role === 'ADMIN' ? ' (관리자)' : ''}
+        ${esc(user.org_name || '소속없음')} ·
+        <b>${esc(user.name)}</b> <span class="role-tag">${roleLabel(user.role)}</span>
         <span class="who-edit">수정</span>
       </button>
       <button class="btn sm" id="btn-pw">비밀번호</button>
@@ -385,5 +394,5 @@
     $('#pw-cur', back).focus();
   }
 
-  global.WR = { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
+  global.WR = { api, toast, esc, roleLabel, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
 })(window);

@@ -351,7 +351,7 @@ router.post('/users', async (req, res, next) => {
     // 기관 관리자는 자기 기관에만, 그리고 전체 관리자는 만들 수 없다
     if (req.user.role === 'ORG_ADMIN') {
       orgId = req.user.org_id;
-      if (role === 'ADMIN') return res.status(403).json({ error: '전체 관리자 계정은 만들 수 없습니다.' });
+      if (role === 'ADMIN') return res.status(403).json({ error: '총괄관리자 계정은 만들 수 없습니다.' });
     }
 
     if (!/^[A-Za-z0-9._-]{3,50}$/.test(username)) {
@@ -386,7 +386,7 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
         return res.status(403).json({ error: '다른 기관 사용자는 수정할 수 없습니다.' });
       }
       if (t[0].role === 'ADMIN' || role === 'ADMIN') {
-        return res.status(403).json({ error: '전체 관리자 권한은 변경할 수 없습니다.' });
+        return res.status(403).json({ error: '총괄관리자 권한은 변경할 수 없습니다.' });
       }
     }
 
@@ -397,7 +397,7 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
       );
       const { rows: target } = await db.query(`SELECT role, is_active FROM wr.users WHERE id = $1`, [id]);
       if (target[0]?.role === 'ADMIN' && target[0]?.is_active && rows[0].c === 0) {
-        return res.status(409).json({ error: '마지막 관리자 계정입니다. 다른 관리자를 먼저 지정하세요.' });
+        return res.status(409).json({ error: '마지막 총괄관리자 계정입니다. 다른 총괄관리자를 먼저 지정하세요.' });
       }
     }
 

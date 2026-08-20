@@ -121,7 +121,7 @@ function requireAuth(req, res, next) {
 /** 전체 관리자 필수 */
 function requireAdmin(req, res, next) {
   if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  if (req.user.role !== 'ADMIN') return res.status(403).json({ error: '전체 관리자 권한이 필요합니다.' });
+  if (req.user.role !== 'ADMIN') return res.status(403).json({ error: '총괄관리자 권한이 필요합니다.' });
   next();
 }
 
