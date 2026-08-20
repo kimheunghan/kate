@@ -531,6 +531,12 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
   /* 특이사항과 증적자료 사이 빈 줄. Word 는 div 의 margin 을 흘려버리는
      경우가 있어 실제 빈 문단을 하나 넣는다. */
   p.gap { margin: 0 !important; font-size: 8.5pt !important; line-height: 1.4; }
+  /* Word 는 표 칸 세로 맞춤 기본이 가운데다. 내용 칸은 위쪽으로 고정한다.
+     (mso- 속성을 함께 줘야 Word 가 확실히 따른다) */
+  td.cell {
+    vertical-align: top !important;
+    mso-vertical-align-alignment: top !important;
+  }
   /* 글꼴도 한글 문서와 같이 휴먼명조 */
   body, h1, table, th, td, p, div, li, ol, ul, span {
     font-family: "휴먼명조", "HY명조", "HYMyeongJo", "Batang", "바탕", serif !important;
