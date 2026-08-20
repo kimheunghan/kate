@@ -121,6 +121,13 @@
     const role = state.me.role;
     const onlyMine = role !== 'ADMIN' && role !== 'ORG_ADMIN';
 
+    // 인쇄·한글·Word 내려받기는 관리자만 쓴다. 작성자에게는 저장만 남긴다.
+    // (지우지 않고 감추기만 하므로 필요하면 이 줄만 빼면 다시 보인다)
+    ['#btn-print', '#btn-export-hwpx', '#btn-export'].forEach((sel) => {
+      const b = $(sel);
+      if (b) b.classList.toggle('hidden', onlyMine);
+    });
+
     // 등록 내역 조회는 관리자만 본다. 작성자에게는 탭을 감춘다.
     // (지우지 않고 감추기만 하므로 필요하면 이 줄만 빼면 다시 보인다)
     const listTab = $$('.tabs button').find((b) => b.dataset.tab === 'list');
