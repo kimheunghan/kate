@@ -602,7 +602,7 @@
             <th style="width:130px">아이디</th><th style="width:110px">이름</th>
             <th style="width:180px">기관</th><th class="center" style="width:80px">권한</th>
             <th class="center" style="width:80px">상태</th><th style="width:150px">최근 로그인</th>
-            <th class="center" style="width:230px">관리</th>
+            <th class="center" style="width:150px">권한 관리</th>
           </tr></thead>
           <tbody>
             ${usersRes.users.map((u) => `
@@ -622,9 +622,7 @@
                 }</td>
                 <td class="small">${fmtDateTime(u.last_login_at)}</td>
                 <td class="center nowrap">
-                  <button class="btn sm" data-uedit="${u.id}">수정</button>
-                  <button class="btn sm" data-upw="${u.id}">비밀번호</button>
-                  <button class="btn sm" data-utoggle="${u.id}">${u.is_active ? '중지' : '활성'}</button>
+                  <button class="btn sm" data-uedit="${u.id}">권한</button>
                   <button class="btn sm danger" data-udel="${u.id}">삭제</button>
                 </td>
               </tr>`).join('')}
@@ -650,28 +648,6 @@
 
     body().querySelectorAll('[data-uedit]').forEach((b) => {
       b.onclick = () => openUserEdit(find(b.dataset.uedit), orgsRes.orgs);
-    });
-
-    body().querySelectorAll('[data-upw]').forEach((b) => {
-      b.onclick = async () => {
-        const u = find(b.dataset.upw);
-        const pw = prompt(`"${u.username}" 계정의 새 비밀번호를 입력하세요 (8자 이상)`);
-        if (!pw) return;
-        try {
-          await api.post(`/api/admin/users/${u.id}/password`, { password: pw });
-          toast('비밀번호가 초기화되었습니다.');
-        } catch (e) { toast(e.message, true); }
-      };
-    });
-
-    body().querySelectorAll('[data-utoggle]').forEach((b) => {
-      b.onclick = async () => {
-        const u = find(b.dataset.utoggle);
-        try {
-          await api.put(`/api/admin/users/${u.id}`, { is_active: !u.is_active });
-          renderUsers();
-        } catch (e) { toast(e.message, true); }
-      };
     });
 
     body().querySelectorAll('[data-udel]').forEach((b) => {
