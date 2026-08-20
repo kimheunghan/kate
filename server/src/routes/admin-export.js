@@ -516,9 +516,13 @@ router.get('/export/audit', async (req, res, next) => {
 
     // 조회 조건을 부제로 적는다
     const cond = [];
+    // 기간을 걸지 않았으면 실제로 담긴 기록의 처음~끝 시각을 적는다
+    const newest = rows.length ? rows[0].created_at : null;
+    const oldest = rows.length ? rows[rows.length - 1].created_at : null;
     cond.push(req.query.from || req.query.to
-      ? `기간 ${String(req.query.from || '처음').replace('T', ' ')} ~ ${String(req.query.to || '지금').replace('T', ' ')}`
-      : '기간 전체(시작일 시간 ~ 종료일 시간)');
+      ? `기간 ${String(req.query.from || stamp(oldest)).replace('T', ' ')}`
+        + ` ~ ${String(req.query.to || stamp(newest)).replace('T', ' ')}`
+      : (rows.length ? `기간 ${stamp(oldest)} ~ ${stamp(newest)}` : '기간 -'));
     if (req.query.action) cond.push(`행위 ${ACTION_TEXT[req.query.action] || req.query.action}`);
     if (req.query.q) cond.push(`검색어 "${String(req.query.q).trim()}"`);
 
