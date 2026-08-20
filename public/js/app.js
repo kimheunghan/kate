@@ -579,7 +579,7 @@
   function bindListTab() {
     $('#btn-search').onclick = () => searchList(1);
     $('#f-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') searchList(1); });
-    ['#f-week', '#f-org', '#f-status'].forEach((s) => { $(s).onchange = () => searchList(1); });
+    ['#f-week', '#f-org'].forEach((s) => { $(s).onchange = () => searchList(1); });
   }
 
   async function searchList(page) {
@@ -587,7 +587,6 @@
     const p = new URLSearchParams({ page: state.listPage, size: 20 });
     if ($('#f-week').value)   p.set('week_id', $('#f-week').value);
     if ($('#f-org').value)    p.set('org_id', $('#f-org').value);
-    if ($('#f-status').value) p.set('status', $('#f-status').value);
     if ($('#f-q').value.trim()) p.set('q', $('#f-q').value.trim());
 
     try {
