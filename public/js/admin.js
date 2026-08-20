@@ -315,9 +315,9 @@
                 <td class="small muted">${esc(u.username)}</td>
                 <td class="center small">${u.duty ? DUTY_LABEL[u.duty] : '-'}</td>
                 <td class="center">${
-                  u.role === 'ADMIN'     ? '<span class="badge draft">총괄관리자</span>' :
-                  u.role === 'ORG_ADMIN' ? '<span class="badge submitted">기관관리자</span>' :
-                                           '<span class="badge none">작성자</span>'
+                  u.role === 'ADMIN'     ? '<span class="badge role-admin">총괄관리자</span>' :
+                  u.role === 'ORG_ADMIN' ? '<span class="badge role-org">기관관리자</span>' :
+                                           '<span class="badge role-user">작성자</span>'
                 }</td>
                 <td class="center">${
                   u.approval_status === 'PENDING'  ? '<span class="badge draft">승인대기</span>' :

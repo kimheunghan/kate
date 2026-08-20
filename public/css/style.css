@@ -172,6 +172,10 @@ textarea { resize: vertical; min-height: 60px; }
 .badge.draft     { background: #fff2d9; color: var(--warn); }
 .badge.submitted { background: #dff3e6; color: var(--success); }
 .badge.closed    { background: #f0e6e4; color: var(--danger); }
+/* 권한 표시는 상태(활성·승인대기·중지)와 색이 겹치지 않게 따로 둔다 */
+.badge.role-admin { background: #e2e9f8; color: #2b4c8c; }
+.badge.role-org   { background: #ece5f7; color: #66459f; }
+.badge.role-user  { background: #eef0f3; color: #77808d; }
 
 /* ------------------------------------------------------------------ 표 */
 table.grid { width: 100%; border-collapse: collapse; font-size: 13.5px; }
