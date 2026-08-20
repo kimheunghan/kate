@@ -3,7 +3,7 @@
    ===================================================================== */
 (function () {
   'use strict';
-  const { api, toast, esc, fmtDateTime, statusBadge, openPrint, downloadReport, $, $$ } = window.WR;
+  const { api, toast, esc, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, $, $$ } = window.WR;
 
   const state = { me: null, orgs: [], tab: 'status' };
   const body = () => $('#tab-body');
@@ -151,7 +151,7 @@
               <th class="center" style="width:60px">항목</th>
               <th class="center" style="width:60px">첨부</th>
               <th style="width:140px">최종수정</th>
-              <th class="center" style="width:270px">관리</th>
+              <th class="center" style="width:330px">관리</th>
             </tr>
           </thead>
           <tbody>
@@ -168,6 +168,8 @@
                   ${r.report_id ? `
                     <button class="btn sm" data-open="${r.report_id}">열기</button>
                     <button class="btn sm" data-print="${r.report_id}">인쇄</button>
+                    <button class="btn sm" data-hwpx="${r.report_id}"
+                      title="아래한글 문서(HWPX)로 내려받습니다">HWPX</button>
                     <button class="btn sm" data-export="${r.report_id}"
                       title="한글문서(HWP) 변환은 현재 [Word 다운로드] 하신 후 한글에서 Word문서를 열어서 다른 이름(확장자 .hwp)으로 저장하시기 바랍니다.">Word</button>
                     <button class="btn sm" data-moveorg="${r.report_id}"
@@ -202,6 +204,9 @@
     });
     body().querySelectorAll('[data-export]').forEach((b) => {
       b.onclick = () => downloadReport(b.dataset.export);
+    });
+    body().querySelectorAll('[data-hwpx]').forEach((b) => {
+      b.onclick = () => downloadReportHwpx(b.dataset.hwpx);
     });
     body().querySelectorAll('[data-moveorg]').forEach((b) => {
       b.onclick = () => moveReportOrg(Number(b.dataset.moveorg));
