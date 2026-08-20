@@ -71,6 +71,7 @@
   }
 
   /** 다음 줄에 이어 붙일 기호. 번호면 하나 올린다. */
+  const SPACE_PX = 4;                    // 공백 한 칸 폭 (문서로 내보낼 때와 같은 값)
   const INDENT_SPACES = 2;               // 들여쓰기 한 단계 = 공백 두 칸
   const NB = '\u00a0';                    // 줄 끝에서도 지워지지 않는 공백
 
@@ -80,6 +81,24 @@
     // 기호 뒤에는 늘 공백을 붙인다. 줄 끝에서 지워지지 않는 공백을 쓴다.
     // (공백 없이 '■글자' 로 저장된 줄에서도 다음 줄에 '■ ' 가 나오게 한다)
     return mark.replace(/[\s\u00a0]*$/, NB);
+  }
+
+  /**
+   * 들여쓰기 값을 한 단계(8px) 의 배수로 맞춘다.
+   * 예전에는 화면에서 잰 공백 폭(4.5px 같은 값)으로 밀어 18px 같은 값이
+   * 남았고, 문서로 내보낼 때 공백 수가 한 칸씩 어긋났다.
+   */
+  function snapIndents(area) {
+    const step = SPACE_PX * INDENT_SPACES;
+    Array.from(area.children).forEach((el) => {
+      if (!el.style) return;
+      ['paddingLeft', 'marginLeft'].forEach((prop) => {
+        const px = parseFloat(el.style[prop]) || 0;
+        if (!px) return;
+        const snapped = Math.max(step, Math.round(px / step) * step);
+        if (snapped !== px) el.style[prop] = `${snapped}px`;
+      });
+    });
   }
 
   /** 그 칸 안의 첫 글자 노드 (없으면 null) */
@@ -221,6 +240,7 @@
       this.area.innerHTML = opts.html || '';
       // 예전에 목록으로 저장된 내용은 글자 줄로 바꿔 둔다
       listsToLines(this.area, null);
+      snapIndents(this.area);
       host.appendChild(this.area);
 
       if (!this.readOnly) this._bind();
@@ -236,6 +256,7 @@
     setHtml(html) {
       this.area.innerHTML = html || '';
       listsToLines(this.area, null);
+      snapIndents(this.area);
     }
 
     isEmpty() { return !this.area.textContent.trim() && !this.area.querySelector('img'); }
@@ -836,16 +857,6 @@
      * 글꼴·크기에 따라 다르므로 편집 영역의 실제 글꼴로 측정한다.
      * (고정값을 쓰면 스페이스로 조절할 때와 간격이 어긋난다)
      */
-    _spaceWidth(ed) {
-      const probe = document.createElement('span');
-      probe.textContent = '\u00a0'.repeat(20);
-      probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;left:-9999px';
-      ed.area.appendChild(probe);
-      const w = probe.getBoundingClientRect().width / 20;
-      probe.remove();
-      return w > 1 ? Math.round(w * 100) / 100 : 4;
-    }
-
     /** 선택 영역에 걸친 최상위 블록들 (편집 영역의 직계 자식) */
     _selectedBlocks(ed) {
       const sel = window.getSelection();
@@ -899,7 +910,9 @@
       ed.restoreRange();
 
       // 한 번에 공백 두 칸씩 민다. 한 칸(약 4px)씩이면 눌러도 티가 나지 않는다.
-      const step = this._spaceWidth(ed) * INDENT_SPACES;
+      // 폭은 문서로 내보낼 때와 같은 값(4px = 공백 한 칸)으로 고정한다.
+      // 화면에서 잰 폭(4.5px 같은 값)을 쓰면 한글 문서에서 공백 수가 어긋난다.
+      const step = SPACE_PX * INDENT_SPACES;
 
       // 한 칸 미는 공통 처리
       const shift = (el, prop) => {
