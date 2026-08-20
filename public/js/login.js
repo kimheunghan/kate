@@ -134,7 +134,7 @@
     const intro = {
       EMAIL:  `<p class="small muted">본인 확인 후 가입 시 등록한 이메일로
                  <b>비밀번호 재설정 링크</b>를 보내드립니다. (${caps.reset_token_minutes}분 이내 유효)</p>`,
-      DIRECT: `<p class="small muted">가입 시 등록한 정보로 본인 확인 후
+      DIRECT: `<p class="small muted">아이디와 이름으로 본인 확인 후
                  <b>바로 새 비밀번호를 설정</b>할 수 있습니다.</p>`,
       ADMIN:  `<p class="small muted">본인 확인 후 <b>재설정 요청</b>이 접수됩니다.
                  <br>관리자가 확인 후 임시 비밀번호를 알려드립니다.</p>`,
@@ -144,15 +144,13 @@
       ${intro}
       <label class="field"><span>아이디</span><input type="text" id="fp-username"></label>
       <label class="field"><span>이름</span><input type="text" id="fp-name"></label>
-      <label class="field"><span>이메일</span><input type="email" id="fp-email"></label>
     `, async (ctx) => {
       const username = ctx.back.querySelector('#fp-username').value.trim();
       const name = ctx.back.querySelector('#fp-name').value.trim();
-      const email = ctx.back.querySelector('#fp-email').value.trim();
-      if (!username || !name || !email) return ctx.fail('아이디, 이름, 이메일을 모두 입력하세요.');
+      if (!username || !name) return ctx.fail('아이디와 이름을 모두 입력하세요.');
 
       try {
-        const res = await api.post('/api/auth/reset-request', { username, name, email }, { allowAnonymous: true });
+        const res = await api.post('/api/auth/reset-request', { username, name }, { allowAnonymous: true });
         // 임시 비밀번호를 화면에 알려주고 재설정 화면으로 안내
         if (res.temp_password) {
           ctx.succeed(`

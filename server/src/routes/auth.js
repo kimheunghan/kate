@@ -211,8 +211,9 @@ router.put('/profile', auth.requireAuth, async (req, res, next) => {
 
     if (!name) return res.status(400).json({ error: '이름을 입력하세요.' });
     if (name.length > 50) return res.status(400).json({ error: '이름이 너무 깁니다.' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: '올바른 이메일을 입력하세요. (아이디·비밀번호 찾기에 사용됩니다)' });
+    // 이메일은 선택 입력. 적었다면 형태만 확인한다.
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: '올바른 이메일을 입력하세요.' });
     }
     if (phone && phone.length > 30) return res.status(400).json({ error: '연락처가 너무 깁니다.' });
 
@@ -328,15 +329,16 @@ router.post('/signup', rateLimit(5, 10 * 60 * 1000), async (req, res, next) => {
     }
     if (password.length < 8) return res.status(400).json({ error: '비밀번호는 8자 이상이어야 합니다.' });
     if (!name) return res.status(400).json({ error: '이름을 입력하세요.' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: '올바른 이메일을 입력하세요. (아이디·비밀번호 찾기에 사용됩니다)' });
+    // 이메일은 선택 입력. 적었다면 형태만 확인한다.
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: '올바른 이메일을 입력하세요.' });
     }
     if (!orgId) return res.status(400).json({ error: '기관을 선택하세요.' });
     if (!duty)  return res.status(400).json({ error: '담당 역할을 선택하세요.' });
 
     // 허용 도메인이 지정되어 있으면 해당 메일 주소만 가입할 수 있다
     const domains = config.signup.allowedEmailDomains;
-    if (domains.length) {
+    if (email && domains.length) {
       const d = email.split('@')[1].toLowerCase();
       if (!domains.includes(d)) {
         return res.status(400).json({
@@ -418,15 +420,15 @@ router.post('/reset-request', rateLimit(5, 10 * 60 * 1000), async (req, res, nex
   try {
     const username = String(req.body?.username || '').trim();
     const name = String(req.body?.name || '').trim();
-    const email = String(req.body?.email || '').trim();
-    if (!username || !name || !email) {
-      return res.status(400).json({ error: '아이디, 이름, 이메일을 모두 입력하세요.' });
+    if (!username || !name) {
+      return res.status(400).json({ error: '아이디와 이름을 모두 입력하세요.' });
     }
 
+    // 아이디 + 이름으로 본인을 확인한다 (이메일은 받지 않는다)
     const { rows } = await db.query(
       `SELECT id, username, name, email FROM wr.users
-        WHERE lower(username) = lower($1) AND name = $2 AND lower(email) = lower($3)`,
-      [username, name, email]
+        WHERE lower(username) = lower($1) AND name = $2`,
+      [username, name]
     );
     if (!rows[0]) {
       return res.status(404).json({ error: '일치하는 가입 정보가 없습니다. 관리자에게 문의하세요.' });
