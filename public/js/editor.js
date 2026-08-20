@@ -284,6 +284,7 @@
 
     _bind() {
       this.area.addEventListener('input', () => {
+        this._dropTrailingBreaks();
         this._restoreMarkers();
         this.saveRange();
         this._changed();
@@ -496,6 +497,19 @@
       before.selectNodeContents(block);
       before.setEnd(range.startContainer, range.startOffset);
       return before.toString().replace(/[\s\u00a0\u200b]/g, '') === '';
+    }
+
+    /**
+     * 글이 있는 줄 끝에 남은 <br> 을 없앤다.
+     * 백스페이스로 빈 줄을 지우면 브라우저가 <br> 만 앞줄로 옮겨 붙여,
+     * 글은 없는데 한 줄이 더 있는 것처럼 벌어져 보인다.
+     */
+    _dropTrailingBreaks() {
+      Array.from(this.area.children).forEach((el) => {
+        if (!el.lastElementChild || el.lastElementChild.tagName !== 'BR') return;
+        if (isBlank(el)) return;                    // 빈 줄의 <br> 은 남겨 둔다
+        el.removeChild(el.lastElementChild);
+      });
     }
 
     /** 커서가 놓인 줄 (편집 영역 바로 아래 칸) */
