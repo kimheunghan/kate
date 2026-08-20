@@ -538,6 +538,29 @@
   // ==================================================================
   // 5. 활동 로그
   // ==================================================================
+  // 동작 코드를 우리말로 풀어 쓴다
+  const ACTION_TEXT = {
+    LOGIN: '로그인', LOGOUT: '로그아웃', LOGIN_FAIL: '로그인 실패',
+    SIGNUP: '회원가입', FIND_ID: '아이디 찾기',
+    PASSWORD_CHANGE: '비밀번호 변경', PROFILE_UPDATE: '내 정보 수정',
+    RESET_REQUEST: '비밀번호 재설정 요청', RESET_DIRECT: '비밀번호 재설정 진행',
+    RESET_COMPLETE: '비밀번호 재설정 완료', RESET_DONE: '비밀번호 재설정 완료',
+    RESET_REJECT: '비밀번호 재설정 반려',
+    RESET_MAIL_SENT: '재설정 메일 발송', RESET_MAIL_FAIL: '재설정 메일 실패',
+    REPORT_SAVE: '보고서 저장', REPORT_UPDATE: '보고서 수정',
+    REPORT_DELETE: '보고서 삭제', REPORT_STATUS: '보고서 상태 변경',
+    REPORT_EXPORT: 'Word 다운로드', REPORT_EXPORT_HWPX: '한글 다운로드',
+    REPORT_EXPORT_HWPX_WEEK: '주차 한글 다운로드',
+    REPORT_EXPORT_HWPX_ALL: '전체 주차 ZIP 다운로드',
+    REPORT_MOVE_ORG: '보고서 기관 이관', REPORT_ORG_CHANGE: '보고서 기관 변경',
+    EXCEL_IMPORT: '엑셀 일괄등록', EXCEL_PREVIEW: '엑셀 미리보기',
+    FILE_UPLOAD: '증적자료 첨부', FILE_DELETE: '증적자료 삭제',
+    USER_CREATE: '사용자 추가', USER_UPDATE: '사용자 수정',
+    USER_DELETE: '사용자 삭제', USER_PASSWORD_RESET: '비밀번호 초기화',
+    ORG_CREATE: '기관 추가', ORG_UPDATE: '기관 수정', ORG_DELETE: '기관 삭제',
+    WEEK_TOGGLE: '주차 마감 전환',
+  };
+
   async function renderAudit() {
     const res = await api.get('/api/admin/audit?limit=200');
     body().innerHTML = `
@@ -547,7 +570,9 @@
             <th style="width:150px">일시</th>
             <th style="width:120px">사용자ID</th>
             <th style="width:110px">사용자</th>
-            <th style="width:160px">동작</th><th>내용</th><th style="width:130px">IP</th>
+            <th style="width:170px">동작</th>
+            <th style="width:150px">행위</th>
+            <th>내용</th><th style="width:130px">IP</th>
           </tr></thead>
           <tbody>
             ${res.logs.length ? res.logs.map((l) => `
@@ -556,9 +581,10 @@
                 <td>${esc(l.username || '-')}</td>
                 <td>${esc(l.user_name || '-')}</td>
                 <td class="small">${esc(l.action)}</td>
-                <td class="small">${esc(l.detail || l.action)}</td>
+                <td class="small">${esc(ACTION_TEXT[l.action] || '-')}</td>
+                <td class="small">${esc(l.detail || '')}</td>
                 <td class="small muted">${esc(l.ip || '-')}</td>
-              </tr>`).join('') : '<tr><td colspan="6" class="empty">기록이 없습니다.</td></tr>'}
+              </tr>`).join('') : '<tr><td colspan="7" class="empty">기록이 없습니다.</td></tr>'}
           </tbody>
         </table>
       </div>`;
