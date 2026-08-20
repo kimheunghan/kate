@@ -453,13 +453,15 @@
           </label>
           <p class="small muted" style="margin:-6px 0 12px">
             <span class="mark">※</span> 비워 두면 기존 비밀번호가 유지됩니다.</p>
-          <label class="field"><span>권한</span>
-            <select id="e-role">
-              <option value="USER"      ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
-              <option value="ORG_ADMIN" ${u.role === 'ORG_ADMIN' ? 'selected' : ''}>기관관리자</option>
-              <option value="ADMIN"     ${u.role === 'ADMIN' ? 'selected' : ''}>총괄관리자</option>
-            </select>
-          </label>
+          <div class="field-hl">
+            <label class="field"><span>권한</span>
+              <select id="e-role">
+                <option value="USER"      ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
+                <option value="ORG_ADMIN" ${u.role === 'ORG_ADMIN' ? 'selected' : ''}>기관관리자</option>
+                <option value="ADMIN"     ${u.role === 'ADMIN' ? 'selected' : ''}>총괄관리자</option>
+              </select>
+            </label>
+          </div>
         </div>
         <footer>
           <button class="btn" id="e-cancel">취소</button>

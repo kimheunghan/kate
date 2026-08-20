@@ -110,6 +110,11 @@ a { color: var(--primary); }
 
 /* ------------------------------------------------------------------ 폼 */
 label.field { display: block; margin-bottom: 12px; }
+
+/* 특정 입력 칸만 배경색으로 강조한다. 테두리는 두지 않는다. */
+.field-hl { background: var(--primary-lt); border: 0; border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+.field-hl > label.field:last-child { margin-bottom: 0; }
+.field-hl > label.field > span { color: var(--primary-dk); }
 label.field > span { display: block; font-size: 12.5px; color: var(--text-dim); margin-bottom: 4px; font-weight: 600; }
 
 input[type=text], input[type=password], input[type=email], input[type=number],
