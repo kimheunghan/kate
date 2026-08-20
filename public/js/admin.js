@@ -107,7 +107,7 @@
         <div class="stat"><div class="k">제출률</div><div class="v">${summary.rate}%</div></div>
       </div>
 
-      ${byOrg.length > 1 ? `
+      ${byOrg.length ? `
       <h3 class="sec-title">기관별 소계</h3>
       <div class="table-scroll">
         <table class="grid">
