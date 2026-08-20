@@ -59,11 +59,13 @@ function makeTempPassword(len = 10) {
 }
 
 /** 아이디 일부를 가린다: bimatrix01 → bi******01 */
+/** 아이디 가운데 두 글자만 가린다. (예: hung6789 → hu**6789) */
 function maskUsername(u) {
-  if (u.length <= 3) return u[0] + '*'.repeat(u.length - 1);
-  const head = u.slice(0, 2);
-  const tail = u.slice(-2);
-  return head + '*'.repeat(Math.max(u.length - 4, 1)) + tail;
+  if (u.length <= 2) return u[0] + '*';
+  if (u.length <= 4) return u[0] + '**' + u.slice(3);
+  // 가운데 자리에서 두 글자를 가린다
+  const at = Math.max(1, Math.round((u.length - 2) / 2));
+  return u.slice(0, at) + '**' + u.slice(at + 2);
 }
 
 // ---------------------------------------------------------------------
