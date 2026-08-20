@@ -325,39 +325,61 @@ router.get('/export/matrix', async (req, res, next) => {
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('주차별 현황');
-    ws.getColumn(1).width = 26;
-    weeks.forEach((w, i) => { ws.getColumn(i + 2).width = 16; });
+    ws.getColumn(1).width = 24;
+    weeks.forEach((w, i) => { ws.getColumn(i + 2).width = 17; });
 
     const cols = weeks.length + 1;
-    let at = putTitle(ws, cols, '주차별 주간보고 실적현황',
-      `최근 ${weeks.length}주 · ${weeks[0].label} ~ ${weeks[weeks.length - 1].label}`);
-    at = putLegend(ws, at + 1);
+    let at = putTitle(ws, cols, `최근 ${weeks.length}주차별 주간보고 실적현황`,
+      `[ ${weeks[0].label} ~ ${weeks[weeks.length - 1].label} ]`);
 
-    // 표 제목 줄
+    // 범례는 오른쪽 끝에 붙인다
+    const legendRow = ws.getRow(at + 1);
+    [['전원 제출', 'FFE6F6EC'], ['일부 제출', 'FFFFF5E0'], ['제출 없음', 'FFFAFAFA']]
+      .forEach(([label, color], i) => {
+        const c = legendRow.getCell(Math.max(2, cols - 2 + i));
+        c.value = label;
+        c.font = { size: 10 };
+        c.alignment = { horizontal: 'center', vertical: 'middle' };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+        c.border = BORDER;
+      });
+    legendRow.height = 18;
+    at += 3;
+
+    // 표 제목 줄 : 주차와 기간을 줄을 나눠 적는다
     const headAt = at;
-    ws.getRow(at).values = ['기관', ...weeks.map((w) => w.label)];
+    const headRow = ws.getRow(at);
+    headRow.getCell(1).value = '기관';
+    weeks.forEach((w, i) => {
+      headRow.getCell(i + 2).value = String(w.label).replace(' (', '\n(').replace('~', '\n~');
+    });
     styleHeader(ws, at);
-    ws.getRow(at).height = 34;
+    headRow.height = 46;
+    headRow.eachCell((c) => { c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
     at += 1;
 
     /** 제출률에 따라 칸 색을 칠한다 (화면과 같은 기준) */
     const paint = (cell, sub, total) => {
-      if (!total) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAFAFA' } }; return; }
-      const rate = sub / total;
+      const rate = total ? sub / total : 0;
       const color = rate >= 1 ? 'FFE6F6EC' : (rate > 0 ? 'FFFFF5E0' : 'FFFAFAFA');
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
     };
+    /** 0/3 아래 (0%) 로 적는다 */
+    const cellText = (sub, total) =>
+      `${sub}/${total}\n(${total ? Math.round((sub / total) * 100) : 0}%)`;
 
     orgs.forEach((o) => {
       const row = ws.getRow(at);
       row.getCell(1).value = o.name;
+      row.getCell(1).alignment = { vertical: 'middle' };
       weeks.forEach((w, i) => {
         const c = find(w.id, o.name);
         const cell = row.getCell(i + 2);
-        cell.value = c ? `${c.submitted} / ${c.total_users}` : '-';
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.value = c ? cellText(c.submitted, c.total_users) : '-';
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         paint(cell, c ? c.submitted : 0, c ? c.total_users : 0);
       });
+      row.height = 34;
       at += 1;
     });
 
@@ -365,19 +387,21 @@ router.get('/export/matrix', async (req, res, next) => {
     totalRow.getCell(1).value = '전체';
     weeks.forEach((w, i) => {
       const list = cells.filter((c) => c.week_id === w.id);
-      const sub = list.reduce((a, c) => a + c.submitted, 0);
-      const tot = list.reduce((a, c) => a + c.total_users, 0);
+      const sub = list.reduce((a2, c) => a2 + c.submitted, 0);
+      const tot = list.reduce((a2, c) => a2 + c.total_users, 0);
       const cell = totalRow.getCell(i + 2);
-      cell.value = `${sub} / ${tot}`;
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.value = cellText(sub, tot);
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     });
     totalRow.font = { bold: true };
+    totalRow.height = 34;
     totalRow.eachCell((c) => {
       c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F6FA' } };
     });
 
     styleBody(ws, headAt);
-    putNote(ws, at, '주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다. (칸의 숫자 = 제출 / 대상)');
+    putNote(ws, at,
+      '주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다. (칸의 숫자 = 제출 / 대상, ( )은 제출률 현황)');
 
     const name = `주차별현황_최근${n}주.xlsx`;
     await audit.log(req, 'EXPORT_MATRIX', { detail: name });
