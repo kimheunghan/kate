@@ -402,9 +402,10 @@ router.post('/find-id', rateLimit(10, 10 * 60 * 1000), async (req, res, next) =>
         ORDER BY name, id`,
       [name, orgId, base]
     );
+    // 아이디 찾기는 로그인하지 않은 사람이 하는 동작이라
+    // 누가 했는지 남기지 않는다. 화면에는 (비로그인) 으로 나온다.
     await audit.log(req, 'FIND_ID', {
       detail: `${name} / 기관 ${orgId} → ${rows.length}건`,
-      actorName: rows.length === 1 ? rows[0].username : name,
     });
 
     if (!rows.length) {

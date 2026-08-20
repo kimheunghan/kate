@@ -654,7 +654,8 @@ router.get('/audit', adminOnly, async (req, res, next) => {
       const kw = `%${String(req.query.q).trim()}%`;
       params.push(kw);
       const n = params.length;
-      where.push(`(a.username ILIKE $${n} OR u.name ILIKE $${n} OR a.detail ILIKE $${n} OR a.ip ILIKE $${n})`);
+      where.push(`(a.username ILIKE $${n} OR COALESCE(a.user_name, u.name) ILIKE $${n}
+                 OR a.detail ILIKE $${n} OR a.ip ILIKE $${n})`);
     }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
@@ -666,7 +667,9 @@ router.get('/audit', adminOnly, async (req, res, next) => {
 
     params.push(size, (page - 1) * size);
     const { rows } = await db.query(
-      `SELECT a.id, a.username, u.name AS user_name,
+      `SELECT a.id, a.username,
+              -- 기록에 남은 이름을 먼저 쓴다 (계정이 지워져도 보인다)
+              COALESCE(a.user_name, u.name) AS user_name,
               a.action, a.target_type, a.target_id, a.detail, a.ip, a.created_at
          FROM wr.audit_logs a
          LEFT JOIN wr.users u ON u.id = a.user_id

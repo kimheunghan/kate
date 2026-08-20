@@ -701,7 +701,7 @@
               <tr>
                 <td class="small">${fmtDateTime(l.created_at)}</td>
                 <td>${esc(l.username || '(비로그인)')}</td>
-                <td>${esc(l.user_name || (l.username ? '(삭제된 계정)' : '(비로그인)'))}</td>
+                <td>${esc(l.user_name || '(비로그인)')}</td>
                 <td class="small">${esc(l.action)}</td>
                 <td class="small">${esc(ACTION_TEXT[l.action] || '-')}</td>
                 <td class="small">${esc(l.detail || '')}</td>
