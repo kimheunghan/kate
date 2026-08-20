@@ -577,7 +577,7 @@
         <label class="field" style="flex:1 1 140px"><span>아이디</span><input type="text" id="u-username" placeholder="영문/숫자"></label>
         <label class="field" style="flex:1 1 120px"><span>이름</span><input type="text" id="u-name"></label>
         <label class="field" style="flex:1 1 160px"><span>초기 비밀번호</span><input type="text" id="u-pw" placeholder="8자 이상"></label>
-        <label class="field" style="flex:1 1 160px"><span>소속 기관</span><select id="u-org">${orgOpts}</select></label>
+        <label class="field" style="flex:1 1 160px"><span>기관</span><select id="u-org">${orgOpts}</select></label>
         <label class="field narrow" style="flex:0 0 120px"><span>권한</span>
           <select id="u-role"><option value="USER">작성자</option><option value="ADMIN">관리자</option></select>
         </label>
@@ -592,7 +592,7 @@
         <table class="grid">
           <thead><tr>
             <th style="width:130px">아이디</th><th style="width:110px">이름</th>
-            <th style="width:180px">소속 기관</th><th class="center" style="width:80px">권한</th>
+            <th style="width:180px">기관</th><th class="center" style="width:80px">권한</th>
             <th class="center" style="width:80px">상태</th><th style="width:150px">최근 로그인</th>
             <th class="center" style="width:230px">관리</th>
           </tr></thead>
@@ -683,7 +683,7 @@
         <div class="body">
           <label class="field"><span>이름</span><input type="text" id="e-name" value="${esc(u.name)}"></label>
           <label class="field"><span>이메일</span><input type="email" id="e-email" value="${esc(u.email || '')}"></label>
-          <label class="field"><span>소속 기관</span>
+          <label class="field"><span>기관</span>
             <select id="e-org">
               <option value="">(없음)</option>
               ${orgs.map((o) => `<option value="${o.id}" ${o.id === u.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}

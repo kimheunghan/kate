@@ -233,7 +233,7 @@
                    placeholder="아이디·비밀번호 찾기에 사용됩니다"></label>
           <label class="field"><span>연락처</span>
             <input type="text" id="pf-phone" value="${esc(u.phone || '')}" placeholder="010-0000-0000"></label>
-          <label class="field" style="margin-bottom:6px"><span>소속 기관</span>
+          <label class="field" style="margin-bottom:6px"><span>기관</span>
             <select id="pf-org">
               ${u.role === 'ADMIN' ? '<option value="">(전체 / 소속 없음)</option>' : ''}
               ${orgs.orgs.map((o) =>
