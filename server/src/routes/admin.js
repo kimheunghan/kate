@@ -221,8 +221,13 @@ router.get('/users', async (req, res, next) => {
                 WHERE r.author_id = u.id AND r.org_id = u.org_id) AS report_count
          FROM wr.users u LEFT JOIN wr.organizations o ON o.id = u.org_id
         WHERE ($1::int IS NULL OR u.org_id = $1::int)
-        ORDER BY u.role DESC, o.sort_order NULLS LAST, u.username`,
-      [auth.scopeOrg(req.user, req.query.org_id)]
+          AND ($2::text IS NULL
+               OR u.name ILIKE '%' || $2 || '%'
+               OR u.username ILIKE '%' || $2 || '%'
+               OR u.email ILIKE '%' || $2 || '%')
+        ORDER BY u.role DESC, o.sort_order NULLS LAST, u.name, u.username`,
+      [auth.scopeOrg(req.user, req.query.org_id),
+       req.query.q ? String(req.query.q).trim() : null]
     );
     res.json({ users: rows });
   } catch (err) { next(err); }
@@ -342,6 +347,51 @@ router.post('/reset-requests/:id(\\d+)', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/**
+ * 같은 기관에 이름이 같은 사람이 이미 있는지 찾는다.
+ * 아이디는 유일하지만 이름은 겹칠 수 있어, 현황 화면에서 누가 누구인지 구분되지 않는다.
+ */
+function baseName(name) {
+  return String(name || '').replace(/-[A-Z]$/, '');   // '홍길동-B' → '홍길동'
+}
+
+async function findSameName(name, orgId, exceptId) {
+  // 이름이 정확히 같은 경우뿐 아니라 이미 접미사가 붙은 동명이인(홍길동-A)도 함께 찾는다.
+  // 그래야 세 번째 동명이인이 들어와도 -C 를 제안할 수 있다.
+  const base = baseName(name);
+  const { rows } = await db.query(
+    `SELECT id, username, name, email
+       FROM wr.users
+      WHERE org_id = $1
+        AND (name = $2 OR name ~ ('^' || $2 || '-[A-Z]$'))
+        AND ($3::int IS NULL OR id <> $3::int)
+      ORDER BY id`,
+    [orgId, base, exceptId || null]
+  );
+  return rows;
+}
+
+/** 동명이인 구분용 접미사 제안. 홍길동 → 홍길동-A / -B / -C … */
+function suggestSuffixed(baseName, existing) {
+  const used = new Set();
+  for (const u of existing) {
+    const m = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-([A-Z])$`).exec(u.name);
+    if (m) used.add(m[1]);
+  }
+  const next = (from) => {
+    for (let c = from.charCodeAt(0); c <= 'Z'.charCodeAt(0); c++) {
+      const ch = String.fromCharCode(c);
+      if (!used.has(ch)) { used.add(ch); return ch; }
+    }
+    return null;
+  };
+  // 접미사 없는 기존 사용자가 있으면 그 사람을 -A 로, 새 사용자를 다음 글자로
+  const plain = existing.find((u) => u.name === baseName);
+  const renameExistingTo = plain ? `${baseName}-${next('A')}` : null;
+  return { renameExistingTo, renameExistingId: plain ? plain.id : null,
+           newName: `${baseName}-${next('A')}` };
+}
+
 router.post('/users', async (req, res, next) => {
   try {
     const username = String(req.body?.username || '').trim();
@@ -362,6 +412,19 @@ router.post('/users', async (req, res, next) => {
     if (password.length < 8) return res.status(400).json({ error: '비밀번호는 8자 이상이어야 합니다.' });
     if (!name) return res.status(400).json({ error: '이름을 입력하세요.' });
     if (role !== 'ADMIN' && !orgId) return res.status(400).json({ error: '소속 기관을 선택하세요.' });
+
+    // 같은 기관 동명이인 확인 (allow_duplicate_name 이 true 면 그대로 진행)
+    if (orgId && req.body?.allow_duplicate_name !== true) {
+      const dup = await findSameName(name, orgId);
+      if (dup.length) {
+        return res.status(409).json({
+          error: '같은 기관에 이름이 같은 사용자가 있습니다.',
+          duplicate_name: true,
+          duplicates: dup.map((d) => ({ id: d.id, username: d.username, name: d.name, email: d.email })),
+          suggestion: suggestSuffixed(baseName(name), dup),
+        });
+      }
+    }
 
     const { rows } = await db.query(
       `INSERT INTO wr.users (username, password_hash, name, email, role, org_id, must_change_pw)

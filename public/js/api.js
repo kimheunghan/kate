@@ -52,6 +52,7 @@
       const msg = (data && data.error) || (typeof data === 'string' && data) || `요청 실패 (${res.status})`;
       const err = new Error(msg);
       err.status = res.status;
+      err.body = (data && typeof data === 'object') ? data : null;  // 상세 정보(중복 목록 등)
       throw err;
     }
     return data;

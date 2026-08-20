@@ -234,8 +234,16 @@
 
   // 4. 사용자 관리
   // ==================================================================
-  async function renderUsers() {
-    const [usersRes, orgsRes] = await Promise.all([api.get('/api/admin/users'), api.get('/api/orgs')]);
+  async function renderUsers(filters) {
+    const f = filters || {};
+    const q = new URLSearchParams();
+    if (f.q) q.set('q', f.q);
+    if (f.org) q.set('org_id', f.org);
+
+    const [usersRes, orgsRes] = await Promise.all([
+      api.get('/api/admin/users' + (q.toString() ? `?${q}` : '')),
+      api.get('/api/orgs'),
+    ]);
     const orgOpts = orgsRes.orgs.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
 
     body().innerHTML = `
@@ -261,6 +269,23 @@
           </select>
         </label>
         <button class="btn primary sb-btn" id="u-add">사용자 추가</button>
+      </div>
+
+      <h3 class="sec-title">사용자 목록 (${usersRes.users.length}명)</h3>
+      <div class="search-bar">
+        <label class="sb-field" style="flex:1 1 240px">
+          <span>검색 (이름·아이디·이메일)</span>
+          <input type="text" id="u-q" value="${esc(f.q || '')}" placeholder="예: 홍길동">
+        </label>
+        <label class="sb-field" style="flex:0 0 200px">
+          <span>기관</span>
+          <select id="u-forg">
+            <option value="">전체</option>
+            ${orgsRes.orgs.map((o) =>
+              `<option value="${o.id}" ${String(f.org) === String(o.id) ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+          </select>
+        </label>
+        <button class="btn primary sb-btn" id="u-search">조회</button>
       </div>
 
       <div class="table-scroll mt8">
@@ -297,15 +322,22 @@
         </table>
       </div>`;
 
+    const readUserFilters = () => ({ q: $('#u-q').value.trim(), org: $('#u-forg').value });
+    $('#u-search').onclick = () => renderUsers(readUserFilters());
+    $('#u-forg').onchange = () => renderUsers(readUserFilters());
+    $('#u-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') renderUsers(readUserFilters()); });
+
     $('#u-add').onclick = async () => {
+      const payload = {
+        username: $('#u-username').value.trim(),
+        name: $('#u-name').value.trim(),
+        password: $('#u-pw').value,
+        org_id: $('#u-role').value === 'ADMIN' ? ($('#u-org').value || null) : $('#u-org').value,
+        role: $('#u-role').value,
+      };
+
       try {
-        await api.post('/api/admin/users', {
-          username: $('#u-username').value.trim(),
-          name: $('#u-name').value.trim(),
-          password: $('#u-pw').value,
-          org_id: $('#u-role').value === 'ADMIN' ? ($('#u-org').value || null) : $('#u-org').value,
-          role: $('#u-role').value,
-        });
+        await addUserWithDuplicateCheck(payload);
         toast('사용자가 추가되었습니다.');
         renderUsers();
       } catch (e) { toast(e.message, true); }
@@ -327,6 +359,43 @@
         } catch (e) { toast(e.message, true); }
       };
     });
+  }
+
+  /**
+   * 사용자 추가. 같은 기관에 이름이 같은 사람이 있으면 서버가 409 로 알려준다.
+   * 이때 구분용 접미사(-A, -B)를 붙일지 관리자에게 확인받는다.
+   */
+  async function addUserWithDuplicateCheck(payload) {
+    try {
+      await api.post('/api/admin/users', payload);
+      return;
+    } catch (e) {
+      if (!e.body || !e.body.duplicate_name) throw e;
+
+      const { duplicates, suggestion } = e.body;
+      const who = duplicates
+        .map((d) => `    · ${d.name} (${d.username}${d.email ? ', ' + d.email : ''})`)
+        .join('\n');
+
+      const ok = confirm(
+        `같은 기관에 "${payload.name}" 님이 이미 ${duplicates.length}명 있습니다.\n\n${who}\n\n` +
+        `[확인] 구분되도록 이름을 바꿔 등록합니다.\n` +
+        (suggestion.renameExistingTo
+          ? `    기존: ${payload.name} → ${suggestion.renameExistingTo}\n`
+          : '') +
+        `    신규: ${payload.name} → ${suggestion.newName}\n\n` +
+        `[취소] 등록을 멈춥니다. 이름을 직접 고쳐 다시 시도하세요.`
+      );
+      if (!ok) throw new Error('등록을 취소했습니다.');
+
+      // 기존 사용자에게도 접미사를 붙여 둘 다 구분되게 한다
+      if (suggestion.renameExistingId && suggestion.renameExistingTo) {
+        await api.put(`/api/admin/users/${suggestion.renameExistingId}`,
+          { name: suggestion.renameExistingTo });
+      }
+      await api.post('/api/admin/users',
+        { ...payload, name: suggestion.newName, allow_duplicate_name: true });
+    }
   }
 
   function openUserEdit(u, orgs) {
