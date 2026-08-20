@@ -481,8 +481,14 @@
     _clearLine(block) {
       const t = firstTextNode(block);
       if (t) t.nodeValue = t.nodeValue.replace(MARKER_RE, '');
-      block.style.removeProperty('padding-left');
+
+      // 들여쓰기는 그 칸의 첫 줄에 맞춘다.
+      // 0 으로 밀어 버리면 '1.' 로 시작하는 줄보다 더 왼쪽으로 나가 어긋난다.
+      const first = this.area.firstElementChild;
+      const base = first && first !== block ? first.style.paddingLeft : '';
       block.style.removeProperty('margin-left');
+      if (base) block.style.paddingLeft = base;
+      else block.style.removeProperty('padding-left');
       if (!block.getAttribute('style')) block.removeAttribute('style');
       if (block.textContent === '' && !block.querySelector('br')) {
         block.appendChild(document.createElement('br'));
