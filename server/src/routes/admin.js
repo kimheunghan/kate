@@ -635,8 +635,11 @@ router.get('/audit', adminOnly, async (req, res, next) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 100, 500);
     const { rows } = await db.query(
-      `SELECT id, username, action, target_type, target_id, detail, ip, created_at
-         FROM wr.audit_logs ORDER BY id DESC LIMIT $1`,
+      `SELECT a.id, a.username, u.name AS user_name,
+              a.action, a.target_type, a.target_id, a.detail, a.ip, a.created_at
+         FROM wr.audit_logs a
+         LEFT JOIN wr.users u ON u.id = a.user_id
+        ORDER BY a.id DESC LIMIT $1`,
       [limit]
     );
     res.json({ logs: rows });

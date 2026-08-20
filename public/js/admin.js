@@ -133,7 +133,7 @@
         </table>
       </div>` : ''}
 
-      <h3 class="sec-title">작성자별 제출 현황 (${rows.length}명)</h3>
+      <h3 class="sec-title">작성자 제출 현황 (${rows.length}명)</h3>
       <div class="table-scroll">
         <table class="grid">
           <thead>
@@ -544,7 +544,9 @@
       <div class="table-scroll">
         <table class="grid">
           <thead><tr>
-            <th style="width:150px">일시</th><th style="width:120px">사용자</th>
+            <th style="width:150px">일시</th>
+            <th style="width:120px">사용자ID</th>
+            <th style="width:110px">사용자</th>
             <th style="width:160px">동작</th><th>내용</th><th style="width:130px">IP</th>
           </tr></thead>
           <tbody>
@@ -552,10 +554,11 @@
               <tr>
                 <td class="small">${fmtDateTime(l.created_at)}</td>
                 <td>${esc(l.username || '-')}</td>
+                <td>${esc(l.user_name || '-')}</td>
                 <td class="small">${esc(l.action)}</td>
                 <td class="small">${esc(l.detail || '')}${l.target_id ? ` <span class="muted">#${l.target_id}</span>` : ''}</td>
                 <td class="small muted">${esc(l.ip || '-')}</td>
-              </tr>`).join('') : '<tr><td colspan="5" class="empty">기록이 없습니다.</td></tr>'}
+              </tr>`).join('') : '<tr><td colspan="6" class="empty">기록이 없습니다.</td></tr>'}
           </tbody>
         </table>
       </div>`;
