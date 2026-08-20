@@ -766,7 +766,9 @@ body.brush-armed .editor-area { cursor: cell; }
 
 /* 너비를 지정한 대로 지키는 표.
    이렇게 하지 않으면 긴 요약글이 열을 밀어내 다른 열이 눌리고 말줄임도 듣지 않는다. */
-table.grid.fixed { table-layout: fixed; min-width: 1320px; }
+/* 창이 좁아져도 가로 막대가 생기지 않게 최소 너비를 두지 않는다.
+   열 너비를 비율(%)로 주면 창 크기에 따라 같이 줄고 늘어난다. */
+table.grid.fixed { table-layout: fixed; width: 100%; }
 table.grid.fixed td { overflow: hidden; text-overflow: ellipsis; }
 /* 기관·참여인력처럼 좁은 칸에서 글자가 한 자씩 끊기지 않게 */
 table.grid.fixed td.col-org, table.grid.fixed td.col-author { word-break: keep-all; }

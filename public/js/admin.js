@@ -116,10 +116,10 @@
       ${byOrg.length ? `
       <h3 class="sec-title">기관별 소계</h3>
       <div class="table-scroll">
-        <table class="grid">
-          <thead><tr><th>기관</th><th class="center" style="width:90px">대상</th>
-            <th class="center" style="width:90px">제출</th>
-            <th class="center" style="width:90px">미등록</th><th class="center" style="width:90px">제출률</th></tr></thead>
+        <table class="grid fixed">
+          <thead><tr><th>기관</th><th class="center" style="width:14%">대상</th>
+            <th class="center" style="width:14%">제출</th>
+            <th class="center" style="width:14%">미등록</th><th class="center" style="width:14%">제출률</th></tr></thead>
           <tbody>
             ${byOrg.map((o) => `
               <tr>
@@ -135,17 +135,17 @@
 
       <h3 class="sec-title">작성자 제출 현황 (${rows.length}명)</h3>
       <div class="table-scroll">
-        <table class="grid">
+        <table class="grid fixed">
           <thead>
             <tr>
-              <th style="width:170px">기관</th>
-              <th style="width:110px">이름</th>
-              <th style="width:130px">아이디</th>
-              <th class="center" style="width:100px">상태</th>
+              <th style="width:18%">기관</th>
+              <th style="width:11%">이름</th>
+              <th style="width:13%">아이디</th>
+              <th class="center" style="width:10%">상태</th>
               <th class="center" style="width:60px">항목</th>
               <th class="center" style="width:60px">첨부</th>
-              <th style="width:150px">제출시각</th>
-              <th style="width:150px">최종수정</th>
+              <th style="width:15%">제출시각</th>
+              <th style="width:15%">최종수정</th>
             </tr>
           </thead>
           <tbody>
@@ -298,14 +298,14 @@
       </div>
 
       <div class="table-scroll mt8">
-        <table class="grid">
+        <table class="grid fixed">
           <thead><tr>
-            <th style="width:180px">기관</th><th style="width:110px">이름</th>
-            <th style="width:130px">아이디</th>
-            <th class="center" style="width:100px">담당 역할</th>
-            <th class="center" style="width:80px">권한</th>
-            <th class="center" style="width:80px">상태</th><th style="width:150px">최근 로그인</th>
-            <th class="center" style="width:170px">사용자 권한 및 삭제</th>
+            <th style="width:19%">기관</th><th style="width:11%">이름</th>
+            <th style="width:13%">아이디</th>
+            <th class="center" style="width:11%">담당 역할</th>
+            <th class="center" style="width:9%">권한</th>
+            <th class="center" style="width:8%">상태</th><th style="width:15%">최근 로그인</th>
+            <th class="center" style="width:14%">사용자 권한 및 삭제</th>
           </tr></thead>
           <tbody>
             ${usersRes.users.map((u) => `
@@ -565,14 +565,14 @@
     const res = await api.get('/api/admin/audit?limit=200');
     body().innerHTML = `
       <div class="table-scroll">
-        <table class="grid">
+        <table class="grid fixed">
           <thead><tr>
-            <th style="width:150px">일시</th>
-            <th style="width:120px">사용자ID</th>
-            <th style="width:110px">사용자</th>
-            <th style="width:170px">동작</th>
-            <th style="width:150px">행위</th>
-            <th>내용</th><th style="width:130px">IP</th>
+            <th style="width:14%">일시</th>
+            <th style="width:11%">사용자ID</th>
+            <th style="width:9%">사용자</th>
+            <th style="width:16%">동작</th>
+            <th style="width:13%">행위</th>
+            <th>내용</th><th style="width:12%">IP</th>
           </tr></thead>
           <tbody>
             ${res.logs.length ? res.logs.map((l) => `
