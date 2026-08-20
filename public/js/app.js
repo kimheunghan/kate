@@ -138,7 +138,7 @@
         ? '본인이 작성한 보고서만 표시됩니다.'
         : (role === 'ORG_ADMIN'
             ? `${state.me.org_name || '소속 기관'} 소속 전체 보고서가 표시됩니다.`
-            : '전체 기관의 보고서가 표시됩니다. (총괄관리자)');
+            : '전체 기관의 보고서가 표시됩니다.');
     }
     // 소속·참여인력 열은 권한과 무관하게 항상 표시한다
     document.querySelectorAll('.col-org, .col-author').forEach((el) => {
