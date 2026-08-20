@@ -9,6 +9,7 @@
 
   /** 담당 역할 표기 */
   const PAGE_SIZE = 10;                  // 목록 한 쪽에 보여 줄 건수
+  const AUDIT_MAX = 5000;                // 활동 로그 엑셀 최대 건수 (서버와 같은 값)
   const page = { status: 1, users: 1, audit: 1 };   // 화면별 현재 쪽
 
   /** 배열에서 현재 쪽에 해당하는 부분만 잘라 낸다 */
@@ -135,8 +136,11 @@
         <div class="stat"><div class="k">제출률</div><div class="v">${summary.rate}%</div></div>
       </div>
 
-      <p class="small muted" style="text-align:right;margin:6px 2px 0">
-        <span class="mark">※</span> 해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.</p>
+      <div class="hint-row">
+        <span class="small muted">
+          <span class="mark">※</span> 해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.</span>
+        <button class="btn sm dl-btn" id="st-xlsx">⤓ 엑셀 다운로드</button>
+      </div>
 
       ${byOrg.length ? `
       <h3 class="sec-title">기관별 소계</h3>
@@ -189,6 +193,14 @@
         </table>
       </div>
       <div class="pager" id="st-pager"></div>`;
+
+    // 엑셀 내려받기 (화면에 걸어 둔 조건 그대로)
+    $('#st-xlsx').onclick = () => {
+      const p = new URLSearchParams();
+      if ($('#st-week').value) p.set('week_id', $('#st-week').value);
+      if ($('#st-org').value) p.set('org_id', $('#st-org').value);
+      window.WR.downloadFile(`/api/admin/export/status?${p}`, '등록현황.xlsx');
+    };
 
     window.WR.renderPager($('#st-pager'), {
       page: page.status, pages: stPages,
@@ -270,11 +282,16 @@
           </tbody>
         </table>
       </div>
-      <p class="small muted" style="text-align:right;margin:6px 2px 0">
-        <span class="mark">※</span> 주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.
-        (칸의 숫자 = <b>제출 / 대상</b>)</p>`;
+      <div class="hint-row">
+        <span class="small muted">
+          <span class="mark">※</span> 주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.
+          (칸의 숫자 = <b>제출 / 대상</b>)</span>
+        <button class="btn sm dl-btn" id="mx-xlsx">⤓ 엑셀 다운로드</button>
+      </div>`;
 
     $('#mx-n').onchange = () => renderMatrix(Number($('#mx-n').value));
+    $('#mx-xlsx').onclick = () =>
+      window.WR.downloadFile(`/api/admin/export/matrix?weeks=${$('#mx-n').value}`, '주차별현황.xlsx');
   }
 
   // 4. 사용자 관리
@@ -376,7 +393,17 @@
           </tbody>
         </table>
       </div>
+      <div class="hint-row" style="justify-content:flex-end">
+        <button class="btn sm dl-btn" id="u-xlsx">⤓ 엑셀 다운로드</button>
+      </div>
       <div class="pager" id="u-pager"></div>`;
+
+    $('#u-xlsx').onclick = () => {
+      const p = new URLSearchParams();
+      if ($('#u-q').value.trim()) p.set('q', $('#u-q').value.trim());
+      if ($('#u-forg').value) p.set('org_id', $('#u-forg').value);
+      window.WR.downloadFile(`/api/admin/export/users?${p}`, '사용자목록.xlsx');
+    };
 
     window.WR.renderPager($('#u-pager'), {
       page: page.users, pages: uPages,
@@ -606,6 +633,8 @@
     FILE_UPLOAD: '증적자료 첨부', FILE_DELETE: '증적자료 삭제',
     USER_CREATE: '사용자 추가', USER_UPDATE: '사용자 수정',
     USER_DELETE: '사용자 삭제', USER_PASSWORD_RESET: '비밀번호 초기화',
+    EXPORT_STATUS: '등록 현황 엑셀', EXPORT_MATRIX: '주차별 현황 엑셀',
+    EXPORT_USERS: '사용자 목록 엑셀', EXPORT_AUDIT: '활동 로그 엑셀',
     ORG_CREATE: '기관 추가', ORG_UPDATE: '기관 수정', ORG_DELETE: '기관 삭제',
     WEEK_TOGGLE: '주차 마감 전환',
   };
@@ -855,7 +884,18 @@
           </tbody>
         </table>
       </div>
+      <div class="hint-row" style="justify-content:flex-end">
+        <span class="small muted">
+          <span class="mark">※</span> 조회 조건에 맞는 기록을 최신순 최대 ${AUDIT_MAX.toLocaleString()}건까지 내려받습니다.</span>
+        <button class="btn sm dl-btn" id="a-xlsx">⤓ 엑셀 다운로드</button>
+      </div>
       <div class="pager" id="a-pager"></div>`;
+
+    $('#a-xlsx').onclick = () => {
+      const p = new URLSearchParams();
+      ['from', 'to', 'action', 'q'].forEach((k) => { if (auditFilter[k]) p.set(k, auditFilter[k]); });
+      window.WR.downloadFile(`/api/admin/export/audit?${p}`, '활동로그.xlsx');
+    };
 
     window.WR.renderPager($('#a-pager'), {
       page: res.page, pages: aPages,

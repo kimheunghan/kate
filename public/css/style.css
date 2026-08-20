@@ -880,3 +880,9 @@ table.grid td.summary .sum-more { color: var(--text-dim); font-size: 12px; opaci
 
 /* 범례 줄 — 배경 없이 오른쪽에 붙인다 */
 .legend-row { display: flex; justify-content: flex-end; margin: 8px 2px 0; }
+
+/* 안내 문구(왼쪽)와 내려받기 단추(오른쪽)를 한 줄에 */
+.hint-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin: 10px 2px 0;
+}

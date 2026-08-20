@@ -61,6 +61,7 @@ app.use('/api', require('./routes/meta'));
 app.use('/api/reports/excel', require('./routes/excel'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api', require('./routes/files'));
+app.use('/api/admin', require('./routes/admin-export'));   // 엑셀 내려받기 (먼저 붙인다)
 app.use('/api/admin', require('./routes/admin'));
 
 // ---------------------------------------------------------------------
