@@ -334,7 +334,7 @@ router.post('/reset-requests/:id(\\d+)', async (req, res, next) => {
 
     await db.tx(async (client) => {
       await client.query(
-        `UPDATE wr.users SET password_hash = $1, must_change_pw = TRUE WHERE id = $2`,
+        `UPDATE wr.users SET password_hash = $1, must_change_pw = FALSE WHERE id = $2`,
         [auth.hashPassword(password), reqRows[0].user_id]
       );
       await client.query(
@@ -436,7 +436,7 @@ router.post('/users', async (req, res, next) => {
 
     const { rows } = await db.query(
       `INSERT INTO wr.users (username, password_hash, name, email, role, org_id, duty, must_change_pw)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE)
        ON CONFLICT (username) DO NOTHING
        RETURNING id, username, name, email, role, org_id, duty, is_active`,
       [username, auth.hashPassword(password), name, req.body?.email || null, role, orgId,
@@ -544,7 +544,7 @@ router.post('/users/:id(\\d+)/password', async (req, res, next) => {
     const pw = String(req.body?.password || '');
     if (pw.length < 8) return res.status(400).json({ error: '비밀번호는 8자 이상이어야 합니다.' });
     const { rows } = await db.query(
-      `UPDATE wr.users SET password_hash = $1, must_change_pw = TRUE WHERE id = $2 RETURNING username`,
+      `UPDATE wr.users SET password_hash = $1, must_change_pw = FALSE WHERE id = $2 RETURNING username`,
       [auth.hashPassword(pw), Number(req.params.id)]
     );
     if (!rows[0]) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });

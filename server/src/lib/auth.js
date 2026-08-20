@@ -154,11 +154,11 @@ async function ensureAdminAccount() {
   }
   await db.query(
     `INSERT INTO wr.users (username, password_hash, name, role, must_change_pw)
-     VALUES ($1, $2, $3, 'ADMIN', TRUE)
+     VALUES ($1, $2, $3, 'ADMIN', FALSE)
      ON CONFLICT (username) DO NOTHING`,
     [config.bootstrap.adminUsername, hashPassword(pw), config.bootstrap.adminName]
   );
-  console.log(`[auth] 초기 관리자 계정 생성: ${config.bootstrap.adminUsername} (최초 로그인 후 비밀번호 변경 필요)`);
+  console.log(`[auth] 초기 관리자 계정 생성: ${config.bootstrap.adminUsername}`);
 }
 
 module.exports = {

@@ -513,7 +513,7 @@ router.post('/reset-request', rateLimit(5, 10 * 60 * 1000), async (req, res, nex
         );
         // 임시 비밀번호를 실제 계정에 적용 (다음 로그인 시 변경 안내)
         await client.query(
-          `UPDATE wr.users SET password_hash = $1, must_change_pw = TRUE WHERE id = $2`,
+          `UPDATE wr.users SET password_hash = $1, must_change_pw = FALSE WHERE id = $2`,
           [auth.hashPassword(tempPassword), user.id]
         );
         await client.query(

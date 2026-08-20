@@ -31,7 +31,6 @@
         password: $('#password').value,
       }, { allowAnonymous: true });
 
-      if (res.user.must_change_pw) sessionStorage.setItem('wr_force_pw', '1');
       location.href = res.user.role === 'ADMIN' ? '/admin' : '/report';
     } catch (e2) {
       err.textContent = e2.message;

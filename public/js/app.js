@@ -29,14 +29,6 @@
     $('#topbar').innerHTML = window.WR.renderTopbar(state.me, 'report');
     window.WR.bindTopbar();
 
-    if (sessionStorage.getItem('wr_force_pw')) {
-      sessionStorage.removeItem('wr_force_pw');
-      setTimeout(() => {
-        toast('초기 비밀번호입니다. 비밀번호를 변경해 주세요.', true);
-        window.WR.openPasswordModal();
-      }, 400);
-    }
-
     const [weeksRes, orgsRes] = await Promise.all([api.get('/api/weeks'), api.get('/api/orgs')]);
     state.weeks = weeksRes.weeks;
     state.orgs = orgsRes.orgs;
