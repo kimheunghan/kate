@@ -23,6 +23,9 @@
     ['Consolas', 'Consolas'],
   ];
 
+  /** 눈에 보이는 글자가 없는 칸인가 (공백·줄바꿈만 있으면 빈 것으로 본다) */
+  const isBlank = (el) => el.textContent.replace(/[\s\u00a0\u200b]/g, '') === '';
+
   // 글머리표 종류. value 는 CSS list-style-type 값.
   //  브라우저가 그리는 네모(square)는 글자보다 훨씬 작다. 본문에서 손으로
   //  찍는 ■ 와 크기를 맞추려고 글자로 직접 지정한다. 점·원은 기본 그대로.
@@ -244,26 +247,50 @@
         // 들여쓴 줄 끝에서 엔터를 치고 붙여넣으면 통째로 밀려 들어가기 때문이다.
         // 줄 가운데서 엔터를 쳐 글이 나뉘는 경우는 그대로 둔다.
         if (e.key === 'Enter' && !e.shiftKey) {
-          setTimeout(() => this._resetNewLineIndent(), 0);
+          // 빈 글머리표 항목에서 또 엔터를 치면 목록에서 빠져나온다.
+          // (한 번째 엔터는 다음 항목을 만들고, 두 번째 엔터로 목록이 끝난다)
+          const li = this._currentListItem();
+          const leaveList = !!li && isBlank(li);
+          setTimeout(() => this._afterEnter(leaveList), 0);
         }
       });
     }
 
-    /** 방금 엔터로 생긴 빈 줄의 들여쓰기를 없앤다 */
-    _resetNewLineIndent() {
+    /** 커서가 놓인 글머리표 항목 (없으면 null) */
+    _currentListItem() {
       const sel = global.getSelection();
-      if (!sel || !sel.rangeCount) return;
-
+      if (!sel || !sel.rangeCount) return null;
       let node = sel.getRangeAt(0).startContainer;
       if (node.nodeType === 3) node = node.parentNode;
+      if (!node || !node.closest) return null;
+      const li = node.closest('li');
+      return li && this.area.contains(li) ? li : null;
+    }
+
+    /** 엔터를 친 뒤 정리 : 목록 빠져나오기 + 새 줄 들여쓰기 없애기 */
+    _afterEnter(leaveList) {
+      if (leaveList) {
+        const li = this._currentListItem();
+        if (li) {
+          document.execCommand(li.closest('ol') ? 'insertOrderedList' : 'insertUnorderedList');
+        }
+      }
+
+      const sel = global.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      let node = sel.getRangeAt(0).startContainer;
+      if (node.nodeType === 3) node = node.parentNode;
+      if (!node || !node.closest) return;
+
+      // 목록 안이면 들여쓰기가 곧 단계이므로 손대지 않는다
+      if (node.closest('li')) return;
+
       // 편집 영역 바로 아래 칸(문단)까지 올라간다
       while (node && node !== this.area && node.parentNode !== this.area) node = node.parentNode;
       if (!node || node === this.area || !node.style) return;
-
-      // 글머리표 목록은 들여쓰기가 곧 단계이므로 손대지 않는다
-      if (node.tagName === 'UL' || node.tagName === 'OL' || node.closest('ul, ol')) return;
+      if (node.tagName === 'UL' || node.tagName === 'OL') return;
       // 글이 들어 있는 줄(가운데서 나뉜 경우)은 그대로 둔다
-      if (node.textContent.replace(/\u200b|\s|\u00a0/g, '') !== '') return;
+      if (!isBlank(node)) return;
 
       node.style.removeProperty('padding-left');
       node.style.removeProperty('margin-left');
