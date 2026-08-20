@@ -325,26 +325,30 @@ router.get('/export/matrix', async (req, res, next) => {
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('주차별 현황');
-    ws.getColumn(1).width = 24;
-    weeks.forEach((w, i) => { ws.getColumn(i + 2).width = 17; });
+    ws.getColumn(1).width = 26;
+    weeks.forEach((w, i) => { ws.getColumn(i + 2).width = 18; });
 
     const cols = weeks.length + 1;
     let at = putTitle(ws, cols, `최근 ${weeks.length}주차별 주간보고 실적현황`,
       `[ ${weeks[0].label} ~ ${weeks[weeks.length - 1].label} ]`);
 
-    // 범례는 오른쪽 끝에 붙인다
-    const legendRow = ws.getRow(at + 1);
-    [['전원 제출', 'FFE6F6EC'], ['일부 제출', 'FFFFF5E0'], ['제출 없음', 'FFFAFAFA']]
-      .forEach(([label, color], i) => {
-        const c = legendRow.getCell(Math.max(2, cols - 2 + i));
-        c.value = label;
-        c.font = { size: 10 };
-        c.alignment = { horizontal: 'center', vertical: 'middle' };
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
-        c.border = BORDER;
-      });
-    legendRow.height = 18;
-    at += 3;
+    // 범례는 칸을 칠하지 않고 한 줄 글자로 둔다 (■ 색만 다르게)
+    const legendAt = at + 1;
+    ws.mergeCells(legendAt, 1, legendAt, cols);
+    const lg = ws.getCell(legendAt, 1);
+    lg.value = {
+      richText: [
+        { text: '■ ', font: { size: 11, color: { argb: 'FF7DC49A' } } },
+        { text: '전원 제출    ', font: { size: 10, color: { argb: 'FF5D6B7D' } } },
+        { text: '■ ', font: { size: 11, color: { argb: 'FFE9B95C' } } },
+        { text: '일부 제출    ', font: { size: 10, color: { argb: 'FF5D6B7D' } } },
+        { text: '■ ', font: { size: 11, color: { argb: 'FFC9CFD6' } } },
+        { text: '제출 없음', font: { size: 10, color: { argb: 'FF5D6B7D' } } },
+      ],
+    };
+    lg.alignment = { horizontal: 'right', vertical: 'middle' };
+    ws.getRow(legendAt).height = 20;
+    at = legendAt + 2;
 
     // 표 제목 줄 : 주차와 기간을 줄을 나눠 적는다
     const headAt = at;
@@ -354,7 +358,7 @@ router.get('/export/matrix', async (req, res, next) => {
       headRow.getCell(i + 2).value = String(w.label).replace(' (', '\n(').replace('~', '\n~');
     });
     styleHeader(ws, at);
-    headRow.height = 46;
+    headRow.height = 60;
     headRow.eachCell((c) => { c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
     at += 1;
 
@@ -379,7 +383,7 @@ router.get('/export/matrix', async (req, res, next) => {
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         paint(cell, c ? c.submitted : 0, c ? c.total_users : 0);
       });
-      row.height = 34;
+      row.height = 38;
       at += 1;
     });
 
@@ -394,7 +398,7 @@ router.get('/export/matrix', async (req, res, next) => {
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     });
     totalRow.font = { bold: true };
-    totalRow.height = 34;
+    totalRow.height = 38;
     totalRow.eachCell((c) => {
       c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F6FA' } };
     });
