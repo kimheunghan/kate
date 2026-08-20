@@ -510,7 +510,7 @@ function buildReportHtml(report, items, files, { forWord = false, nextWeek = nul
    * 줄머리에 &nbsp; 를 넣으면 Word·브라우저·한글 모두에서 동일하게 보인다.
    * (화면 편집기는 8px 단위 = 공백 2칸)
    */
-  const toDoc = (h) => String(h || '').replace(
+  const toDoc = (h) => String(listsToText(h) || '').replace(
     /<(div|p|li)([^>]*)>/gi,
     (m, tag, attrs) => {
       const px = (/(?:padding|margin)-left\s*:\s*([\d.]+)px/i.exec(attrs) || [])[1];
@@ -667,7 +667,58 @@ ${forWord ? '</div>' : ''}
  * hwp-convert 는 표 칸 안의 <div>/<p> 를 한 문단으로 합쳐 버리므로
  * 줄바꿈은 <br>, 들여쓰기는 앞쪽 &nbsp; 로 바꿔서 넘긴다.
  */
-function toHwpxCell(html) {
+/**
+ * 예전에 목록(<ul>/<ol>)으로 저장된 내용을 줄머리에 기호를 붙인 보통 줄로 바꾼다.
+ * 편집기는 이미 글자 방식으로 바뀌었지만, 저장된 자료에는 아직 목록이 남아 있다.
+ * 그대로 문서로 만들면 목록 태그가 지워지면서 기호까지 사라진다.
+ */
+function listsToText(html) {
+  if (!html || !/<(ul|ol)\b/i.test(html)) return html;
+
+  const MARK = { disc: '•', square: '■', circle: '○', decimal: '' };
+  const px = (style, prop) => {
+    const m = new RegExp(`${prop}\\s*:\\s*([\\d.]+)px`, 'i').exec(style || '');
+    return m ? Number(m[1]) : 0;
+  };
+  const styleOf = (tag) => (/style\s*=\s*"([^"]*)"/i.exec(tag) || [, ''])[1];
+  const markOf = (style, tag) => {
+    const dm = (/data-mk\s*=\s*"([^"]*)"/i.exec(tag) || [, ''])[1];
+    const raw = dm || (/list-style-type\s*:\s*([^;"]+)/i.exec(style) || [, ''])[1] || '';
+    const q = /['"]\s*(\S+)/.exec(raw);
+    if (q) return q[1];
+    return MARK[String(raw).trim()] !== undefined ? MARK[String(raw).trim()] : '•';
+  };
+
+  // 안쪽 목록부터 하나씩 푼다 (목록 안에 목록이 있어도 처리된다)
+  let out = html;
+  for (let guard = 0; guard < 20; guard++) {
+    const m = /<(ul|ol)\b([^>]*)>((?:(?!<(?:ul|ol)\b)[\s\S])*?)<\/\1>/i.exec(out);
+    if (!m) break;
+
+    const [whole, tag, attrs, inner] = m;
+    const ordered = tag.toLowerCase() === 'ol';
+    const listStyle = styleOf(`<x ${attrs}>`);
+    const base = Math.max(0, px(listStyle, 'padding-left') - 24) + px(listStyle, 'margin-left');
+    const listMark = ordered ? '' : markOf(listStyle, attrs);
+
+    let no = 0;
+    const lines = [];
+    const liRe = /<li\b([^>]*)>([\s\S]*?)<\/li>/gi;
+    let li;
+    while ((li = liRe.exec(inner)) !== null) {
+      const liAttrs = li[1];
+      const liStyle = styleOf(`<x ${liAttrs}>`);
+      const pad = base + px(liStyle, 'margin-left') + px(liStyle, 'padding-left');
+      const mark = ordered ? `${++no}.` : markOf(liStyle, liAttrs) || listMark;
+      lines.push(`<div${pad ? ` style="padding-left: ${pad}px"` : ''}>${mark}&nbsp;${li[2]}</div>`);
+    }
+    out = out.slice(0, m.index) + lines.join('') + out.slice(m.index + whole.length);
+  }
+  return out;
+}
+
+function toHwpxCell(raw) {
+  const html = listsToText(raw);
   if (!html) return '';
   const SPACE_PX = 4;                     // 공백 한 칸 폭
   const STEP_PX = SPACE_PX * 2;           // 들여쓰기 한 단계 = 공백 두 칸
