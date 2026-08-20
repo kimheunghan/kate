@@ -132,10 +132,9 @@
     const role = state.me.role;
     const onlyMine = role !== 'ADMIN' && role !== 'ORG_ADMIN';
 
-    const orgFilter = $('#f-org');
-    if (orgFilter && orgFilter.closest('label')) {
-      orgFilter.closest('label').classList.toggle('hidden', role !== 'ADMIN');
-    }
+    // 기관 필터는 전체 관리자만 (기관 관리자는 자기 기관으로 고정되므로 불필요)
+    const orgField = $('#f-org-field');
+    if (orgField) orgField.classList.toggle('hidden', role !== 'ADMIN');
     const note = $('#list-scope-note');
     if (note) {
       note.textContent = onlyMine

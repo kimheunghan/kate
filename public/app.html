@@ -124,13 +124,16 @@
         <div class="spacer"></div>
       </header>
       <div class="body">
-        <div class="row">
-          <label class="field"><span>주차</span><select id="f-week"><option value="">전체</option></select></label>
-          <label class="field"><span>기관</span><select id="f-org"><option value="">전체</option></select></label>
-          <div class="field narrow">
-            <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
-            <button class="btn primary" id="btn-search">조회</button>
-          </div>
+        <div class="search-bar">
+          <label class="sb-field" style="flex:2 1 340px">
+            <span>주차</span>
+            <select id="f-week"><option value="">전체</option></select>
+          </label>
+          <label class="sb-field" id="f-org-field" style="flex:1 1 220px">
+            <span>기관</span>
+            <select id="f-org"><option value="">전체</option></select>
+          </label>
+          <button class="btn primary sb-btn" id="btn-search">조회</button>
         </div>
 
         <div class="table-scroll mt8">
