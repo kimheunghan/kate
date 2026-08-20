@@ -51,7 +51,8 @@ router.get('/status', async (req, res, next) => {
     const { rows } = await db.query(
       `SELECT * FROM wr.v_submission_status
         WHERE ${where.join(' AND ')}
-        ORDER BY sort_order NULLS LAST, org_name, user_name`,
+        -- 총괄관리자를 맨 위에, 나머지는 기관 → 이름(가나다) 순
+        ORDER BY (role = 'ADMIN') DESC, sort_order NULLS LAST, org_name, user_name`,
       params
     );
 
@@ -225,7 +226,8 @@ router.get('/users', async (req, res, next) => {
                OR u.name ILIKE '%' || $2 || '%'
                OR u.username ILIKE '%' || $2 || '%'
                OR u.email ILIKE '%' || $2 || '%')
-        ORDER BY o.sort_order NULLS LAST, o.name, u.name, u.username`,
+        -- 총괄관리자를 맨 위에, 나머지는 기관 → 이름(가나다) 순
+        ORDER BY (u.role = 'ADMIN') DESC, o.sort_order NULLS LAST, o.name, u.name, u.username`,
       [auth.scopeOrg(req.user, req.query.org_id),
        req.query.q ? String(req.query.q).trim() : null]
     );
