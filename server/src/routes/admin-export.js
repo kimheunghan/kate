@@ -20,30 +20,148 @@ router.use(auth.requireAuth, auth.requireAdmin);
 
 const AUDIT_MAX = 5000;          // 활동 로그는 최신 이 건수까지만 내려받는다
 
-/** 제목 줄 꾸미기 (가운데 정렬 · 연노랑 배경 · 굵게) */
-function styleHeader(ws) {
-  const row = ws.getRow(1);
+/** 2026-08-21 01:27:52 형태로 (엑셀에서 24시 41분 처럼 나오지 않게) */
+function stamp(d) {
+  if (!d) return '-';
+  const t = new Date(d);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())} `
+       + `${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`;
+}
+
+/** 동작 코드를 우리말로 (화면과 같은 표기) */
+const ACTION_TEXT = {
+  LOGIN: '로그인', LOGOUT: '로그아웃', LOGIN_FAIL: '로그인 실패',
+  SIGNUP: '회원가입', FIND_ID: '아이디 찾기',
+  PASSWORD_CHANGE: '비밀번호 변경', PROFILE_UPDATE: '내 정보 수정',
+  RESET_REQUEST: '비밀번호 재설정 요청', RESET_DIRECT: '비밀번호 재설정 진행',
+  RESET_COMPLETE: '비밀번호 재설정 완료', RESET_DONE: '비밀번호 재설정 완료',
+  RESET_REJECT: '비밀번호 재설정 반려',
+  RESET_MAIL_SENT: '재설정 메일 발송', RESET_MAIL_FAIL: '재설정 메일 실패',
+  REPORT_SAVE: '보고서 저장', REPORT_UPDATE: '보고서 수정',
+  REPORT_DELETE: '보고서 삭제', REPORT_STATUS: '보고서 상태 변경',
+  REPORT_EXPORT: 'Word 다운로드', REPORT_EXPORT_HWPX: '한글 다운로드',
+  REPORT_EXPORT_HWPX_WEEK: '주차 한글 다운로드',
+  REPORT_EXPORT_HWPX_ALL: '전체 주차 ZIP 다운로드',
+  REPORT_MOVE_ORG: '보고서 기관 이관', REPORT_ORG_CHANGE: '보고서 기관 변경',
+  EXCEL_IMPORT: '엑셀 일괄등록', EXCEL_PREVIEW: '엑셀 미리보기',
+  FILE_UPLOAD: '증적자료 첨부', FILE_DELETE: '증적자료 삭제',
+  USER_CREATE: '사용자 추가', USER_UPDATE: '사용자 수정',
+  USER_DELETE: '사용자 삭제', USER_PASSWORD_RESET: '비밀번호 초기화',
+  ORG_CREATE: '기관 추가', ORG_UPDATE: '기관 수정', ORG_DELETE: '기관 삭제',
+  EXPORT_STATUS: '등록 현황 엑셀', EXPORT_MATRIX: '주차별 현황 엑셀',
+  EXPORT_USERS: '사용자 목록 엑셀', EXPORT_AUDIT: '활동 로그 엑셀',
+};
+
+/**
+ * 시트 맨 위에 제목과 부제를 넣는다.
+ * @returns {number} 다음에 쓸 줄 번호
+ */
+function putTitle(ws, cols, title, subtitle) {
+  const last = String.fromCharCode(64 + cols);          // A, B, C …
+
+  ws.mergeCells(`A1:${last}1`);
+  const t = ws.getCell('A1');
+  t.value = title;
+  t.font = { bold: true, size: 16 };
+  t.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(1).height = 30;
+
+  ws.mergeCells(`A2:${last}2`);
+  const s = ws.getCell('A2');
+  s.value = subtitle;
+  s.font = { size: 11, color: { argb: 'FF5D6B7D' } };
+  s.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(2).height = 20;
+
+  return 3;                                             // 3행은 비워 둔다
+}
+
+/** 요약 상자 (대상 인원 / 제출완료 / 미등록 / 제출률) */
+function putSummary(ws, at, pairs) {
+  const head = ws.getRow(at);
+  const body = ws.getRow(at + 1);
+  pairs.forEach(([k, v], i) => {
+    const hc = head.getCell(i + 1);
+    hc.value = k;
+    hc.font = { bold: true, size: 11 };
+    hc.alignment = { horizontal: 'center', vertical: 'middle' };
+    hc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF3F8' } };
+    hc.border = BORDER;
+
+    const bc = body.getCell(i + 1);
+    bc.value = v;
+    bc.font = { bold: true, size: 14 };
+    bc.alignment = { horizontal: 'center', vertical: 'middle' };
+    bc.border = BORDER;
+  });
+  head.height = 20;
+  body.height = 26;
+  return at + 3;                                        // 한 줄 띄운다
+}
+
+/** 구역 제목 (기관별 소계 …) */
+function putSectionTitle(ws, at, text) {
+  const c = ws.getRow(at).getCell(1);
+  c.value = text;
+  c.font = { bold: true, size: 12, color: { argb: 'FF17497F' } };
+  ws.getRow(at).height = 22;
+  return at + 1;
+}
+
+/** 표 아래 안내 문구 */
+function putNote(ws, at, text) {
+  const c = ws.getRow(at + 1).getCell(1);
+  c.value = `※ ${text}`;
+  c.font = { size: 10, color: { argb: 'FF5D6B7D' } };
+  return at + 2;
+}
+
+/** 색 범례 (전원 제출 / 일부 제출 / 제출 없음) */
+function putLegend(ws, at) {
+  const items = [
+    ['전원 제출', 'FFE6F6EC'],
+    ['일부 제출', 'FFFFF5E0'],
+    ['제출 없음', 'FFFAFAFA'],
+  ];
+  const row = ws.getRow(at);
+  row.getCell(1).value = '범례';
+  row.getCell(1).font = { bold: true, size: 10, color: { argb: 'FF5D6B7D' } };
+  items.forEach(([label, color], i) => {
+    const c = row.getCell(i + 2);
+    c.value = label;
+    c.alignment = { horizontal: 'center', vertical: 'middle' };
+    c.font = { size: 10 };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+    c.border = BORDER;
+  });
+  row.height = 20;
+  return at + 2;
+}
+
+const BORDER = {
+  top: { style: 'thin' }, bottom: { style: 'thin' },
+  left: { style: 'thin' }, right: { style: 'thin' },
+};
+
+/** 표 제목 줄 꾸미기 (가운데 정렬 · 연노랑 배경 · 굵게) */
+function styleHeader(ws, at = 1) {
+  const row = ws.getRow(at);
   row.font = { bold: true, size: 11 };
   row.alignment = { horizontal: 'center', vertical: 'middle' };
   row.height = 22;
   row.eachCell((c) => {
     c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBDD' } };
-    c.border = {
-      top: { style: 'thin' }, bottom: { style: 'thin' },
-      left: { style: 'thin' }, right: { style: 'thin' },
-    };
+    c.border = BORDER;
   });
 }
 
-/** 내용 칸에 테두리 */
-function styleBody(ws) {
+/** 내용 칸에 테두리 (제목 줄 다음부터) */
+function styleBody(ws, from = 2) {
   ws.eachRow((row, n) => {
-    if (n === 1) return;
+    if (n < from) return;
     row.eachCell((c) => {
-      c.border = {
-        top: { style: 'hair' }, bottom: { style: 'hair' },
-        left: { style: 'hair' }, right: { style: 'hair' },
-      };
+      c.border = BORDER;
       c.alignment = { vertical: 'middle', wrapText: true, ...(c.alignment || {}) };
     });
   });
@@ -98,32 +216,52 @@ router.get('/export/status', async (req, res, next) => {
       params
     );
 
+    const tot = rows.reduce((a, r) => ({ t: a.t + r.total_users, s: a.s + r.submitted }), { t: 0, s: 0 });
+
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('등록 현황');
-    ws.columns = [
-      { header: '기관', key: 'org', width: 28 },
-      { header: '대상 인원', key: 'total', width: 12 },
-      { header: '제출', key: 'sub', width: 10 },
-      { header: '미등록', key: 'none', width: 10 },
-      { header: '제출률', key: 'rate', width: 10 },
-    ];
-    rows.forEach((r) => ws.addRow({
-      org: r.org_name || '(소속없음)',
-      total: r.total_users,
-      sub: r.submitted,
-      none: r.total_users - r.submitted,
-      rate: r.total_users ? `${Math.round((r.submitted / r.total_users) * 100)}%` : '0%',
-    }));
-    const tot = rows.reduce((a, r) => ({ t: a.t + r.total_users, s: a.s + r.submitted }), { t: 0, s: 0 });
-    const last = ws.addRow({
-      org: '전체', total: tot.t, sub: tot.s, none: tot.t - tot.s,
-      rate: tot.t ? `${Math.round((tot.s / tot.t) * 100)}%` : '0%',
+    [28, 12, 10, 10, 10].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+    let at = putTitle(ws, 5, '해당 주차 주간보고 실적현황', week.label);
+    at = putSummary(ws, at + 1, [
+      ['대상 인원', tot.t],
+      ['제출완료', tot.s],
+      ['미등록', tot.t - tot.s],
+      ['제출률', tot.t ? `${Math.round((tot.s / tot.t) * 100)}%` : '0%'],
+    ]);
+
+    at = putSectionTitle(ws, at, '기관별 소계');
+    const headAt = at;
+    ws.getRow(at).values = ['기관', '대상 인원', '제출', '미등록', '제출률'];
+    styleHeader(ws, at);
+    at += 1;
+
+    rows.forEach((r) => {
+      ws.getRow(at).values = [
+        r.org_name || '(소속없음)',
+        r.total_users,
+        r.submitted,
+        r.total_users - r.submitted,
+        r.total_users ? `${Math.round((r.submitted / r.total_users) * 100)}%` : '0%',
+      ];
+      at += 1;
     });
-    last.font = { bold: true };
-    ['total', 'sub', 'none', 'rate'].forEach((k) => {
-      ws.getColumn(k).alignment = { horizontal: 'center', vertical: 'middle' };
+    const lastRow = ws.getRow(at);
+    lastRow.values = ['전체', tot.t, tot.s, tot.t - tot.s,
+      tot.t ? `${Math.round((tot.s / tot.t) * 100)}%` : '0%'];
+    lastRow.font = { bold: true };
+    lastRow.eachCell((c) => {
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F6FA' } };
     });
-    styleHeader(ws); styleBody(ws);
+
+    // 숫자 칸은 가운데로
+    for (let r = headAt; r <= at; r++) {
+      for (let c = 2; c <= 5; c++) {
+        ws.getRow(r).getCell(c).alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    }
+    styleBody(ws, headAt);
+    putNote(ws, at, '해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.');
 
     const name = `${safeName(`등록현황_${week.label.replace(/\//g, '.')}`)}.xlsx`;
     await audit.log(req, 'EXPORT_STATUS', { detail: name });
@@ -161,30 +299,59 @@ router.get('/export/matrix', async (req, res, next) => {
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('주차별 현황');
-    ws.columns = [
-      { header: '기관', key: 'org', width: 26 },
-      ...weeks.map((w, i) => ({ header: w.label, key: `w${i}`, width: 18 })),
-    ];
+    ws.getColumn(1).width = 26;
+    weeks.forEach((w, i) => { ws.getColumn(i + 2).width = 16; });
+
+    const cols = weeks.length + 1;
+    let at = putTitle(ws, cols, '주차별 주간보고 실적현황',
+      `최근 ${weeks.length}주 · ${weeks[0].label} ~ ${weeks[weeks.length - 1].label}`);
+    at = putLegend(ws, at + 1);
+
+    // 표 제목 줄
+    const headAt = at;
+    ws.getRow(at).values = ['기관', ...weeks.map((w) => w.label)];
+    styleHeader(ws, at);
+    ws.getRow(at).height = 34;
+    at += 1;
+
+    /** 제출률에 따라 칸 색을 칠한다 (화면과 같은 기준) */
+    const paint = (cell, sub, total) => {
+      if (!total) { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAFAFA' } }; return; }
+      const rate = sub / total;
+      const color = rate >= 1 ? 'FFE6F6EC' : (rate > 0 ? 'FFFFF5E0' : 'FFFAFAFA');
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+    };
+
     orgs.forEach((o) => {
-      const row = { org: o.name };
+      const row = ws.getRow(at);
+      row.getCell(1).value = o.name;
       weeks.forEach((w, i) => {
         const c = find(w.id, o.name);
-        row[`w${i}`] = c ? `${c.submitted} / ${c.total_users}` : '-';
+        const cell = row.getCell(i + 2);
+        cell.value = c ? `${c.submitted} / ${c.total_users}` : '-';
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        paint(cell, c ? c.submitted : 0, c ? c.total_users : 0);
       });
-      ws.addRow(row);
+      at += 1;
     });
-    const totalRow = { org: '전체' };
+
+    const totalRow = ws.getRow(at);
+    totalRow.getCell(1).value = '전체';
     weeks.forEach((w, i) => {
       const list = cells.filter((c) => c.week_id === w.id);
-      const s = list.reduce((a, c) => a + c.submitted, 0);
-      const t = list.reduce((a, c) => a + c.total_users, 0);
-      totalRow[`w${i}`] = `${s} / ${t}`;
+      const sub = list.reduce((a, c) => a + c.submitted, 0);
+      const tot = list.reduce((a, c) => a + c.total_users, 0);
+      const cell = totalRow.getCell(i + 2);
+      cell.value = `${sub} / ${tot}`;
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
     });
-    ws.addRow(totalRow).font = { bold: true };
-    weeks.forEach((w, i) => {
-      ws.getColumn(`w${i}`).alignment = { horizontal: 'center', vertical: 'middle' };
+    totalRow.font = { bold: true };
+    totalRow.eachCell((c) => {
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F6FA' } };
     });
-    styleHeader(ws); styleBody(ws);
+
+    styleBody(ws, headAt);
+    putNote(ws, at, '주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다. (칸의 숫자 = 제출 / 대상)');
 
     const name = `주차별현황_최근${n}주.xlsx`;
     await audit.log(req, 'EXPORT_MATRIX', { detail: name });
@@ -220,29 +387,34 @@ router.get('/export/users', async (req, res, next) => {
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('사용자 목록');
-    ws.columns = [
-      { header: '기관', key: 'org', width: 26 },
-      { header: '이름', key: 'name', width: 14 },
-      { header: '아이디', key: 'id', width: 18 },
-      { header: '담당 역할', key: 'duty', width: 14 },
-      { header: '권한', key: 'role', width: 14 },
-      { header: '상태', key: 'state', width: 10 },
-      { header: '최근 로그인', key: 'login', width: 20 },
-      { header: '가입일', key: 'created', width: 20 },
-    ];
-    const fmt = (d) => (d ? new Date(d).toLocaleString('ko-KR', { hour12: false }) : '-');
-    rows.forEach((u) => ws.addRow({
-      org: u.org_name || '-', name: u.name, id: u.username,
-      duty: DUTY[u.duty] || '-', role: ROLE[u.role] || u.role,
-      state: u.approval_status === 'PENDING' ? '승인대기'
-        : u.approval_status === 'REJECTED' ? '반려'
-          : (u.is_active ? '활성' : '중지'),
-      login: fmt(u.last_login_at), created: fmt(u.created_at),
-    }));
-    ['duty', 'role', 'state'].forEach((k) => {
-      ws.getColumn(k).alignment = { horizontal: 'center', vertical: 'middle' };
+    [26, 14, 18, 14, 14, 10, 20, 20].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+    const cond = [`${rows.length}명`];
+    if (req.query.q) cond.push(`검색어 "${String(req.query.q).trim()}"`);
+    let at = putTitle(ws, 8, '사용자 목록', cond.join('  ·  '));
+    at += 1;
+
+    const headAt = at;
+    ws.getRow(at).values = ['기관', '이름', '아이디', '담당 역할', '권한', '상태', '최근 로그인', '가입일'];
+    styleHeader(ws, at);
+    at += 1;
+
+    rows.forEach((u) => {
+      const row = ws.getRow(at);
+      row.values = [
+        u.org_name || '-', u.name, u.username,
+        DUTY[u.duty] || '-', ROLE[u.role] || u.role,
+        u.approval_status === 'PENDING' ? '승인대기'
+          : u.approval_status === 'REJECTED' ? '반려'
+            : (u.is_active ? '활성' : '중지'),
+        stamp(u.last_login_at), stamp(u.created_at),
+      ];
+      [3, 4, 5, 6, 7, 8].forEach((c) => {
+        row.getCell(c).alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+      at += 1;
     });
-    styleHeader(ws); styleBody(ws);
+    styleBody(ws, headAt);
 
     const name = `사용자목록_${rows.length}명.xlsx`;
     await audit.log(req, 'EXPORT_USERS', { detail: name });
@@ -286,23 +458,43 @@ router.get('/export/audit', async (req, res, next) => {
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('활동 로그');
-    ws.columns = [
-      { header: '일시', key: 'at', width: 20 },
-      { header: '사용자ID', key: 'id', width: 16 },
-      { header: '사용자', key: 'name', width: 14 },
-      { header: '동작', key: 'action', width: 22 },
-      { header: '내용', key: 'detail', width: 50 },
-      { header: 'IP', key: 'ip', width: 16 },
-    ];
-    rows.forEach((l) => ws.addRow({
-      at: new Date(l.created_at).toLocaleString('ko-KR', { hour12: false }),
-      id: l.username || '(비로그인)',
-      name: l.user_name || '(비로그인)',
-      action: l.action,
-      detail: l.detail || '',
-      ip: l.ip || '-',
-    }));
-    styleHeader(ws); styleBody(ws);
+    [20, 16, 14, 24, 20, 46, 16].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+    // 조회 조건을 부제로 적는다
+    const cond = [];
+    cond.push(req.query.from || req.query.to
+      ? `기간 ${String(req.query.from || '처음').replace('T', ' ')} ~ ${String(req.query.to || '지금').replace('T', ' ')}`
+      : '기간 전체');
+    if (req.query.action) cond.push(`행위 ${ACTION_TEXT[req.query.action] || req.query.action}`);
+    if (req.query.q) cond.push(`검색어 "${String(req.query.q).trim()}"`);
+    cond.push(`${rows.length.toLocaleString()}건`);
+
+    let at = putTitle(ws, 7, '활동 로그', cond.join('  ·  '));
+    at += 1;
+
+    const headAt = at;
+    ws.getRow(at).values = ['일시', '사용자ID', '사용자', '동작', '행위', '내용', 'IP'];
+    styleHeader(ws, at);
+    at += 1;
+
+    rows.forEach((l) => {
+      const row = ws.getRow(at);
+      row.values = [
+        stamp(l.created_at),
+        l.username || '(비로그인)',
+        l.user_name || '(비로그인)',
+        l.action,
+        ACTION_TEXT[l.action] || '-',
+        l.detail || '',
+        l.ip || '-',
+      ];
+      [1, 2, 3, 5, 7].forEach((c) => {
+        row.getCell(c).alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+      at += 1;
+    });
+    styleBody(ws, headAt);
+    putNote(ws, at, `조회 조건에 맞는 기록을 최신순 최대 ${AUDIT_MAX.toLocaleString()}건까지 내려받습니다.`);
 
     const name = `활동로그_${rows.length}건.xlsx`;
     await audit.log(req, 'EXPORT_AUDIT', { detail: `${name} (최대 ${limit}건)` });

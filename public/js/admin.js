@@ -393,10 +393,12 @@
           </tbody>
         </table>
       </div>
-      <div class="hint-row" style="justify-content:flex-end">
-        <button class="btn sm dl-btn" id="u-xlsx">⤓ 엑셀 다운로드</button>
-      </div>
-      <div class="pager" id="u-pager"></div>`;
+      <div class="pager-row">
+        <div class="pager" id="u-pager"></div>
+        <span class="pager-side">
+          <button class="btn sm dl-btn" id="u-xlsx">⤓ 엑셀 다운로드</button>
+        </span>
+      </div>`;
 
     $('#u-xlsx').onclick = () => {
       const p = new URLSearchParams();
@@ -884,12 +886,14 @@
           </tbody>
         </table>
       </div>
-      <div class="hint-row" style="justify-content:flex-end">
-        <span class="small muted">
-          <span class="mark">※</span> 조회 조건에 맞는 기록을 최신순 최대 ${AUDIT_MAX.toLocaleString()}건까지 내려받습니다.</span>
-        <button class="btn sm dl-btn" id="a-xlsx">⤓ 엑셀 다운로드</button>
-      </div>
-      <div class="pager" id="a-pager"></div>`;
+      <div class="pager-row">
+        <div class="pager" id="a-pager"></div>
+        <span class="pager-side">
+          <span class="small muted">
+            <span class="mark">※</span> 최신순 최대 ${AUDIT_MAX.toLocaleString()}건까지 내려받습니다.</span>
+          <button class="btn sm dl-btn" id="a-xlsx">⤓ 엑셀 다운로드</button>
+        </span>
+      </div>`;
 
     $('#a-xlsx').onclick = () => {
       const p = new URLSearchParams();
