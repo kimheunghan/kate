@@ -556,7 +556,7 @@
                 <td>${esc(l.username || '-')}</td>
                 <td>${esc(l.user_name || '-')}</td>
                 <td class="small">${esc(l.action)}</td>
-                <td class="small">${esc(l.detail || '')}</td>
+                <td class="small">${esc(l.detail || l.action)}</td>
                 <td class="small muted">${esc(l.ip || '-')}</td>
               </tr>`).join('') : '<tr><td colspan="6" class="empty">기록이 없습니다.</td></tr>'}
           </tbody>
