@@ -9,9 +9,10 @@
 
   /** 담당 역할 표기 */
   const DUTY_LABEL = { LEAD: '총괄책임자', MANAGER: '실무책임자', RESEARCHER: '참여연구원' };
+  // 담당 역할은 반드시 선택해야 한다. 빈 항목은 고르라는 안내일 뿐 저장되지 않는다.
   const dutyOptions = (sel) => ['', 'LEAD', 'MANAGER', 'RESEARCHER']
     .map((v) => `<option value="${v}" ${sel === v || (!sel && !v) ? 'selected' : ''}>${
-      v ? DUTY_LABEL[v] : '선택 안 함'}</option>`).join('');
+      v ? DUTY_LABEL[v] : '선택하세요'}</option>`).join('');
   const body = () => $('#tab-body');
 
   async function init() {
@@ -251,6 +252,7 @@
     const orgOpts = orgsRes.orgs.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
 
     body().innerHTML = `
+      <h3 class="sec-title">사용자 추가</h3>
       <div class="search-bar">
         <label class="sb-field" style="flex:1 1 140px">
           <span>아이디</span><input type="text" id="u-username" placeholder="영문/숫자 4자 이상">
@@ -356,7 +358,8 @@
         !payload.name ? ['#u-name', '이름을 입력하세요.'] :
         !payload.password ? ['#u-pw', '초기 비밀번호를 입력하세요.'] :
         payload.password.length < 8 ? ['#u-pw', '초기 비밀번호는 8자 이상이어야 합니다.'] :
-        (payload.role !== 'ADMIN' && !payload.org_id) ? ['#u-org', '기관을 선택하세요.'] : null;
+        (payload.role !== 'ADMIN' && !payload.org_id) ? ['#u-org', '기관을 선택하세요.'] :
+        !payload.duty ? ['#u-duty', '담당 역할을 선택하세요.'] : null;
 
       if (problem) {
         toast(problem[1], true);
@@ -493,6 +496,12 @@
             `업무·첨부는 어느 쪽이든 삭제되지 않습니다.`
           );
         }
+      }
+
+      if (!payload.duty) {
+        toast('담당 역할을 선택하세요.', true);
+        $('#e-duty', back).focus();
+        return;
       }
 
       const newPw = $('#e-pw', back).value.trim();

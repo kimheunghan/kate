@@ -417,6 +417,9 @@ router.post('/users', async (req, res, next) => {
     if (!password) return res.status(400).json({ error: '초기 비밀번호를 입력하세요.' });
     if (password.length < 8) return res.status(400).json({ error: '초기 비밀번호는 8자 이상이어야 합니다.' });
     if (role !== 'ADMIN' && !orgId) return res.status(400).json({ error: '기관을 선택하세요.' });
+    if (!['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty)) {
+      return res.status(400).json({ error: '담당 역할을 선택하세요.' });
+    }
 
     // 같은 기관 동명이인 확인 (allow_duplicate_name 이 true 면 그대로 진행)
     if (orgId && req.body?.allow_duplicate_name !== true) {
@@ -435,7 +438,7 @@ router.post('/users', async (req, res, next) => {
       `INSERT INTO wr.users (username, password_hash, name, email, role, org_id, duty, must_change_pw)
        VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
        ON CONFLICT (username) DO NOTHING
-       RETURNING id, username, name, email, role, org_id, is_active`,
+       RETURNING id, username, name, email, role, org_id, duty, is_active`,
       [username, auth.hashPassword(password), name, req.body?.email || null, role, orgId,
        ['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty) ? req.body.duty : null]
     );
@@ -491,9 +494,13 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
     }
 
     const DUTIES = ['LEAD', 'MANAGER', 'RESEARCHER'];
-    const duty = Object.prototype.hasOwnProperty.call(req.body || {}, 'duty')
-      ? (DUTIES.includes(req.body.duty) ? req.body.duty : null)
-      : undefined;
+    let duty;
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'duty')) {
+      if (!DUTIES.includes(req.body.duty)) {
+        return res.status(400).json({ error: '담당 역할을 선택하세요.' });
+      }
+      duty = req.body.duty;
+    }
 
     const { rows } = await db.query(
       `UPDATE wr.users
