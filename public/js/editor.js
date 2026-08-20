@@ -71,6 +71,7 @@
   }
 
   /** 다음 줄에 이어 붙일 기호. 번호면 하나 올린다. */
+  const INDENT_SPACES = 2;               // 들여쓰기 한 단계 = 공백 두 칸
   const NB = '\u00a0';                    // 줄 끝에서도 지워지지 않는 공백
 
   function nextMarker(mark) {
@@ -832,7 +833,8 @@
       ed.area.focus();
       ed.restoreRange();
 
-      const step = this._spaceWidth(ed);
+      // 한 번에 공백 두 칸씩 민다. 한 칸(약 4px)씩이면 눌러도 티가 나지 않는다.
+      const step = this._spaceWidth(ed) * INDENT_SPACES;
 
       // 한 칸 미는 공통 처리
       const shift = (el, prop) => {
