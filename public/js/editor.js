@@ -24,7 +24,9 @@
   ];
 
   // 글머리표 종류. value 는 CSS list-style-type 값.
-  //  - 'dash' 는 CSS 문자열 카운터( '- ' )로 처리한다.
+  //  브라우저가 그리는 네모(square)는 글자보다 훨씬 작다. 본문에서 손으로
+  //  찍는 ■ 와 크기를 맞추려고 글자로 직접 지정한다. 점·원은 기본 그대로.
+  const BULLET_CHAR = { square: '■', dash: '−' };
   const BULLETS = [
     ['',        '글머리표'],
     ['disc',    '•  점'],
@@ -627,8 +629,9 @@
       }
 
       if (list) {
-        // 대시는 CSS 문자열 카운터로 표현한다
-        list.style.listStyleType = kind === 'dash' ? "'−  '" : kind;
+        // 기호는 글자로 지정해 본문 글씨와 같은 크기로 보이게 한다
+        const ch = BULLET_CHAR[kind];
+        list.style.listStyleType = ch ? `'${ch}  '` : kind;
         list.style.paddingLeft = '24px';
       }
       ed.touch();
