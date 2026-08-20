@@ -716,8 +716,9 @@ table.grid td.summary {
    (제한이 없으면 검색줄 전체를 차지해 기관이 붙어 버린다) */
 .search-bar .sb-week { max-width: 62%; }
 
-/* 검색줄에서 오른쪽 끝으로 밀어 붙이는 항목 (예: 기관) */
-.search-bar .sb-right { margin-left: auto; text-align: right; }
-.search-bar .sb-right > span { text-align: right; }
-.search-bar .sb-right .sb-static { justify-content: flex-end; }
+/* 검색줄에서 오른쪽 끝으로 밀어 붙이는 항목 (예: 기관)
+   블록만 오른쪽으로 보내고, 그 안의 라벨·값은 왼쪽 정렬로 맞춘다. */
+.search-bar .sb-right { margin-left: auto; text-align: left; }
+.search-bar .sb-right > span { text-align: left; }
+.search-bar .sb-right .sb-static { justify-content: flex-start; }
 .search-bar .sb-right > select { min-width: 200px; }
