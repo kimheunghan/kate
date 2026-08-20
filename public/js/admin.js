@@ -447,6 +447,14 @@
           <label class="field"><span>담당 역할</span>
             <select id="e-duty">${dutyOptions(u.duty || '')}</select>
           </label>
+          <label class="field"><span>비밀번호 재설정</span>
+            <input type="text" id="e-pw" autocomplete="off" data-lpignore="true"
+                   placeholder="변경할 때만 입력 (8자 이상)">
+          </label>
+          <p class="small muted" style="margin:-6px 0 12px">
+            입력하면 그 값으로 바뀌며, 본인이 첫 로그인 시 변경 안내를 받습니다.
+            비워 두면 기존 비밀번호가 유지됩니다.
+          </p>
           <label class="field"><span>권한</span>
             <select id="e-role">
               <option value="USER"      ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
@@ -492,12 +500,31 @@
         }
       }
 
+      const newPw = $('#e-pw', back).value.trim();
+      if (newPw && newPw.length < 8) {
+        toast('비밀번호는 8자 이상이어야 합니다.', true);
+        $('#e-pw', back).focus();
+        return;
+      }
+
       try {
         const res = await api.put(`/api/admin/users/${u.id}`, payload);
+
+        // 비밀번호는 별도 엔드포인트에서 처리한다 (해싱·변경 안내 플래그 포함)
+        if (newPw) {
+          await api.post(`/api/admin/users/${u.id}/password`, { password: newPw });
+        }
+
         close();
-        toast(res.moved_reports
-          ? `저장되었습니다. 보고서 ${res.moved_reports}건을 함께 옮겼습니다.`
-          : '저장되었습니다.');
+        const parts = ['저장되었습니다.'];
+        if (res.moved_reports) parts.push(`보고서 ${res.moved_reports}건을 함께 옮겼습니다.`);
+        if (newPw) parts.push('비밀번호가 변경되었습니다.');
+        toast(parts.join(' '));
+
+        if (newPw) {
+          alert(`"${u.name}" 님의 비밀번호를 바꿨습니다.\n\n    ${newPw}\n\n` +
+                `본인에게 전달하세요. 첫 로그인 시 변경 안내가 표시됩니다.`);
+        }
         renderUsers();
       } catch (e) { toast(e.message, true); }
     };
