@@ -576,6 +576,15 @@ h3.sec-title {
 }
 h3.sec-title:first-child { margin-top: 4px; }
 
+/* 목록 제목(건수)과 쪽 이동을 표 바로 위 한 줄에 둔다.
+   밑줄은 관리자 화면의 구역 제목과 같은 모양이 되도록 줄 전체에 긋는다. */
+.list-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 10px;
+  margin: 22px 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--primary);
+}
+.list-head h3.sec-title { margin: 0; padding: 0; border-bottom: 0; }
+.list-head #list-pager { display: flex; gap: 6px; align-items: center; }
+
 /* 체크박스 한 줄 */
 label.check {
   display: flex; align-items: center; gap: 7px;

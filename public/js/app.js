@@ -586,6 +586,7 @@
     if (!res.reports.length) {
       const cols = document.querySelectorAll('#tab-list thead th:not(.hidden)').length || 9;
       tbody.innerHTML = `<tr><td colspan="${cols}" class="empty">조회된 보고서가 없습니다.</td></tr>`;
+      $('#list-count').textContent = '보고서 목록 (총 0건)';
       $('#list-pager').innerHTML = '';
       return;
     }
@@ -626,9 +627,10 @@
     applyListScopeUi();
 
     const pages = Math.ceil(res.total / res.size);
-    $('#list-pager').innerHTML = pages <= 1 ? `<span class="small muted">총 ${res.total}건</span>` : `
+    $('#list-count').textContent = `보고서 목록 (총 ${res.total}건)`;
+    $('#list-pager').innerHTML = pages <= 1 ? '' : `
       <button class="btn sm" ${res.page <= 1 ? 'disabled' : ''} id="pg-prev">이전</button>
-      <span class="small muted">${res.page} / ${pages} (총 ${res.total}건)</span>
+      <span class="small muted">${res.page} / ${pages}</span>
       <button class="btn sm" ${res.page >= pages ? 'disabled' : ''} id="pg-next">다음</button>`;
     if ($('#pg-prev')) $('#pg-prev').onclick = () => searchList(res.page - 1);
     if ($('#pg-next')) $('#pg-next').onclick = () => searchList(res.page + 1);
