@@ -588,8 +588,57 @@
     WEEK_TOGGLE: '주차 마감 전환',
   };
 
+  // 활동 로그의 기간 고르기.
+  //  월·주·일 단위를 한 번에 고를 수 있게 미리 담아 둔다.
+  //  '직접 지정' 을 고르면 시각까지 직접 적을 수 있다.
+  const RANGE_LABEL = {
+    today: '오늘', yesterday: '어제',
+    d7: '최근 7일', d30: '최근 30일',
+    week: '이번 주', lastweek: '지난 주',
+    month: '이번 달', lastmonth: '지난 달',
+    custom: '직접 지정',
+  };
+
+  /** 두 자리로 맞춘다 */
+  const p2 = (n) => String(n).padStart(2, '0');
+  /** 날짜를 입력칸에 넣을 모양(YYYY-MM-DDTHH:MM)으로 */
+  const stamp = (d, h, m) =>
+    `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(h)}:${p2(m)}`;
+
+  /** 고른 단위에 맞는 시작·끝 시각을 만든다 */
+  function rangeOf(kind) {
+    const now = new Date();
+    const day = (n) => { const d = new Date(now); d.setDate(d.getDate() + n); return d; };
+    const s = (d) => stamp(d, 0, 0);
+    const e = (d) => stamp(d, 23, 59);
+
+    switch (kind) {
+      case 'today':     return { from: s(now), to: e(now) };
+      case 'yesterday': return { from: s(day(-1)), to: e(day(-1)) };
+      case 'd7':        return { from: s(day(-6)), to: e(now) };
+      case 'd30':       return { from: s(day(-29)), to: e(now) };
+      case 'week': {    // 월요일 시작
+        const back = (now.getDay() + 6) % 7;
+        return { from: s(day(-back)), to: e(now) };
+      }
+      case 'lastweek': {
+        const back = (now.getDay() + 6) % 7 + 7;
+        const start = day(-back);
+        const end = new Date(start); end.setDate(end.getDate() + 6);
+        return { from: s(start), to: e(end) };
+      }
+      case 'month':     return { from: s(new Date(now.getFullYear(), now.getMonth(), 1)), to: e(now) };
+      case 'lastmonth': {
+        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const end = new Date(now.getFullYear(), now.getMonth(), 0);
+        return { from: s(start), to: e(end) };
+      }
+      default:          return { from: '', to: '' };
+    }
+  }
+
   // 활동 로그 검색 조건 (화면을 다시 그려도 유지된다)
-  const auditFilter = { from: '', to: '', action: '', q: '' };
+  const auditFilter = { range: '', from: '', to: '', action: '', q: '' };
 
   async function renderAudit() {
     const q = new URLSearchParams({ page: page.audit, size: PAGE_SIZE });
@@ -601,13 +650,21 @@
 
     body().innerHTML = `
       <div class="search-bar">
-        <label class="sb-field" style="flex:0 0 165px">
-          <span>시작일</span>
-          <input type="date" id="al-from" value="${esc(auditFilter.from)}">
+        <label class="sb-field" style="flex:0 0 130px">
+          <span>기간</span>
+          <select id="al-range">
+            <option value="">전체</option>
+            ${Object.entries(RANGE_LABEL).map(([k, v]) =>
+              `<option value="${k}" ${auditFilter.range === k ? 'selected' : ''}>${v}</option>`).join('')}
+          </select>
         </label>
-        <label class="sb-field" style="flex:0 0 165px">
-          <span>종료일</span>
-          <input type="date" id="al-to" value="${esc(auditFilter.to)}">
+        <label class="sb-field" style="flex:0 0 205px">
+          <span>시작</span>
+          <input type="datetime-local" id="al-from" value="${esc(auditFilter.from)}">
+        </label>
+        <label class="sb-field" style="flex:0 0 205px">
+          <span>종료</span>
+          <input type="datetime-local" id="al-to" value="${esc(auditFilter.to)}">
         </label>
         <label class="sb-field" style="flex:0 0 190px">
           <span>행위</span>
@@ -670,7 +727,28 @@
     };
     $('#al-search').onclick = runSearch;
     $('#al-action').onchange = runSearch;
-    ['#al-from', '#al-to'].forEach((s) => { $(s).onchange = runSearch; });
+
+    // 기간을 고르면 시작·종료가 자동으로 채워지고 바로 조회한다
+    $('#al-range').onchange = () => {
+      const kind = $('#al-range').value;
+      auditFilter.range = kind;
+      if (kind && kind !== 'custom') {
+        const r = rangeOf(kind);
+        auditFilter.from = r.from;
+        auditFilter.to = r.to;
+      } else if (!kind) {
+        auditFilter.from = '';
+        auditFilter.to = '';
+      }
+      auditFilter.action = $('#al-action').value;
+      auditFilter.q = $('#al-q').value.trim();
+      page.audit = 1;
+      renderAudit();
+    };
+    // 시각을 직접 고치면 '직접 지정' 으로 바뀐다
+    ['#al-from', '#al-to'].forEach((s) => {
+      $(s).onchange = () => { auditFilter.range = 'custom'; runSearch(); };
+    });
     $('#al-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
     $('#al-reset').onclick = () => {
       Object.keys(auditFilter).forEach((k) => { auditFilter[k] = ''; });

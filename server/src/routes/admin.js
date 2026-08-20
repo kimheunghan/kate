@@ -644,8 +644,11 @@ router.get('/audit', adminOnly, async (req, res, next) => {
     const params = [];
     const add = (sql, v) => { params.push(v); where.push(sql.replace('$$', `$${params.length}`)); };
 
-    if (req.query.from) add('a.created_at >= $$::date', String(req.query.from));
-    if (req.query.to)   add('a.created_at < ($$::date + 1)', String(req.query.to));
+    // 날짜만 오면 그날 처음·끝으로 넓힌다. 시각까지 오면 그대로 쓴다.
+    const asStart = (v) => (String(v).includes('T') ? String(v) : `${v}T00:00:00`);
+    const asEnd   = (v) => (String(v).includes('T') ? String(v) : `${v}T23:59:59`);
+    if (req.query.from) add('a.created_at >= $$::timestamptz', asStart(req.query.from));
+    if (req.query.to)   add('a.created_at <= $$::timestamptz', asEnd(req.query.to));
     if (req.query.action) add('a.action = $$', String(req.query.action));
     if (req.query.q) {
       const kw = `%${String(req.query.q).trim()}%`;
