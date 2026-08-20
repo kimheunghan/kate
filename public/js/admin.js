@@ -135,9 +135,8 @@
         <div class="stat"><div class="k">제출률</div><div class="v">${summary.rate}%</div></div>
       </div>
 
-      <div class="toolbar-hint">
-        <span><span class="mark">※</span> 해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.</span>
-      </div>
+      <p class="small muted" style="text-align:right;margin:6px 2px 0">
+        <span class="mark">※</span> 해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.</p>
 
       ${byOrg.length ? `
       <h3 class="sec-title">기관별 소계</h3>
