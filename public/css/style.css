@@ -611,7 +611,6 @@ h3.sec-title:first-child { margin-top: 4px; }
   background: var(--primary); border-color: var(--primary); color: #fff;
 }
 .btn.dl-btn .dl-ico { font-size: 15px; line-height: 1; margin-top: -1px; }
-.list-head #list-pager { display: flex; gap: 6px; align-items: center; }
 
 /* 쪽 이동 — 표 아래 가운데 */
 .pager { display: flex; gap: 4px; align-items: center; justify-content: center; margin-top: 12px; }

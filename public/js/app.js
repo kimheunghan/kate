@@ -657,7 +657,6 @@
       const cols = document.querySelectorAll('#tab-list thead th:not(.hidden)').length || 9;
       tbody.innerHTML = `<tr><td colspan="${cols}" class="empty">조회된 보고서가 없습니다.</td></tr>`;
       $('#list-count').textContent = '보고서 목록 (총 0건)';
-      $('#list-pager').innerHTML = '';
       $('#list-pager-bottom').innerHTML = '';
       return;
     }
@@ -699,8 +698,7 @@
 
     const pages = Math.ceil(res.total / res.size);
     $('#list-count').textContent = `보고서 목록 (총 ${res.total}건)`;
-    $('#list-pager').innerHTML = pages <= 1 ? '' : `<span class="small muted">${res.page} / ${pages}</span>`;
-    // 쪽 이동은 표 아래 가운데
+    // 쪽 이동은 표 아래 가운데 (몇 쪽인지도 거기 나온다)
     window.WR.renderPager($('#list-pager-bottom'), {
       page: res.page, pages, onGo: (n) => searchList(n),
     });
