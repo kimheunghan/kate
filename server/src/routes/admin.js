@@ -217,7 +217,7 @@ router.get('/users', async (req, res, next) => {
   try {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.name, u.email, u.phone, u.role, u.org_id, u.is_active,
-              u.must_change_pw, u.approval_status, u.last_login_at, u.created_at, o.name AS org_name,
+              u.must_change_pw, u.approval_status, u.duty, u.last_login_at, u.created_at, o.name AS org_name,
               (SELECT count(*)::int FROM wr.reports r
                 WHERE r.author_id = u.id AND r.org_id = u.org_id) AS report_count
          FROM wr.users u LEFT JOIN wr.organizations o ON o.id = u.org_id
@@ -227,7 +227,8 @@ router.get('/users', async (req, res, next) => {
                OR u.username ILIKE '%' || $2 || '%'
                OR u.email ILIKE '%' || $2 || '%')
         -- 총괄관리자를 맨 위에, 나머지는 기관 → 이름(가나다) 순
-        ORDER BY (u.role = 'ADMIN') DESC, o.sort_order NULLS LAST, o.name, u.name, u.username`,
+        ORDER BY (u.role = 'ADMIN') DESC, o.sort_order NULLS LAST, o.name,
+                 wr.duty_order(u.duty), u.name, u.username`,
       [auth.scopeOrg(req.user, req.query.org_id),
        req.query.q ? String(req.query.q).trim() : null]
     );
@@ -432,11 +433,12 @@ router.post('/users', async (req, res, next) => {
     }
 
     const { rows } = await db.query(
-      `INSERT INTO wr.users (username, password_hash, name, email, role, org_id, must_change_pw)
-       VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+      `INSERT INTO wr.users (username, password_hash, name, email, role, org_id, duty, must_change_pw)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
        ON CONFLICT (username) DO NOTHING
        RETURNING id, username, name, email, role, org_id, is_active`,
-      [username, auth.hashPassword(password), name, req.body?.email || null, role, orgId]
+      [username, auth.hashPassword(password), name, req.body?.email || null, role, orgId,
+       ['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty) ? req.body.duty : null]
     );
     if (!rows[0]) return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
 
@@ -489,15 +491,21 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
       }
     }
 
+    const DUTIES = ['LEAD', 'MANAGER', 'RESEARCHER'];
+    const duty = Object.prototype.hasOwnProperty.call(req.body || {}, 'duty')
+      ? (DUTIES.includes(req.body.duty) ? req.body.duty : null)
+      : undefined;
+
     const { rows } = await db.query(
       `UPDATE wr.users
           SET name      = COALESCE($1, name),
               email     = COALESCE($2, email),
               role      = COALESCE($3, role),
               org_id    = CASE WHEN $4::boolean THEN $5::int ELSE org_id END,
-              is_active = COALESCE($6, is_active)
+              is_active = COALESCE($6, is_active),
+              duty      = CASE WHEN $8::boolean THEN $9::varchar ELSE duty END
         WHERE id = $7
-        RETURNING id, username, name, email, role, org_id, is_active`,
+        RETURNING id, username, name, email, role, org_id, is_active, duty`,
       [
         req.body?.name ? String(req.body.name).trim() : null,
         req.body?.email ?? null,
@@ -506,6 +514,8 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
         req.body?.org_id ? Number(req.body.org_id) : null,
         req.body?.is_active != null ? Boolean(req.body.is_active) : null,
         id,
+        duty !== undefined,
+        duty ?? null,
       ]
     );
     if (!rows[0]) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });

@@ -62,7 +62,7 @@
         username, password, name, email,
         phone: $('#phone').value.trim(),
         org_id: Number($('#org_id').value),
-        signup_note: $('#signup_note').value.trim(),
+        duty: $('#duty').value || null,
       }, { allowAnonymous: true });
 
       $('#form-body').classList.add('hidden');

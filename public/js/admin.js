@@ -6,6 +6,12 @@
   const { api, toast, esc, fmtDateTime, statusBadge, $, $$ } = window.WR;
 
   const state = { me: null, orgs: [], tab: 'status' };
+
+  /** 담당 역할 표기 */
+  const DUTY_LABEL = { LEAD: '총괄책임자', MANAGER: '실무책임자', RESEARCHER: '참여연구원' };
+  const dutyOptions = (sel) => ['', 'LEAD', 'MANAGER', 'RESEARCHER']
+    .map((v) => `<option value="${v}" ${sel === v || (!sel && !v) ? 'selected' : ''}>${
+      v ? DUTY_LABEL[v] : '선택 안 함'}</option>`).join('');
   const body = () => $('#tab-body');
 
   async function init() {
@@ -258,6 +264,10 @@
         <label class="sb-field" style="flex:1 1 160px">
           <span>기관</span><select id="u-org">${orgOpts}</select>
         </label>
+        <label class="sb-field" style="flex:0 0 140px">
+          <span>담당 역할</span>
+          <select id="u-duty">${dutyOptions('')}</select>
+        </label>
         <label class="sb-field" style="flex:0 0 130px">
           <span>권한</span>
           <select id="u-role">
@@ -290,7 +300,9 @@
         <table class="grid">
           <thead><tr>
             <th style="width:180px">기관</th><th style="width:110px">이름</th>
-            <th style="width:130px">아이디</th><th class="center" style="width:80px">권한</th>
+            <th style="width:130px">아이디</th>
+            <th class="center" style="width:100px">담당 역할</th>
+            <th class="center" style="width:80px">권한</th>
             <th class="center" style="width:80px">상태</th><th style="width:150px">최근 로그인</th>
             <th class="center" style="width:170px">사용자 권한 및 삭제</th>
           </tr></thead>
@@ -300,6 +312,7 @@
                 <td>${esc(u.org_name || '-')}</td>
                 <td><b>${esc(u.name)}</b></td>
                 <td class="small muted">${esc(u.username)}</td>
+                <td class="center small">${u.duty ? DUTY_LABEL[u.duty] : '-'}</td>
                 <td class="center">${
                   u.role === 'ADMIN'     ? '<span class="badge draft">총괄관리자</span>' :
                   u.role === 'ORG_ADMIN' ? '<span class="badge submitted">기관관리자</span>' :
@@ -332,6 +345,7 @@
         password: $('#u-pw').value,
         org_id: $('#u-role').value === 'ADMIN' ? ($('#u-org').value || null) : $('#u-org').value,
         role: $('#u-role').value,
+        duty: $('#u-duty').value || null,
       };
 
       // 어느 칸이 문제인지 바로 알 수 있게 항목별로 확인하고 그 칸에 커서를 둔다
@@ -430,6 +444,9 @@
           <p class="small muted" style="margin:-4px 0 10px">
             이 기관에서 작성한 보고서 ${u.report_count || 0}건
           </p>
+          <label class="field"><span>담당 역할</span>
+            <select id="e-duty">${dutyOptions(u.duty || '')}</select>
+          </label>
           <label class="field"><span>권한</span>
             <select id="e-role">
               <option value="USER"      ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
@@ -455,6 +472,7 @@
         email: $('#e-email', back).value.trim() || null,
         org_id: $('#e-org', back).value ? Number($('#e-org', back).value) : null,
         role: $('#e-role', back).value,
+        duty: $('#e-duty', back).value || null,
       };
 
       // 소속을 바꾸면, 이 사람이 이전 기관에서 쓴 보고서를 함께 옮길지 확인한다.
