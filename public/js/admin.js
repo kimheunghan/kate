@@ -441,9 +441,6 @@
               ${orgs.map((o) => `<option value="${o.id}" ${o.id === u.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
             </select>
           </label>
-          <p class="small muted" style="margin:-4px 0 10px">
-            이 기관에서 작성한 보고서 ${u.report_count || 0}건
-          </p>
           <label class="field"><span>담당 역할</span>
             <select id="e-duty">${dutyOptions(u.duty || '')}</select>
           </label>
@@ -451,10 +448,7 @@
             <input type="text" id="e-pw" autocomplete="off" data-lpignore="true"
                    placeholder="변경할 때만 입력 (8자 이상)">
           </label>
-          <p class="small muted" style="margin:-6px 0 12px">
-            입력하면 그 값으로 바뀌며, 본인이 첫 로그인 시 변경 안내를 받습니다.
-            비워 두면 기존 비밀번호가 유지됩니다.
-          </p>
+          <p class="small muted" style="margin:-6px 0 12px">비워 두면 기존 비밀번호가 유지됩니다.</p>
           <label class="field"><span>권한</span>
             <select id="e-role">
               <option value="USER"      ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
