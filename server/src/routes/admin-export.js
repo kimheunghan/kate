@@ -514,13 +514,12 @@ router.get('/export/audit', async (req, res, next) => {
     const cond = [];
     cond.push(req.query.from || req.query.to
       ? `기간 ${String(req.query.from || '처음').replace('T', ' ')} ~ ${String(req.query.to || '지금').replace('T', ' ')}`
-      : '기간 전체');
+      : '기간 전체(시작일 시간 ~ 종료일 시간)');
     if (req.query.action) cond.push(`행위 ${ACTION_TEXT[req.query.action] || req.query.action}`);
     if (req.query.q) cond.push(`검색어 "${String(req.query.q).trim()}"`);
-    cond.push(`${rows.length.toLocaleString()}건`);
 
-    let at = putTitle(ws, 7, '활동 로그', cond.join('  ·  '));
-    at += 1;
+    let at = putTitle(ws, 7, '주간보고 실적 활동 로그', cond.join('  ·  '));
+    at = putSectionTitle(ws, at, `활동 로그 (총 ${rows.length.toLocaleString()}건)`);
 
     const headAt = at;
     ws.getRow(at).values = ['일시', '사용자ID', '사용자', '동작', '행위', '내용', 'IP'];
