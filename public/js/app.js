@@ -525,11 +525,11 @@
     ul.innerHTML = '';
     $('#dropzone').classList.toggle('hidden', !!readOnly);
 
-    if (!list || !list.length) {
-      $('#files-note').textContent = readOnly ? '첨부된 자료가 없습니다.' : '';
-      return;
-    }
-    $('#files-note').textContent = `총 ${list.length}건`;
+    // 건수는 아래 별도 줄이 아니라 제목 옆 괄호에 표시한다
+    const cnt = $('#files-count');
+    if (cnt) cnt.textContent = list && list.length ? `(${list.length}건)` : '';
+
+    if (!list || !list.length) return;
 
     list.forEach((a) => {
       const li = document.createElement('li');
