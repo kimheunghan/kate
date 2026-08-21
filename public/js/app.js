@@ -271,6 +271,10 @@
     $('#btn-print').disabled = readOnly;
     $('#btn-export').disabled = readOnly;
     $('#btn-export-hwpx').disabled = readOnly;
+
+    // 삭제는 이미 등록된 내 보고서에만 쓴다
+    const delBtn = $('#btn-delete');
+    if (delBtn) delBtn.classList.toggle('hidden', !(report && report.can_edit));
   }
 
   // ==================================================================
@@ -372,7 +376,8 @@
 
   function bindEditorPanel() {
     $('#btn-load').onclick = () => {
-      if (state.dirty && !confirm('저장하지 않은 변경사항이 있습니다. 그래도 불러올까요?')) return;
+      if (state.dirty && !confirm(
+        '저장하지 않은 내용이 있습니다.\n저장하지 않고 다른 주차를 불러올까요?\n\n(고친 내용은 사라지고, 이미 등록된 보고서는 그대로 남습니다)')) return;
       loadCurrent();
     };
     $('#sel-week').onchange = () => $('#btn-load').click();
@@ -481,6 +486,20 @@
       }
       save('SUBMITTED');
     };
+    $('#btn-delete').onclick = async () => {
+      if (!state.report) return;
+      const label = $('#sel-week').selectedOptions[0]?.textContent.trim() || '이 주차';
+      if (!confirm(`${label} 보고서를 지웁니다.\n내용과 첨부가 함께 지워지고 되돌릴 수 없습니다.\n\n지울까요?`)) return;
+      try {
+        await api.del(`/api/reports/${state.report.id}`);
+        state.dirty = false;
+        toast('보고서를 지웠습니다.');
+        $('#btn-load').click();          // 같은 주차를 다시 열어 빈 화면으로
+      } catch (e) {
+        toast(e.message, true);
+      }
+    };
+
     // 저장 전이면 세 칸이 다 찼을 때 저장한 뒤 내려받는다
     $('#btn-print').onclick = async () => {
       const r = await ensureSavedReport();
