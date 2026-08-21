@@ -263,7 +263,7 @@
     $('#btn-add-row').disabled = readOnly;
     $('#btn-del-row').disabled = readOnly;
     $('#btn-save').disabled = readOnly;
-    // 남이 쓴 보고서를 열어 둔 상태에서는 엑셀 일괄등록도 막는다
+    // 남이 쓴 보고서를 열어 둔 상태에서는 엑셀 업로드도 막는다
     $('#btn-excel-import').disabled = readOnly;
     $('#btn-excel-import').title = readOnly
       ? '본인이 작성한 보고서에서만 사용할 수 있습니다.' : '';
@@ -415,7 +415,7 @@
 
   // ==================================================================
   // ==================================================================
-  // Excel 일괄등록 — 화면에서 고른 주차로 바로 등록된다
+  // 엑셀 업로드 — 화면에서 고른 주차로 불러온다
   // ==================================================================
   function bindExcelImport() {
     $('#btn-excel-template').onclick = () => {
@@ -457,7 +457,7 @@
         toast(err.message, true);
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Excel 일괄등록';
+        btn.textContent = '엑셀 업로드';
       }
     };
   }
