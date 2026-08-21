@@ -377,7 +377,7 @@
   function bindEditorPanel() {
     $('#btn-load').onclick = () => {
       if (state.dirty && !confirm(
-        '저장하지 않은 내용이 있습니다.\n저장하지 않고 다른 주차를 불러올까요?\n\n(고친 내용은 사라지고, 이미 등록된 보고서는 그대로 남습니다)')) return;
+        '저장하지 않은 내용이 있습니다.\n다른 주차 선택 시 저장되지 않습니다.')) return;
       loadCurrent();
     };
     $('#sel-week').onchange = () => $('#btn-load').click();
@@ -489,11 +489,11 @@
     $('#btn-delete').onclick = async () => {
       if (!state.report) return;
       const label = $('#sel-week').selectedOptions[0]?.textContent.trim() || '이 주차';
-      if (!confirm(`${label} 보고서를 지웁니다.\n내용과 첨부가 함께 지워지고 되돌릴 수 없습니다.\n\n지울까요?`)) return;
+      if (!confirm(`${label} 등록을 취소합니다.\n작성한 내용과 첨부가 지워지며 되돌릴 수 없습니다.\n\n진행할까요?`)) return;
       try {
         await api.del(`/api/reports/${state.report.id}`);
         state.dirty = false;
-        toast('보고서를 지웠습니다.');
+        toast('등록을 취소했습니다.');
         $('#btn-load').click();          // 같은 주차를 다시 열어 빈 화면으로
       } catch (e) {
         toast(e.message, true);
