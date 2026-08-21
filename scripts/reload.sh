@@ -16,6 +16,15 @@ PORT="$(grep -E '^APP_PORT=' .env | cut -d= -f2 || echo 16000)"
 # 소스/첨부파일 동기화 과정에서 달라질 수 있는 rootless UID를 먼저 보정한다.
 bash scripts/fix-runtime-permissions.sh
 
+# 헬스체크 주소. 운영에서는 특정 IP 에만 포트를 열어 두어
+# 127.0.0.1 로는 닿지 않는다. 두 곳을 모두 시도한다.
+health_ok() {
+  curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1 && return 0
+  local ip
+  ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  [[ -n "${ip}" ]] && curl -fsS "http://${ip}:${PORT}/api/health" >/dev/null 2>&1
+}
+
 echo "[*] 이미지 빌드"
 podman build -q -t localhost/weekly-report:1.0 -f Containerfile . >/dev/null
 
@@ -24,7 +33,7 @@ podman rm -f wr-app >/dev/null 2>&1 || true
 podman-compose up -d --no-deps app >/dev/null 2>&1 || podman-compose up -d >/dev/null 2>&1
 
 for i in $(seq 1 40); do
-  if curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
+  if health_ok; then
     echo "[✔] 앱 재배포 완료 (${i}초)"
     exit 0
   fi

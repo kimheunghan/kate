@@ -107,9 +107,12 @@ EOF
     echo
     echo "[*] 기동 확인 (최대 60초 대기)"
     PORT="$(grep -E '^APP_PORT=' .env | cut -d= -f2 || echo 16000)"
+    # 운영에서는 특정 IP 에만 포트를 열어 두어 127.0.0.1 로는 닿지 않는다
+    HOST_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
     for i in $(seq 1 30); do
-      if curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
-        echo "[✔] 정상 기동 → http://$(hostname -I | awk '{print $1}'):${PORT}"
+      if curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1 \
+         || { [[ -n "${HOST_IP}" ]] && curl -fsS "http://${HOST_IP}:${PORT}/api/health" >/dev/null 2>&1; }; then
+        echo "[✔] 정상 기동 → http://${HOST_IP:-127.0.0.1}:${PORT}"
         exit 0
       fi
       sleep 2
