@@ -56,6 +56,19 @@ function addViewScope(user, where, params) {
   }
 }
 
+/**
+ * 문서로 내려받을 수 있는가 (인쇄·Word·한글).
+ *   작성자는 화면에서 작성만 한다. 내려받기 단추가 없고 서버에서도 막는다.
+ *   기관관리자·감독관리자·중복권한자·총괄관리자만 쓴다.
+ */
+function canExport(user) {
+  return auth.seesAllOrgs(user) || user.role === 'ORG_ADMIN';
+}
+
+const requireExport = (req, res, next) =>
+  (canExport(req.user) ? next()
+    : res.status(403).json({ error: '문서 내려받기 권한이 없습니다.' }));
+
 /** 이 보고서를 열람할 수 있는가 */
 function canViewReport(user, report) {
   if (auth.seesAllOrgs(user)) return true;     // 총괄관리자·감독관리자
@@ -1009,7 +1022,7 @@ function safeFileName(v) {
 // ---------------------------------------------------------------------
 // GET /api/reports/:id/print  — 인쇄용 화면
 // ---------------------------------------------------------------------
-router.get('/:id(\\d+)/print', async (req, res, next) => {
+router.get('/:id(\\d+)/print', requireExport, async (req, res, next) => {
   try {
     const report = await loadReport(Number(req.params.id));
     if (!report) return res.status(404).send('보고서를 찾을 수 없습니다.');
@@ -1025,7 +1038,7 @@ router.get('/:id(\\d+)/print', async (req, res, next) => {
 // ---------------------------------------------------------------------
 // GET /api/reports/:id/export  — Word 문서로 다운로드 (한글에서도 열림)
 // ---------------------------------------------------------------------
-router.get('/:id(\\d+)/export', async (req, res, next) => {
+router.get('/:id(\\d+)/export', requireExport, async (req, res, next) => {
   try {
     const report = await loadReport(Number(req.params.id));
     if (!report) return res.status(404).send('보고서를 찾을 수 없습니다.');
@@ -1052,7 +1065,7 @@ router.get('/:id(\\d+)/export', async (req, res, next) => {
 // ---------------------------------------------------------------------
 // GET /api/reports/:id/export-hwpx  — 한글 문서(HWPX)로 다운로드
 // ---------------------------------------------------------------------
-router.get('/:id(\\d+)/export-hwpx', async (req, res, next) => {
+router.get('/:id(\\d+)/export-hwpx', requireExport, async (req, res, next) => {
   try {
     const report = await loadReport(Number(req.params.id));
     if (!report) return res.status(404).json({ error: '보고서를 찾을 수 없습니다.' });
@@ -1153,7 +1166,7 @@ function weekFileBase(label) {
 //   없으면 보고서가 있는 주차를 각각 만들어 ZIP 하나로 묶어 내려준다.
 //   보이는 범위는 목록과 같다. (작성자=본인, 기관관리자=자기 기관, 총괄관리자=전체)
 // ---------------------------------------------------------------------
-router.get('/export-hwpx-week', async (req, res, next) => {
+router.get('/export-hwpx-week', requireExport, async (req, res, next) => {
   try {
     const orgId = auth.seesAllOrgs(req.user) ? req.query.org_id : null;
     const weekId = Number(req.query.week_id);
