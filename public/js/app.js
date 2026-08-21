@@ -542,8 +542,8 @@
   async function uploadFiles(fileList) {
     // 첨부는 보고서 id 가 있어야 한다.
     //  예전에는 빈 보고서를 자동으로 만들어 붙였고, 그래서 쓰지도 않은
-    //  주차가 '등록된 보고서' 로 잡혔다. 이제는 세 칸을 다 채웠을 때만
-    //  묻고 저장한 뒤 첨부한다.
+    //  주차가 '등록된 보고서' 로 잡혔다. 이제는 세 칸이 다 찼을 때만
+    //  저장하고 첨부한다. 비어 있으면 안내만 띄운다.
     if (!state.report) {
       const missing = findEmptyCell();
       if (!collectItems().length || missing) {
@@ -551,7 +551,6 @@
         if (missing) missing.editor.area.focus();
         return;
       }
-      if (!confirm('증적자료를 첨부하려면 보고서를 먼저 저장해야 합니다.\n지금 저장할까요?')) return;
       const saved = await save('SUBMITTED', { silent: true });
       if (!saved) return;
     }
