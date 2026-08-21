@@ -38,6 +38,14 @@
     $('#topbar').innerHTML = window.WR.renderTopbar(state.me, 'admin');
     window.WR.bindTopbar();
 
+    // 감독관리자는 조회만 한다. 사용자 관리·활동 로그 탭은 감춘다.
+    if (state.me.role === 'SUPERVISOR') {
+      $$('#admin-tabs button').forEach((b) => {
+        if (b.dataset.tab === 'users' || b.dataset.tab === 'audit') b.classList.add('hidden');
+      });
+      if (state.tab === 'users' || state.tab === 'audit') state.tab = 'status';
+    }
+
     $$('#admin-tabs button').forEach((b) => {
       b.onclick = () => {
         $$('#admin-tabs button').forEach((x) => x.classList.toggle('active', x === b));
@@ -332,6 +340,7 @@
           <select id="u-role">
             <option value="USER">작성자</option>
             <option value="ORG_ADMIN">기관관리자</option>
+            <option value="SUPERVISOR">감독관리자</option>
             <option value="ADMIN">총괄관리자</option>
           </select>
         </label>
@@ -373,9 +382,10 @@
                 <td class="small muted">${esc(u.username)}</td>
                 <td class="center small">${u.duty ? DUTY_LABEL[u.duty] : '-'}</td>
                 <td class="center">${
-                  u.role === 'ADMIN'     ? '<span class="badge role-admin">총괄관리자</span>' :
-                  u.role === 'ORG_ADMIN' ? '<span class="badge role-org">기관관리자</span>' :
-                                           '<span class="badge role-user">작성자</span>'
+                  u.role === 'ADMIN'      ? '<span class="badge role-admin">총괄관리자</span>' :
+                  u.role === 'SUPERVISOR' ? '<span class="badge role-super">감독관리자</span>' :
+                  u.role === 'ORG_ADMIN'  ? '<span class="badge role-org">기관관리자</span>' :
+                                            '<span class="badge role-user">작성자</span>'
                 }</td>
                 <td class="center">${
                   u.approval_status === 'PENDING'  ? '<span class="badge draft">승인대기</span>' :
@@ -519,9 +529,10 @@
           <div class="field-hl">
             <label class="field"><span>권한</span>
               <select id="e-role">
-                <option value="USER"      ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
-                <option value="ORG_ADMIN" ${u.role === 'ORG_ADMIN' ? 'selected' : ''}>기관관리자</option>
-                <option value="ADMIN"     ${u.role === 'ADMIN' ? 'selected' : ''}>총괄관리자</option>
+                <option value="USER"       ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
+                <option value="ORG_ADMIN"  ${u.role === 'ORG_ADMIN' ? 'selected' : ''}>기관관리자</option>
+                <option value="SUPERVISOR" ${u.role === 'SUPERVISOR' ? 'selected' : ''}>감독관리자</option>
+                <option value="ADMIN"      ${u.role === 'ADMIN' ? 'selected' : ''}>총괄관리자</option>
               </select>
             </label>
           </div>

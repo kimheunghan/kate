@@ -15,7 +15,9 @@ const auth = require('../lib/auth');
 const audit = require('../lib/audit');
 
 const router = express.Router();
-router.use(auth.requireAuth, auth.requireAdmin);
+// 등록 현황·주차별 현황판은 관리자 화면을 볼 수 있는 사람이면 내려받는다.
+// 활동 로그만 총괄관리자 전용이다.
+router.use(auth.requireAuth, auth.requireManager);
 
 const AUDIT_MAX = 5000;          // 활동 로그는 최신 이 건수까지만 내려받는다
 
@@ -472,7 +474,7 @@ router.get('/export/matrix', async (req, res, next) => {
 // ---------------------------------------------------------------------
 // 활동 로그 — 화면과 같은 조건. 최신 AUDIT_MAX 건까지.
 // ---------------------------------------------------------------------
-router.get('/export/audit', async (req, res, next) => {
+router.get('/export/audit', auth.requireAdmin, async (req, res, next) => {
   try {
     const where = [];
     const params = [];

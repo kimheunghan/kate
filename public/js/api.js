@@ -191,7 +191,9 @@
    *   ORG_ADMIN 기관관리자 — 자기 기관만
    *   USER      작성자     — 자기가 속한 기관
    */
-  const ROLE_LABEL = { ADMIN: '총괄관리자', ORG_ADMIN: '기관관리자', USER: '작성자' };
+  const ROLE_LABEL = {
+    ADMIN: '총괄관리자', SUPERVISOR: '감독관리자', ORG_ADMIN: '기관관리자', USER: '작성자',
+  };
   function roleLabel(role) { return ROLE_LABEL[role] || '작성자'; }
 
   /**

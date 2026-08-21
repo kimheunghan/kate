@@ -12,6 +12,8 @@ router.use(auth.requireManager);
 
 /** 전체 관리자만 허용 (기관/주차/사용자 삭제 등 전역 설정) */
 const adminOnly = auth.requireAdmin;
+// 사용자·기관을 손대는 자리. 감독관리자는 조회만 하므로 여기서 막힌다.
+const userManager = auth.requireUserManager;
 
 // =====================================================================
 //  현황
@@ -222,7 +224,7 @@ router.delete('/orgs/:id(\\d+)', adminOnly, async (req, res, next) => {
 // =====================================================================
 //  사용자 관리
 // =====================================================================
-router.get('/users', async (req, res, next) => {
+router.get('/users', userManager, async (req, res, next) => {
   try {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.name, u.email, u.phone, u.role, u.org_id, u.is_active,
@@ -251,7 +253,7 @@ router.get('/users', async (req, res, next) => {
 // ---------------------------------------------------------------------
 // GET /api/admin/approvals  — 대기 중인 가입 신청 + 재설정 요청
 // ---------------------------------------------------------------------
-router.get('/approvals', async (req, res, next) => {
+router.get('/approvals', userManager, async (req, res, next) => {
   try {
     const { rows: signups } = await db.query(
       `SELECT u.id, u.username, u.name, u.email, u.phone, u.signup_note,
@@ -285,7 +287,7 @@ router.get('/approvals', async (req, res, next) => {
 // ---------------------------------------------------------------------
 // POST /api/admin/users/:id/approval   { approve: true|false, org_id? }
 // ---------------------------------------------------------------------
-router.post('/users/:id(\\d+)/approval', async (req, res, next) => {
+router.post('/users/:id(\\d+)/approval', userManager, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const approve = req.body?.approve !== false;
@@ -315,7 +317,7 @@ router.post('/users/:id(\\d+)/approval', async (req, res, next) => {
 // POST /api/admin/reset-requests/:id  { password?, reject? }
 //   password 를 주면 임시 비밀번호로 설정하고 요청을 완료 처리한다.
 // ---------------------------------------------------------------------
-router.post('/reset-requests/:id(\\d+)', async (req, res, next) => {
+router.post('/reset-requests/:id(\\d+)', userManager, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const reject = req.body?.reject === true;
@@ -403,7 +405,7 @@ function suggestSuffixed(baseName, existing) {
            newName: `${baseName}-${next('A')}` };
 }
 
-router.post('/users', async (req, res, next) => {
+router.post('/users', userManager, async (req, res, next) => {
   try {
     const username = String(req.body?.username || '').trim();
     const password = String(req.body?.password || '');
@@ -458,7 +460,7 @@ router.post('/users', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/users/:id(\\d+)', async (req, res, next) => {
+router.put('/users/:id(\\d+)', userManager, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const role = ['ADMIN', 'ORG_ADMIN', 'USER'].includes(req.body?.role) ? req.body.role : null;
@@ -542,7 +544,7 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/users/:id(\\d+)/password', async (req, res, next) => {
+router.post('/users/:id(\\d+)/password', userManager, async (req, res, next) => {
   try {
     if (req.user.role === 'ORG_ADMIN') {
       const { rows: t } = await db.query(`SELECT org_id FROM wr.users WHERE id = $1`, [Number(req.params.id)]);
@@ -578,7 +580,7 @@ router.delete('/users/:id(\\d+)', adminOnly, async (req, res, next) => {
 // =====================================================================
 //  보고서 소속 이관 (소속을 잘못 지정해 등록한 경우 바로잡기)
 // =====================================================================
-router.put('/reports/:id(\\d+)/org', async (req, res, next) => {
+router.put('/reports/:id(\\d+)/org', userManager, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const toOrg = Number(req.body?.org_id);

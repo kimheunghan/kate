@@ -46,7 +46,7 @@ function canEditReport(user, report) {
  *   ADMIN     : 전부
  */
 function addViewScope(user, where, params) {
-  if (user.role === 'ADMIN') return;
+  if (auth.seesAllOrgs(user)) return;          // 총괄관리자·감독관리자
   if (user.role === 'ORG_ADMIN') {
     params.push(user.org_id || -1);
     where.push(`r.org_id = $${params.length}`);
@@ -58,7 +58,7 @@ function addViewScope(user, where, params) {
 
 /** 이 보고서를 열람할 수 있는가 */
 function canViewReport(user, report) {
-  if (user.role === 'ADMIN') return true;
+  if (auth.seesAllOrgs(user)) return true;     // 총괄관리자·감독관리자
   if (user.role === 'ORG_ADMIN') return Number(report.org_id) === Number(user.org_id);
   return report.author_id != null && Number(report.author_id) === Number(user.id);
 }
@@ -212,7 +212,7 @@ router.get('/', async (req, res, next) => {
 
     // 권한별 조회 범위 (작성자는 본인 것만)
     addViewScope(req.user, where, params);
-    if (req.user.role === 'ADMIN' && req.query.org_id) {
+    if (auth.seesAllOrgs(req.user) && req.query.org_id) {
       params.push(Number(req.query.org_id)); where.push(`r.org_id = $${params.length}`);
     }
     if (req.query.q) {
@@ -277,8 +277,8 @@ router.get('/lookup', async (req, res, next) => {
     const weekId = Number(req.query.week_id);
     if (!weekId) return res.status(400).json({ error: 'week_id 가 필요합니다.' });
 
-    // 기본은 "내 보고서". 전체 관리자만 다른 사람 것을 지정해 볼 수 있다.
-    const authorId = (req.user.role === 'ADMIN' && req.query.author_id)
+    // 기본은 "내 보고서". 전체를 보는 권한만 다른 사람 것을 지정해 볼 수 있다.
+    const authorId = (auth.seesAllOrgs(req.user) && req.query.author_id)
       ? Number(req.query.author_id) : req.user.id;
 
     const { rows } = await db.query(
@@ -1093,7 +1093,7 @@ async function renderWeekHwpx(user, week, orgId) {
   const where = ['r.week_id = $1'];
   const params = [week.id];
   addViewScope(user, where, params);
-  if (user.role === 'ADMIN' && orgId) {
+  if (auth.seesAllOrgs(user) && orgId) {
     params.push(Number(orgId));
     where.push(`r.org_id = $${params.length}`);
   }
@@ -1149,7 +1149,7 @@ function weekFileBase(label) {
 // ---------------------------------------------------------------------
 router.get('/export-hwpx-week', async (req, res, next) => {
   try {
-    const orgId = req.user.role === 'ADMIN' ? req.query.org_id : null;
+    const orgId = auth.seesAllOrgs(req.user) ? req.query.org_id : null;
     const weekId = Number(req.query.week_id);
 
     // 대상 주차 목록 (보고서가 있는 주차만, 최신 주차부터)

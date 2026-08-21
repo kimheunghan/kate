@@ -115,7 +115,8 @@
    */
   function applyListScopeUi() {
     const role = state.me.role;
-    const onlyMine = role !== 'ADMIN' && role !== 'ORG_ADMIN';
+    const seesAll = role === 'ADMIN' || role === 'SUPERVISOR';   // 전체 기관
+    const onlyMine = !seesAll && role !== 'ORG_ADMIN';
 
     // 내려받기 단추 정리 (지우지 않고 감추기만 한다)
     //   작성자   : 저장만
@@ -141,7 +142,7 @@
 
     // 기관 필터는 전체 관리자만 (기관 관리자는 자기 기관으로 고정되므로 불필요)
     const orgField = $('#f-org-field');
-    if (orgField) orgField.classList.toggle('hidden', role !== 'ADMIN');
+    if (orgField) orgField.classList.toggle('hidden', !seesAll);
     const note = $('#list-scope-note');
     if (note) {
       note.textContent = onlyMine

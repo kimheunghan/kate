@@ -125,16 +125,33 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-/** 관리자 화면 접근 (전체 관리자 또는 기관 관리자) */
+/** 관리자 화면 접근 (총괄·기관·감독 관리자) */
 function requireManager(req, res, next) {
   if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  if (req.user.role !== 'ADMIN' && req.user.role !== 'ORG_ADMIN') {
+  if (!['ADMIN', 'ORG_ADMIN', 'SUPERVISOR'].includes(req.user.role)) {
     return res.status(403).json({ error: '관리자 권한이 필요합니다.' });
   }
   next();
 }
 
-/** 기관 관리자는 자기 기관으로만 조회 범위를 제한한다. 전체 관리자는 요청값 그대로. */
+/**
+ * 사용자·기관을 손대는 자리 (총괄관리자 또는 기관관리자).
+ * 감독관리자는 조회만 하므로 여기서 막는다.
+ */
+function requireUserManager(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'ORG_ADMIN') {
+    return res.status(403).json({ error: '사용자·기관을 관리할 권한이 없습니다.' });
+  }
+  next();
+}
+
+/** 기관을 가리지 않고 전체를 볼 수 있는가 (총괄관리자·감독관리자) */
+function seesAllOrgs(user) {
+  return user.role === 'ADMIN' || user.role === 'SUPERVISOR';
+}
+
+/** 기관 관리자는 자기 기관으로만 조회 범위를 제한한다. 전체를 보는 권한은 요청값 그대로. */
 function scopeOrg(user, requestedOrgId) {
   if (user.role === 'ORG_ADMIN') return user.org_id || -1;
   return requestedOrgId ? Number(requestedOrgId) : null;
@@ -170,6 +187,8 @@ module.exports = {
   requireAuth,
   requireAdmin,
   requireManager,
+  requireUserManager,
+  seesAllOrgs,
   scopeOrg,
   ensureAdminAccount,
 };
