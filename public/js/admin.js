@@ -848,7 +848,14 @@
         <button class="btn sb-btn" id="al-reset">초기화</button>
       </div>
 
-      <h3 class="sec-title">활동 로그 (총 ${res.total}건)</h3>
+      <div class="list-head">
+        <h3 class="sec-title">활동 로그 (총 ${res.total}건)</h3>
+        <span class="pager-side">
+          <span class="small muted">
+            <span class="mark">※</span> 최신순 최대 ${AUDIT_MAX.toLocaleString()}건까지 내려받습니다.</span>
+          <button class="btn sm dl-btn" id="a-xlsx">⤓ 엑셀 다운로드</button>
+        </span>
+      </div>
 
       <div class="table-scroll">
         <table class="grid fixed">
@@ -874,14 +881,7 @@
           </tbody>
         </table>
       </div>
-      <div class="pager-row">
-        <div class="pager" id="a-pager"></div>
-        <span class="pager-side">
-          <span class="small muted">
-            <span class="mark">※</span> 최신순 최대 ${AUDIT_MAX.toLocaleString()}건까지 내려받습니다.</span>
-          <button class="btn sm dl-btn" id="a-xlsx">⤓ 엑셀 다운로드</button>
-        </span>
-      </div>`;
+      <div class="pager" id="a-pager"></div>`;
 
     $('#a-xlsx').onclick = () => {
       const p = new URLSearchParams();
