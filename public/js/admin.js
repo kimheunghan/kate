@@ -92,7 +92,10 @@
       state.me = me.user;
     } catch (e) { return; }
 
-    if (state.me.role !== 'ADMIN') { location.href = '/report'; return; }
+    // 관리자 화면을 쓸 수 있는 사람 : 총괄·기관·감독 관리자와 중복권한자
+    const canEnter = ['ADMIN', 'ORG_ADMIN', 'SUPERVISOR'].includes(state.me.role)
+      || state.me.can_view_all === true;
+    if (!canEnter) { location.href = '/report'; return; }
 
     $('#topbar').innerHTML = window.WR.renderTopbar(state.me, 'admin');
     window.WR.bindTopbar();
