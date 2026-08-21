@@ -175,8 +175,12 @@ textarea { resize: vertical; min-height: 60px; }
 /* 권한 표시는 상태(활성·승인대기·중지)와 색이 겹치지 않게 따로 둔다 */
 .badge.role-admin { background: #e2e9f8; color: #2b4c8c; }
 .badge.role-super { background: #dcefe6; color: #2c6b52; }
-/* 중복권한 표식. 이름 옆에 붙여 목록에서 바로 눈에 띄게 한다. */
-.dual-mark { color: #2c8f66; font-size: 12px; vertical-align: 1px; cursor: default; }
+/* 중복권한 표식. 권한 배지 오른쪽 위 모서리에 살짝 겹쳐 붙인다. */
+.dual-mark {
+  color: #2c8f66; font-size: 12px; line-height: 1;
+  position: relative; top: -6px; margin-left: -5px;
+  cursor: default;
+}
 
 /* 검색줄 안의 체크박스 (전체 조회 겸직 등) */
 .search-bar .sb-check { align-items: center; }
