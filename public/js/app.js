@@ -260,9 +260,11 @@
     $('#btn-excel-import').disabled = readOnly;
     $('#btn-excel-import').title = readOnly
       ? '본인이 작성한 보고서에서만 사용할 수 있습니다.' : '';
-    $('#btn-print').disabled = !report;
-    $('#btn-export').disabled = !report;
-    $('#btn-export-hwpx').disabled = !report;
+    // 아직 저장 전이라도 세 칸이 차 있으면 저장한 뒤 내려받게 하므로
+    // 버튼은 열어 둔다. 남이 쓴 보고서일 때만 막는다.
+    $('#btn-print').disabled = readOnly;
+    $('#btn-export').disabled = readOnly;
+    $('#btn-export-hwpx').disabled = readOnly;
   }
 
   // ==================================================================
@@ -473,17 +475,18 @@
       }
       save('SUBMITTED');
     };
-    $('#btn-print').onclick = () => {
-      if (!state.report) return;
-      openPrint(state.report.id);
+    // 저장 전이면 세 칸이 다 찼을 때 저장한 뒤 내려받는다
+    $('#btn-print').onclick = async () => {
+      const r = await ensureSavedReport();
+      if (r) openPrint(r.id);
     };
-    $('#btn-export').onclick = () => {
-      if (!state.report) return;
-      downloadReport(state.report.id);
+    $('#btn-export').onclick = async () => {
+      const r = await ensureSavedReport();
+      if (r) downloadReport(r.id);
     };
-    $('#btn-export-hwpx').onclick = () => {
-      if (!state.report) return;
-      downloadReportHwpx(state.report.id);
+    $('#btn-export-hwpx').onclick = async () => {
+      const r = await ensureSavedReport();
+      if (r) downloadReportHwpx(r.id);
     };
   }
 
@@ -539,21 +542,26 @@
     });
   }
 
-  async function uploadFiles(fileList) {
-    // 첨부는 보고서 id 가 있어야 한다.
-    //  예전에는 빈 보고서를 자동으로 만들어 붙였고, 그래서 쓰지도 않은
-    //  주차가 '등록된 보고서' 로 잡혔다. 이제는 세 칸이 다 찼을 때만
-    //  저장하고 첨부한다. 비어 있으면 안내만 띄운다.
-    if (!state.report) {
-      const missing = findEmptyCell();
-      if (!collectItems().length || missing) {
-        toast('계획 및 실적 칸에 입력되지 않으면 등록되지 않습니다.', true);
-        if (missing) missing.editor.area.focus();
-        return;
-      }
-      const saved = await save('SUBMITTED', { silent: true });
-      if (!saved) return;
+  /**
+   * 첨부·내려받기는 보고서 id 가 있어야 한다.
+   * 아직 저장 전이면 세 칸이 다 찼을 때만 저장해서 id 를 만든다.
+   * 비어 있으면 안내만 띄우고 null 을 준다.
+   * @returns {Promise<object|null>}
+   */
+  async function ensureSavedReport() {
+    if (state.report) return state.report;
+
+    const missing = findEmptyCell();
+    if (!collectItems().length || missing) {
+      toast('계획 및 실적 칸에 입력되지 않으면 등록되지 않습니다.', true);
+      if (missing) missing.editor.area.focus();
+      return null;
     }
+    return save('SUBMITTED', { silent: true });
+  }
+
+  async function uploadFiles(fileList) {
+    if (!await ensureSavedReport()) return;
     if (!state.report.can_edit) { toast('첨부 권한이 없습니다.', true); return; }
 
     const files = Array.from(fileList);
