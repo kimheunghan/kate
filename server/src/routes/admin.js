@@ -49,7 +49,12 @@ router.get('/status', async (req, res, next) => {
     }
 
     const { rows } = await db.query(
-      `SELECT * FROM wr.v_submission_status
+      `SELECT s.*,
+              -- 마지막으로 활동 기록이 남은 접속 IP (한 번도 안 들어왔으면 null)
+              (SELECT a.ip FROM wr.audit_logs a
+                WHERE a.user_id = s.user_id AND a.ip IS NOT NULL
+                ORDER BY a.created_at DESC LIMIT 1) AS last_ip
+         FROM wr.v_submission_status s
         WHERE ${where.join(' AND ')}
         -- 기관 → 담당 역할(총괄책임자→실무책임자→참여연구원) → 이름(가나다)
         ORDER BY sort_order NULLS LAST, org_name, wr.duty_order(duty), user_name`,
