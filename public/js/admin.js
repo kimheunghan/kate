@@ -115,6 +115,8 @@
     $$('#admin-tabs button').forEach((b) => {
       b.classList.toggle('active', b.dataset.tab === state.tab);
     });
+    // 여기까지 정해진 뒤에 탭 줄을 보여 준다
+    $('#admin-tabs').classList.remove('pending');
 
     $$('#admin-tabs button').forEach((b) => {
       b.onclick = () => {

@@ -177,6 +177,9 @@ textarea { resize: vertical; min-height: 60px; }
 .badge.role-super { background: #dcefe6; color: #2c6b52; }
 /* 중복권한 표식. 권한 배지 오른쪽 위 모서리에 겹쳐 얹는다.
    배지를 감싼 칸을 기준으로 잡아야 테두리 위로 올라온다. */
+/* 권한을 확인하기 전의 탭 줄. 자리는 잡아 두고 글자만 감춘다. */
+.tabs.pending { visibility: hidden; }
+
 .role-cell { position: relative; display: inline-block; }
 .role-cell.has-dual { cursor: default; }
 .dual-mark {

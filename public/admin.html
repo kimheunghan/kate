@@ -13,7 +13,9 @@
 
   <div class="wrap">
     <div class="panel">
-      <div class="tabs" id="admin-tabs">
+      <!-- 권한을 확인하기 전에는 비워 둔다. 먼저 그려 버리면
+           쓸 수 없는 탭이 잠깐 보였다가 사라진다. -->
+      <div class="tabs pending" id="admin-tabs">
         <button data-tab="status"  class="active">등록 현황</button>
         <button data-tab="matrix">주차별 현황판</button>
         <button data-tab="users">사용자 관리</button>
