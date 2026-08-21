@@ -618,7 +618,9 @@ ${forWord ? `<!--[if gte mso 9]><xml>
   td p { margin: 0 0 3px; }
 
   thead { display: table-header-group; }
-  tr { page-break-inside: avoid; break-inside: avoid; }
+  /* 한 사람이 한 줄이라 줄이 길다. 쪽에서 나누지 못하게 막으면
+     줄 하나가 통째로 다음 쪽으로 넘어가 앞 쪽이 비어 버린다. */
+  tr { page-break-inside: auto; break-inside: auto; }
 
   .note { margin-top: 12px; font-size: 10pt; page-break-inside: avoid; break-inside: avoid; }
   ol.files { margin: 5px 0 0; padding-left: 20px; font-size: 9pt; }
