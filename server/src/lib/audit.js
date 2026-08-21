@@ -3,6 +3,12 @@
 const db = require('./db');
 const config = require('./config');
 
+/** 프록시를 거쳐도 실제 접속 주소가 나오게 한다 */
+function clientIp(req) {
+  return (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+      || req.socket?.remoteAddress || null;
+}
+
 /** 감사 로그 기록. 실패해도 본 요청은 막지 않는다. */
 /**
  * @param {object} opts
@@ -13,7 +19,7 @@ async function log(req, action, {
   targetType = null, targetId = null, detail = null, actorId, actorName,
 } = {}) {
   try {
-    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || null;
+    const ip = clientIp(req);
 
     const uid = req.user?.id ?? actorId ?? null;
     const uname = req.user?.username ?? actorName ?? null;
@@ -73,4 +79,4 @@ function startPurgeSchedule() {
   timer.unref();                       // 이 타이머 때문에 종료가 늦어지지 않게
 }
 
-module.exports = { log, purgeOld, startPurgeSchedule };
+module.exports = { log, purgeOld, startPurgeSchedule, clientIp };

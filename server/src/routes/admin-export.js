@@ -226,9 +226,12 @@ router.get('/export/status', async (req, res, next) => {
     const { rows: people } = await db.query(
       `SELECT s.org_name, s.user_name, s.username, s.status, s.file_count,
               s.submitted_at, s.updated_at, s.report_id,
-              (SELECT a.ip FROM wr.audit_logs a
-                WHERE a.user_id = s.user_id AND a.ip IS NOT NULL
-                ORDER BY a.created_at DESC LIMIT 1) AS last_ip
+              COALESCE(
+                (SELECT u2.last_login_ip FROM wr.users u2 WHERE u2.id = s.user_id),
+                (SELECT a.ip FROM wr.audit_logs a
+                  WHERE a.user_id = s.user_id AND a.ip IS NOT NULL
+                  ORDER BY a.created_at DESC LIMIT 1)
+              ) AS last_ip
          FROM wr.v_submission_status s
         WHERE ${where}
         ORDER BY s.sort_order NULLS LAST, s.org_name,
