@@ -107,16 +107,13 @@
       </div>
     </div>
 
-    <!-- 저장·내려받기 버튼은 작성 영역 제목줄로 올렸다.
-         인쇄/Word 는 지금 쓰지 않으므로 이 칸째로 감춰 둔다. -->
-    <div class="panel no-print hidden" id="save-panel">
-      <div class="body">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end">
-          <button class="btn" id="btn-print">인쇄 / PDF</button>
-          <button class="btn" id="btn-export"
-                  title="Word 문서로 내려받기">Word 다운로드</button>
-        </div>
-      </div>
+    <!-- 저장·한글 다운로드 버튼은 작성 영역 제목줄로 올렸다.
+         인쇄/Word 는 지금 쓰지 않는다. 기능은 그대로 두되 화면에는
+         내지 않으려고 감춘 칸에 담아 둔다. hidden 만 떼면 다시 보인다. -->
+    <div class="hidden" id="spare-buttons">
+      <button class="btn" id="btn-print">인쇄 / PDF</button>
+      <button class="btn" id="btn-export"
+              title="Word 문서로 내려받기">Word 다운로드</button>
     </div>
 
     <!-- ================================================= 조회 탭 내용 -->

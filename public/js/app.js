@@ -163,7 +163,7 @@
         const isWrite = b.dataset.tab === 'write';
         $('#tab-write').classList.toggle('hidden', !isWrite);
         $('#tab-list').classList.toggle('hidden', isWrite);
-        ['#editor-panel', '#files-panel', '#save-panel'].forEach((s) =>
+        ['#editor-panel', '#files-panel'].forEach((s) =>
           $(s).classList.toggle('hidden', !isWrite));
         if (!isWrite) searchList(1);
       };
