@@ -544,7 +544,7 @@
     //  예전에는 빈 보고서를 자동으로 만들어 붙였는데, 쓰지도 않은 주차에
     //  보고서가 생겨 '등록된 보고서' 로 잡히는 문제가 있었다.
     if (!state.report) {
-      toast('보고서를 먼저 저장한 뒤 증적자료를 첨부해 주세요.', true);
+      toast('계획 및 실적 칸에 입력되지 않으면 등록되지 않습니다.', true);
       return;
     }
     if (!state.report.can_edit) { toast('첨부 권한이 없습니다.', true); return; }
@@ -569,10 +569,6 @@
     const ul = $('#file-list');
     ul.innerHTML = '';
     $('#dropzone').classList.toggle('hidden', !!readOnly);
-
-    // 저장 전에는 첨부할 수 없으므로 미리 알려 준다
-    const hint = $('#dz-hint');
-    if (hint) hint.textContent = state.report ? '' : '보고서를 저장한 뒤 첨부할 수 있습니다.';
 
     // 건수는 아래 별도 줄이 아니라 제목 옆 괄호에 표시한다
     const cnt = $('#files-count');
