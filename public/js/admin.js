@@ -65,7 +65,7 @@
         const holder = viewAllChk.closest('label') || viewAllChk;
         holder.classList.toggle('hidden', seesAll);
         viewAllChk.title =
-          '등록 내역과 주차별 현황판을 전체 범위로 봅니다. 참여 인력 자격은 그대로입니다.';
+          '등록 내역 및 주차별 현황판 조회 가능. 참여 인력 자격은 그대로입니다.';
       }
     };
 
@@ -404,9 +404,9 @@
           </select>
         </label>
         <label class="sb-field sb-check" style="flex:0 0 auto" id="u-view-all-field">
-          <span>전체 조회</span>
+          <span>중복권한</span>
           <input type="checkbox" id="u-view-all"
-                 title="등록 내역과 주차별 현황판을 전체 범위로 봅니다. 참여 인력 자격은 그대로입니다.">
+                 title="등록 내역 및 주차별 현황판 조회 가능. 참여 인력 자격은 그대로입니다.">
         </label>
         <button class="btn primary sb-btn" id="u-add">사용자 추가</button>
       </div>
@@ -450,7 +450,7 @@
                    u.role === 'SUPERVISOR' ? '<span class="badge role-super">감독관리자</span>' :
                    u.role === 'ORG_ADMIN'  ? '<span class="badge role-org">기관관리자</span>' :
                                              '<span class="badge role-user">작성자</span>')
-                  + (u.can_view_all ? ' <span class="badge role-super" title="등록 내역·주차별 현황판을 전체 범위로 봅니다">전체 조회</span>' : '')
+                  + (u.can_view_all ? ' <span class="badge role-super" title="등록 내역 및 주차별 현황판 조회 가능">중복권한</span>' : '')
                 }</td>
                 <td class="center">${
                   u.approval_status === 'PENDING'  ? '<span class="badge draft">승인대기</span>' :
@@ -597,7 +597,7 @@
           <div class="field-hl">
             <label class="field check-line">
               <input type="checkbox" id="e-view-all" ${u.can_view_all ? 'checked' : ''}>
-              <span>전체 조회 (등록 내역·주차별 현황판을 전체 범위로)</span>
+              <span><span class="mark">※</span> 중복권한 (등록 내역 및 주차별 현황판 조회 가능)</span>
             </label>
             <label class="field"><span>권한</span>
               <select id="e-role">

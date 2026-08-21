@@ -189,7 +189,9 @@ textarea { resize: vertical; min-height: 60px; }
 .field.check-line input[type="checkbox"] {
   width: 18px; height: 18px; margin: 0; accent-color: var(--primary); cursor: pointer;
 }
-.field.check-line span { font-size: 13px; color: var(--text); }
+/* 한 줄로 고정한다. 줄이 나뉘면 체크박스와 글이 어긋나 보인다. */
+.field.check-line span { font-size: 13px; color: var(--text); white-space: nowrap; }
+.field.check-line span .mark { white-space: normal; }
 .badge.role-org   { background: #ece5f7; color: #66459f; }
 .badge.role-user  { background: #eef0f3; color: #77808d; }
 
