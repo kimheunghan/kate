@@ -107,7 +107,6 @@
 
   function statusBadge(status) {
     if (status === 'SUBMITTED') return '<span class="badge submitted">제출완료</span>';
-    if (status === 'DRAFT')     return '<span class="badge draft">임시저장</span>';
     return '<span class="badge none">미등록</span>';
   }
 

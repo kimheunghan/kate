@@ -334,7 +334,7 @@ router.post('/', async (req, res, next) => {
     const missing = findEmptyCell(items);
     if (missing) return res.status(400).json({ error: missing });
     const note = String(req.body?.note || '').slice(0, 5000);
-    const status = req.body?.status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT';
+    const status = 'SUBMITTED';           // 임시저장은 쓰지 않는다
 
     const reportId = await db.tx(async (client) => {
       const { rows } = await client.query(
@@ -380,7 +380,7 @@ router.put('/:id(\\d+)', async (req, res, next) => {
     const missing = findEmptyCell(items);
     if (missing) return res.status(400).json({ error: missing });
     const note = String(req.body?.note || '').slice(0, 5000);
-    const status = req.body?.status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT';
+    const status = 'SUBMITTED';           // 임시저장은 쓰지 않는다
 
     // 전체 관리자는 수정 시 기관도 바꿀 수 있다
     if (req.user.role === 'ADMIN' && req.body?.org_id
@@ -413,31 +413,6 @@ router.put('/:id(\\d+)', async (req, res, next) => {
     report.attachments = await loadAttachments(id);
     report.can_edit = true;
     res.json({ report });
-  } catch (err) { next(err); }
-});
-
-// ---------------------------------------------------------------------
-// POST /api/reports/:id/status  — 제출 / 임시저장 전환
-// ---------------------------------------------------------------------
-router.post('/:id(\\d+)/status', async (req, res, next) => {
-  try {
-    const id = Number(req.params.id);
-    const status = req.body?.status === 'SUBMITTED' ? 'SUBMITTED' : 'DRAFT';
-
-    const existing = await loadReport(id);
-    if (!existing) return res.status(404).json({ error: '보고서를 찾을 수 없습니다.' });
-    if (!canEditReport(req.user, existing)) return res.status(403).json({ error: '본인이 작성한 보고서만 변경할 수 있습니다.' });
-
-    await db.query(
-      `UPDATE wr.reports
-          SET status = $1::varchar,
-              submitted_at = CASE WHEN $1::varchar = 'SUBMITTED'
-                                  THEN COALESCE(submitted_at, now()) ELSE NULL END
-        WHERE id = $2`,
-      [status, id]
-    );
-    await audit.log(req, 'REPORT_STATUS', { targetType: 'report', targetId: id, detail: status });
-    res.json({ ok: true, status });
   } catch (err) { next(err); }
 });
 

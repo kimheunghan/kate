@@ -318,7 +318,7 @@ router.get('/export/status', async (req, res, next) => {
     styleHeader(ws, at);
     at += 1;
 
-    const STATUS_TEXT = { SUBMITTED: '제출완료', DRAFT: '임시저장', NONE: '미등록' };
+    const STATUS_TEXT = { SUBMITTED: '제출완료', NONE: '미등록' };
     people.forEach((r) => {
       ws.getRow(at).values = [
         r.org_name || '(소속없음)',
