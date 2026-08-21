@@ -229,6 +229,24 @@
   function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
 
   /**
+   * 내 정보(권한·소속)를 이 창이 열려 있는 동안만 기억한다.
+   *   화면을 옮길 때마다 서버 답을 기다리느라 상단바와 탭이 비어 보였다.
+   *   기억해 둔 값으로 먼저 그리고, 받아 온 값으로 다시 맞춘다.
+   *   화면 표시에만 쓴다. 실제 권한은 언제나 서버가 확인한다.
+   */
+  const ME_KEY = 'wr.me';
+  const store = () => (typeof window !== 'undefined' ? window.sessionStorage : null);
+  function rememberMe(user) {
+    try { store().setItem(ME_KEY, JSON.stringify(user)); } catch (e) { /* 무시 */ }
+  }
+  function cachedMe() {
+    try { return JSON.parse(store().getItem(ME_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function forgetMe() {
+    try { store().removeItem(ME_KEY); } catch (e) { /* 무시 */ }
+  }
+
+  /**
    * 아이디 칸에 공백이 들어오지 않게 한다.
    *   표에서 아이디를 드래그해 복사하면 칸 앞의 줄바꿈·들여쓰기가 함께 붙는다.
    *   붙여넣는 순간 지워 준다.
@@ -272,6 +290,7 @@
     if (logout) {
       logout.onclick = async () => {
         await api.post('/api/auth/logout', {}).catch(() => {});
+        forgetMe();
         location.href = '/login';
       };
     }
@@ -459,5 +478,5 @@
     $('#pw-cur', back).focus();
   }
 
-  global.WR = { api, toast, esc, roleLabel, renderPager, stripBlanks, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
+  global.WR = { api, toast, esc, roleLabel, renderPager, stripBlanks, rememberMe, cachedMe, forgetMe, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
 })(window);

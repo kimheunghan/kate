@@ -23,11 +23,21 @@
   // 초기화
   // ==================================================================
   async function init() {
+    // 기억해 둔 내 정보가 있으면 상단바를 먼저 그린다 (빈 채로 깜빡이지 않게)
+    const cached = window.WR.cachedMe();
+    if (cached) {
+      state.me = cached;
+      $('#topbar').innerHTML = window.WR.renderTopbar(state.me, 'report');
+      window.WR.bindTopbar();
+    }
+
     try {
       const me = await api.get('/api/auth/me');
       state.me = me.user;
+      window.WR.rememberMe(state.me);
     } catch (e) { return; }   // api.js 가 /login 으로 보냄
 
+    // 받아 온 값으로 다시 맞춘다 (권한이 바뀌었을 수 있다)
     $('#topbar').innerHTML = window.WR.renderTopbar(state.me, 'report');
     window.WR.bindTopbar();
 

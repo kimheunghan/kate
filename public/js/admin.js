@@ -87,9 +87,15 @@
   const body = () => $('#tab-body');
 
   async function init() {
+    // 기억해 둔 내 정보가 있으면 상단바와 탭을 먼저 그린다.
+    //  서버 답을 기다리는 동안 화면이 비어 보이던 것을 없앤다.
+    const cached = window.WR.cachedMe();
+    if (cached) { state.me = cached; paintShell(); }
+
     try {
       const me = await api.get('/api/auth/me');
       state.me = me.user;
+      window.WR.rememberMe(state.me);
     } catch (e) { return; }
 
     // 관리자 화면을 쓰는 사람 : 총괄관리자 · 감독관리자 · 중복권한자
@@ -99,24 +105,7 @@
       || state.me.can_view_all === true;
     if (!canEnter) { location.href = '/report'; return; }
 
-    $('#topbar').innerHTML = window.WR.renderTopbar(state.me, 'admin');
-    window.WR.bindTopbar();
-
-    // 탭은 실제로 쓸 수 있는 것만 보여준다.
-    //   등록 현황 · 사용자 관리 · 활동 로그 : 총괄관리자
-    //   감독관리자와 중복권한자 : 주차별 현황판만
-    const isAdmin = state.me.role === 'ADMIN';
-    const allowed = { status: isAdmin, matrix: true, users: isAdmin, audit: isAdmin };
-    $$('#admin-tabs button').forEach((b) => {
-      b.classList.toggle('hidden', !allowed[b.dataset.tab]);
-    });
-    if (!allowed[state.tab]) state.tab = 'matrix';
-    // 첫 화면 탭에 '선택됨' 표시를 맞춘다
-    $$('#admin-tabs button').forEach((b) => {
-      b.classList.toggle('active', b.dataset.tab === state.tab);
-    });
-    // 여기까지 정해진 뒤에 탭 줄을 보여 준다
-    $('#admin-tabs').classList.remove('pending');
+    paintShell();
 
     $$('#admin-tabs button').forEach((b) => {
       b.onclick = () => {
@@ -126,6 +115,29 @@
       };
     });
     render();
+  }
+
+  /**
+   * 상단바와 탭 줄을 지금 아는 권한대로 그린다.
+   *   기억해 둔 정보로 한 번, 서버 답을 받고 한 번 부른다.
+   *   탭은 실제로 쓸 수 있는 것만 보인다.
+   *     등록 현황 · 사용자 관리 · 활동 로그 : 총괄관리자
+   *     감독관리자와 중복권한자 : 주차별 현황판만
+   */
+  function paintShell() {
+    $('#topbar').innerHTML = window.WR.renderTopbar(state.me, 'admin');
+    window.WR.bindTopbar();
+
+    const isAdmin = state.me.role === 'ADMIN';
+    const allowed = { status: isAdmin, matrix: true, users: isAdmin, audit: isAdmin };
+    $$('#admin-tabs button').forEach((b) => {
+      b.classList.toggle('hidden', !allowed[b.dataset.tab]);
+    });
+    if (!allowed[state.tab]) state.tab = 'matrix';
+    $$('#admin-tabs button').forEach((b) => {
+      b.classList.toggle('active', b.dataset.tab === state.tab);
+    });
+    $('#admin-tabs').classList.remove('pending');
   }
 
   function render() {
