@@ -92,8 +92,10 @@
       state.me = me.user;
     } catch (e) { return; }
 
-    // 관리자 화면을 쓸 수 있는 사람 : 총괄·기관·감독 관리자와 중복권한자
-    const canEnter = ['ADMIN', 'ORG_ADMIN', 'SUPERVISOR'].includes(state.me.role)
+    // 관리자 화면을 쓰는 사람 : 총괄관리자 · 감독관리자 · 중복권한자
+    //  기관관리자는 여기 들어오지 않는다. 자기 기관 보고서는
+    //  주간보고 화면의 [등록 내역 조회] 탭에서 본다.
+    const canEnter = state.me.role === 'ADMIN' || state.me.role === 'SUPERVISOR'
       || state.me.can_view_all === true;
     if (!canEnter) { location.href = '/report'; return; }
 
@@ -101,10 +103,9 @@
     window.WR.bindTopbar();
 
     // 탭은 실제로 쓸 수 있는 것만 보여준다.
-    //   사용자 관리 : 총괄관리자 · 기관관리자
-    //   활동 로그   : 총괄관리자
-    //   감독관리자와 '전체 조회' 겸직자는 조회 탭만 쓴다.
-    const canUsers = state.me.role === 'ADMIN' || state.me.role === 'ORG_ADMIN';
+    //   사용자 관리 · 활동 로그 : 총괄관리자
+    //   감독관리자와 중복권한자 : 등록 현황 · 주차별 현황판만
+    const canUsers = state.me.role === 'ADMIN';
     const canAudit = state.me.role === 'ADMIN';
     $$('#admin-tabs button').forEach((b) => {
       if (b.dataset.tab === 'users') b.classList.toggle('hidden', !canUsers);

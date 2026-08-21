@@ -231,8 +231,9 @@
   /** 공통 상단바 렌더 */
   function renderTopbar(user, active) {
     const nav = [{ href: '/report', key: 'report', label: '주간보고' }];
-    // 관리자 화면은 총괄·기관·감독 관리자와 전체 조회 겸직자가 쓴다
-    const seesAdmin = ['ADMIN', 'ORG_ADMIN', 'SUPERVISOR'].includes(user.role)
+    // 관리자 화면은 총괄관리자 · 감독관리자 · 중복권한자가 쓴다.
+    // 기관관리자는 주간보고 화면의 [등록 내역 조회] 탭을 쓴다.
+    const seesAdmin = user.role === 'ADMIN' || user.role === 'SUPERVISOR'
       || user.can_view_all === true;
     if (seesAdmin) nav.push({ href: '/admin', key: 'admin', label: '관리자' });
 
