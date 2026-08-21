@@ -125,22 +125,23 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-/** 관리자 화면 접근 (총괄·기관·감독 관리자) */
+/**
+ * 관리자 화면 접근.
+ *   총괄관리자 · 감독관리자 · 중복권한자만 들어온다.
+ *   작성자와 기관관리자는 주간보고 화면만 쓴다.
+ */
 function requireManager(req, res, next) {
   if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  const ok = ['ADMIN', 'ORG_ADMIN', 'SUPERVISOR'].includes(req.user.role)
+  const ok = req.user.role === 'ADMIN' || req.user.role === 'SUPERVISOR'
           || req.user.can_view_all === true;
   if (!ok) return res.status(403).json({ error: '관리자 권한이 필요합니다.' });
   next();
 }
 
-/**
- * 사용자·기관을 손대는 자리 (총괄관리자 또는 기관관리자).
- * 감독관리자는 조회만 하므로 여기서 막는다.
- */
+/** 사용자·기관을 손대는 자리. 총괄관리자만. */
 function requireUserManager(req, res, next) {
   if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  if (req.user.role !== 'ADMIN' && req.user.role !== 'ORG_ADMIN') {
+  if (req.user.role !== 'ADMIN') {
     return res.status(403).json({ error: '사용자·기관을 관리할 권한이 없습니다.' });
   }
   next();
@@ -152,7 +153,7 @@ function requireUserManager(req, res, next) {
  */
 function requireStatusView(req, res, next) {
   if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  if (req.user.role !== 'ADMIN' && req.user.role !== 'ORG_ADMIN') {
+  if (req.user.role !== 'ADMIN') {
     return res.status(403).json({ error: '등록 현황을 볼 권한이 없습니다.' });
   }
   next();
