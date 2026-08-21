@@ -183,15 +183,20 @@ textarea { resize: vertical; min-height: 60px; }
 }
 .search-bar .sb-check input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .5; }
 /* 수정 창 안의 한 줄짜리 체크박스 */
+/* 체크박스와 글을 한 줄에 나란히. display:flex 가 없으면 label.field > span 이
+   블록이라 글이 아래로 내려간다. */
 .field.check-line {
-  flex-direction: row; align-items: center; gap: 8px; margin-bottom: 10px;
+  display: flex; flex-direction: row; align-items: center;
+  gap: 8px; margin-bottom: 10px;
 }
 .field.check-line input[type="checkbox"] {
+  flex: 0 0 auto;
   width: 18px; height: 18px; margin: 0; accent-color: var(--primary); cursor: pointer;
 }
-/* 한 줄로 고정한다. 줄이 나뉘면 체크박스와 글이 어긋나 보인다. */
-.field.check-line span { font-size: 13px; color: var(--text); white-space: nowrap; }
-.field.check-line span .mark { white-space: normal; }
+.field.check-line > span {
+  display: inline-block; margin: 0;
+  font-size: 13px; font-weight: 600; white-space: nowrap;
+}
 .badge.role-org   { background: #ece5f7; color: #66459f; }
 .badge.role-user  { background: #eef0f3; color: #77808d; }
 
