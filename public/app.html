@@ -28,13 +28,8 @@
             <select id="sel-week"></select>
           </label>
           <button class="btn primary sb-btn" id="btn-load">검색</button>
-          <!-- 기관은 검색줄 오른쪽 끝에 붙인다 -->
-          <label class="sb-field sb-right" id="org-field" style="flex:0 0 auto">
-            <span>기관</span>
-            <!-- 보고서는 항상 본인 소속으로 저장되므로 기관명만 보여준다 -->
-            <select id="sel-org" class="hidden"></select>
-            <div id="sel-org-text" class="sb-static"></div>
-          </label>
+          <!-- 보고서는 언제나 본인 소속으로 저장된다. 화면에 따로 보이지 않는다. -->
+          <select id="sel-org" class="hidden"></select>
         </div>
         <div id="write-status"></div>
       </div>

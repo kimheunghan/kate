@@ -78,16 +78,10 @@
     $('#f-org').innerHTML = '<option value="">전체</option>' + opts;
 
     // 보고서는 언제나 "본인 소속 기관" 으로 저장된다.
-    // 총괄관리자도 마찬가지이므로 선택박스 없이 기관명만 보여준다.
+    // 총괄관리자도 마찬가지라 고를 일이 없어 화면에는 보이지 않는다.
     const orgSel = $('#sel-org');
-    const orgText = $('#sel-org-text');
     orgSel.value = state.me.org_id || '';
     orgSel.classList.add('hidden');
-    if (orgText) {
-      orgText.textContent = state.me.org_name || '소속 없음';
-      orgText.title = '기관은 상단 [내 정보]에서 변경할 수 있습니다.';
-      orgText.classList.remove('hidden');
-    }
   }
 
   /** 표 위의 공용 툴바를 만든다 (칸마다 툴바를 붙이지 않기 위함) */
@@ -237,10 +231,9 @@
     state.dirty = false;
 
     const week = state.weeks.find((w) => w.id === weekId);
-    const org = state.orgs.find((o) => o.id === orgId);
     const readOnly = report ? !report.can_edit : false;
 
-    $('#editor-title').textContent = `${org ? org.name : ''} · ${week ? week.label : ''}`;
+    $('#editor-title').textContent = week ? week.label : '';
     updateTableHeads(week);
     $('#editor-badge').innerHTML = report ? statusBadge(report.status) : statusBadge('NONE');
 
