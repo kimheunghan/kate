@@ -23,46 +23,53 @@
   const DUTY_LABEL = { LEAD: '총괄책임자', MANAGER: '실무책임자', RESEARCHER: '참여연구원' };
   // 담당 역할은 반드시 선택해야 한다. 빈 항목은 고르라는 안내일 뿐 저장되지 않는다.
   /**
-   * 권한에 맞춰 담당 역할 칸을 잠근다.
-   * 감독관리자는 참여 인력이 아니라 담당 역할이 없다.
+   * 기관 · 권한 · 담당 역할 · 전체 조회 칸을 서로 맞춰 준다.
+   *   - 감독 기관(회원가입에 안 나오는 기관)을 고르면 권한을 감독관리자로 고정
+   *   - 감독관리자는 참여 인력이 아니라 담당 역할이 없다 → 칸을 잠그고 비운다
+   *   - 이미 전체를 보는 권한(총괄·감독)에는 '전체 조회' 겸직이 의미가 없다
+   * 한 함수로 묶어 둔다. 나눠 두면 값을 코드로 바꿀 때 다른 쪽이 따라오지 않는다.
    */
-  function syncDutyByRole(roleSel, dutySel) {
-    if (!roleSel || !dutySel) return;
-    const apply = () => {
-      const off = roleSel.value === 'SUPERVISOR';
-      dutySel.disabled = off;
-      dutySel.title = off ? '감독관리자는 참여 인력이 아니라 담당 역할이 없습니다.' : '';
-      if (off) dutySel.value = '';
-    };
-    roleSel.addEventListener('change', apply);
-    apply();
-  }
-
-  /**
-   * 감독 기관(회원가입에 안 나오는 기관)을 고르면 권한을 감독관리자로 고정한다.
-   * 그리고 이미 전체를 보는 권한에는 '전체 조회' 겸직이 의미가 없으므로 잠근다.
-   */
-  function syncSupervisorOrg(orgSel, roleSel, viewAllChk, orgs) {
-    if (!orgSel || !roleSel) return;
+  function syncUserFields(orgSel, roleSel, dutySel, viewAllChk, orgs) {
+    if (!roleSel) return;
     const supOrgIds = new Set(
       (orgs || []).filter((o) => o.is_signup_visible === false).map((o) => String(o.id))
     );
+    // 감독 기관을 골랐다가 되돌릴 때 원래 권한으로 돌아오게 기억해 둔다
+    let lastRole = roleSel.value;
+
     const apply = () => {
-      const isSupOrg = supOrgIds.has(String(orgSel.value));
-      if (isSupOrg) roleSel.value = 'SUPERVISOR';
+      const isSupOrg = orgSel ? supOrgIds.has(String(orgSel.value)) : false;
+      if (isSupOrg) {
+        roleSel.value = 'SUPERVISOR';
+      } else if (roleSel.disabled) {
+        // 방금 감독 기관에서 빠져나온 참이면 원래 권한으로 되돌린다
+        roleSel.value = lastRole === 'SUPERVISOR' ? 'USER' : lastRole;
+      }
       roleSel.disabled = isSupOrg;
       roleSel.title = isSupOrg ? '감독 기관 소속은 감독관리자로 지정됩니다.' : '';
+      if (!isSupOrg) lastRole = roleSel.value;
 
+      const isSupervisor = roleSel.value === 'SUPERVISOR';
+      if (dutySel) {
+        dutySel.disabled = isSupervisor;
+        dutySel.title = isSupervisor
+          ? '감독관리자는 참여 인력이 아니라 담당 역할이 없습니다.' : '';
+        if (isSupervisor) dutySel.value = '';
+      }
+
+      // 전체 조회 겸직은 3사 소속에게만 뜻이 있다.
+      // 총괄·감독 관리자는 이미 전체를 보므로 칸 자체를 감춘다.
       if (viewAllChk) {
-        const seesAll = roleSel.value === 'ADMIN' || roleSel.value === 'SUPERVISOR';
-        viewAllChk.disabled = seesAll;
+        const seesAll = roleSel.value === 'ADMIN' || isSupervisor;
         if (seesAll) viewAllChk.checked = false;
-        viewAllChk.title = seesAll
-          ? '이미 전체를 볼 수 있는 권한입니다.'
-          : '등록 내역과 주차별 현황판을 전체 범위로 봅니다. 참여 인력 자격은 그대로입니다.';
+        const holder = viewAllChk.closest('label') || viewAllChk;
+        holder.classList.toggle('hidden', seesAll);
+        viewAllChk.title =
+          '등록 내역과 주차별 현황판을 전체 범위로 봅니다. 참여 인력 자격은 그대로입니다.';
       }
     };
-    orgSel.addEventListener('change', apply);
+
+    if (orgSel) orgSel.addEventListener('change', apply);
     roleSel.addEventListener('change', apply);
     apply();
   }
@@ -471,8 +478,7 @@
     $('#u-forg').onchange = () => { page.users = 1; renderUsers(readUserFilters()); };
     $('#u-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { page.users = 1; renderUsers(readUserFilters()); } });
 
-    syncDutyByRole($('#u-role'), $('#u-duty'));
-    syncSupervisorOrg($('#u-org'), $('#u-role'), $('#u-view-all'), orgsRes.orgs);
+    syncUserFields($('#u-org'), $('#u-role'), $('#u-duty'), $('#u-view-all'), orgsRes.orgs);
 
     $('#u-add').onclick = async () => {
       const payload = {
@@ -610,8 +616,8 @@
       </div>`;
     document.body.appendChild(back);
 
-    syncDutyByRole($('#e-role', back), $('#e-duty', back));
-    syncSupervisorOrg($('#e-org', back), $('#e-role', back), $('#e-view-all', back), orgs);
+    syncUserFields($('#e-org', back), $('#e-role', back), $('#e-duty', back),
+                   $('#e-view-all', back), orgs);
 
     const close = () => back.remove();
     $('#e-cancel', back).onclick = close;
