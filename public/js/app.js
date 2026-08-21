@@ -78,16 +78,10 @@
     $('#f-org').innerHTML = '<option value="">전체</option>' + opts;
 
     // 보고서는 언제나 "본인 소속 기관" 으로 저장된다.
-    // 총괄관리자도 마찬가지이므로 선택박스 없이 기관명만 보여준다.
+    // 총괄관리자도 마찬가지라 고를 일이 없어 화면에는 보이지 않는다.
     const orgSel = $('#sel-org');
-    const orgText = $('#sel-org-text');
     orgSel.value = state.me.org_id || '';
     orgSel.classList.add('hidden');
-    if (orgText) {
-      orgText.textContent = state.me.org_name || '소속 없음';
-      orgText.title = '기관은 상단 [내 정보]에서 변경할 수 있습니다.';
-      orgText.classList.remove('hidden');
-    }
   }
 
   /** 표 위의 공용 툴바를 만든다 (칸마다 툴바를 붙이지 않기 위함) */
@@ -169,7 +163,7 @@
         const isWrite = b.dataset.tab === 'write';
         $('#tab-write').classList.toggle('hidden', !isWrite);
         $('#tab-list').classList.toggle('hidden', isWrite);
-        ['#editor-panel', '#files-panel', '#save-panel'].forEach((s) =>
+        ['#editor-panel', '#files-panel'].forEach((s) =>
           $(s).classList.toggle('hidden', !isWrite));
         if (!isWrite) searchList(1);
       };
@@ -237,10 +231,9 @@
     state.dirty = false;
 
     const week = state.weeks.find((w) => w.id === weekId);
-    const org = state.orgs.find((o) => o.id === orgId);
     const readOnly = report ? !report.can_edit : false;
 
-    $('#editor-title').textContent = `${org ? org.name : ''} · ${week ? week.label : ''}`;
+    $('#editor-title').textContent = week ? week.label : '';
     updateTableHeads(week);
     $('#editor-badge').innerHTML = report ? statusBadge(report.status) : statusBadge('NONE');
 
@@ -263,13 +256,15 @@
     $('#btn-add-row').disabled = readOnly;
     $('#btn-del-row').disabled = readOnly;
     $('#btn-save').disabled = readOnly;
-    // 남이 쓴 보고서를 열어 둔 상태에서는 엑셀 일괄등록도 막는다
+    // 남이 쓴 보고서를 열어 둔 상태에서는 엑셀 업로드도 막는다
     $('#btn-excel-import').disabled = readOnly;
     $('#btn-excel-import').title = readOnly
       ? '본인이 작성한 보고서에서만 사용할 수 있습니다.' : '';
-    $('#btn-print').disabled = !report;
-    $('#btn-export').disabled = !report;
-    $('#btn-export-hwpx').disabled = !report;
+    // 아직 저장 전이라도 세 칸이 차 있으면 저장한 뒤 내려받게 하므로
+    // 버튼은 열어 둔다. 남이 쓴 보고서일 때만 막는다.
+    $('#btn-print').disabled = readOnly;
+    $('#btn-export').disabled = readOnly;
+    $('#btn-export-hwpx').disabled = readOnly;
   }
 
   // ==================================================================
@@ -415,7 +410,7 @@
 
   // ==================================================================
   // ==================================================================
-  // Excel 일괄등록 — 화면에서 고른 주차로 바로 등록된다
+  // 엑셀 업로드 — 화면에서 고른 주차로 불러온다
   // ==================================================================
   function bindExcelImport() {
     $('#btn-excel-template').onclick = () => {
@@ -457,7 +452,7 @@
         toast(err.message, true);
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Excel 일괄등록';
+        btn.textContent = '엑셀 업로드';
       }
     };
   }
@@ -480,17 +475,18 @@
       }
       save('SUBMITTED');
     };
-    $('#btn-print').onclick = () => {
-      if (!state.report) return;
-      openPrint(state.report.id);
+    // 저장 전이면 세 칸이 다 찼을 때 저장한 뒤 내려받는다
+    $('#btn-print').onclick = async () => {
+      const r = await ensureSavedReport();
+      if (r) openPrint(r.id);
     };
-    $('#btn-export').onclick = () => {
-      if (!state.report) return;
-      downloadReport(state.report.id);
+    $('#btn-export').onclick = async () => {
+      const r = await ensureSavedReport();
+      if (r) downloadReport(r.id);
     };
-    $('#btn-export-hwpx').onclick = () => {
-      if (!state.report) return;
-      downloadReportHwpx(state.report.id);
+    $('#btn-export-hwpx').onclick = async () => {
+      const r = await ensureSavedReport();
+      if (r) downloadReportHwpx(r.id);
     };
   }
 
@@ -528,30 +524,53 @@
     const input = $('#file-input');
 
     dz.onclick = () => input.click();
-    input.onchange = () => { if (input.files.length) uploadFiles(input.files); input.value = ''; };
+    // input.value = '' 는 FileList 를 비운다. uploadFiles 가 기다리는 동안
+    // 목록이 사라지지 않도록 미리 배열로 옮겨서 넘긴다.
+    input.onchange = () => {
+      const picked = Array.from(input.files);
+      input.value = '';
+      if (picked.length) uploadFiles(picked);
+    };
 
     ['dragenter', 'dragover'].forEach((ev) =>
       dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('over'); }));
     ['dragleave', 'drop'].forEach((ev) =>
       dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('over'); }));
     dz.addEventListener('drop', (e) => {
-      if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
+      const dropped = Array.from(e.dataTransfer.files);   // 이벤트가 끝나면 못 읽는다
+      if (dropped.length) uploadFiles(dropped);
     });
   }
 
-  async function uploadFiles(fileList) {
-    // 아직 저장 전이면 먼저 저장한다 (첨부는 보고서 id 가 필요)
-    if (!state.report) {
-      toast('보고서를 먼저 저장합니다...');
-      const saved = await save('DRAFT', { silent: true });
-      if (!saved) return;
+  /**
+   * 첨부·내려받기는 보고서 id 가 있어야 한다.
+   * 아직 저장 전이면 세 칸이 다 찼을 때만 저장해서 id 를 만든다.
+   * 비어 있으면 안내만 띄우고 null 을 준다.
+   * @returns {Promise<object|null>}
+   */
+  async function ensureSavedReport() {
+    if (state.report) return state.report;
+
+    const missing = findEmptyCell();
+    if (!collectItems().length || missing) {
+      toast('계획 및 실적 칸에 입력되지 않으면 등록되지 않습니다.', true);
+      if (missing) missing.editor.area.focus();
+      return null;
     }
+    return save('SUBMITTED', { silent: true });
+  }
+
+  async function uploadFiles(fileList) {
+    if (!await ensureSavedReport()) return;
     if (!state.report.can_edit) { toast('첨부 권한이 없습니다.', true); return; }
 
-    const fd = new FormData();
-    for (const f of fileList) fd.append('files', f);
+    const files = Array.from(fileList);
+    if (!files.length) { toast('올릴 파일이 없습니다.', true); return; }
 
-    $('#dz-hint').textContent = `업로드 중... (${fileList.length}개)`;
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+
+    $('#dz-hint').textContent = `업로드 중... (${files.length}개)`;
     try {
       const res = await api.post(`/api/reports/${state.report.id}/attachments`, fd);
       state.report.attachments = (state.report.attachments || []).concat(res.attachments);

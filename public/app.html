@@ -28,13 +28,8 @@
             <select id="sel-week"></select>
           </label>
           <button class="btn primary sb-btn" id="btn-load">검색</button>
-          <!-- 기관은 검색줄 오른쪽 끝에 붙인다 -->
-          <label class="sb-field sb-right" id="org-field" style="flex:0 0 auto">
-            <span>기관</span>
-            <!-- 보고서는 항상 본인 소속으로 저장되므로 기관명만 보여준다 -->
-            <select id="sel-org" class="hidden"></select>
-            <div id="sel-org-text" class="sb-static"></div>
-          </label>
+          <!-- 보고서는 언제나 본인 소속으로 저장된다. 화면에 따로 보이지 않는다. -->
+          <select id="sel-org" class="hidden"></select>
         </div>
         <div id="write-status"></div>
       </div>
@@ -48,7 +43,10 @@
         <div class="spacer"></div>
         <!-- Excel 양식 내려받기 : 지금은 감춰 둔다. 기능은 그대로라 hidden 만 떼면 다시 보인다. -->
         <button class="btn sm hidden" id="btn-excel-template">Excel 양식</button>
-        <button class="btn sm primary" id="btn-excel-import">Excel 일괄등록</button>
+        <button class="btn sm" id="btn-export-hwpx"
+                title="아래한글 문서(HWPX)로 내려받기">한글 다운로드</button>
+        <button class="btn sm primary" id="btn-excel-import">엑셀 업로드</button>
+        <button class="btn sm primary" id="btn-save">저장</button>
         <input type="file" id="excel-file-input" accept=".xlsx" class="hidden">
       </header>
 
@@ -95,6 +93,9 @@
       <header>
         <h2>증적자료 첨부 <span id="files-count" class="title-count"></span></h2>
         <span class="muted small">문서, 소스파일, 캡처 등 (실행파일은 zip 으로 압축해서 올려주세요)</span>
+        <div class="spacer"></div>
+        <!-- 저장 전에는 첨부할 수 없다 -->
+        <span class="small muted"><span class="mark">※</span> 계획·실적을 입력해야 등록됩니다.</span>
       </header>
       <div class="body">
         <div class="dropzone" id="dropzone">
@@ -106,19 +107,13 @@
       </div>
     </div>
 
-    <!-- ==================================================== 저장 버튼 -->
-    <div class="panel no-print" id="save-panel">
-      <div class="body">
-        <!-- 오른쪽 정렬, 주 동작(저장)을 맨 오른쪽에 둔다 -->
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end">
-          <button class="btn" id="btn-print">인쇄 / PDF</button>
-          <button class="btn" id="btn-export"
-                  title="Word 문서로 내려받기">Word 다운로드</button>
-          <button class="btn" id="btn-export-hwpx"
-                  title="아래한글 문서(HWPX)로 내려받기">한글 다운로드</button>
-          <button class="btn primary" id="btn-save">저장</button>
-        </div>
-      </div>
+    <!-- 저장·한글 다운로드 버튼은 작성 영역 제목줄로 올렸다.
+         인쇄/Word 는 지금 쓰지 않는다. 기능은 그대로 두되 화면에는
+         내지 않으려고 감춘 칸에 담아 둔다. hidden 만 떼면 다시 보인다. -->
+    <div class="hidden" id="spare-buttons">
+      <button class="btn" id="btn-print">인쇄 / PDF</button>
+      <button class="btn" id="btn-export"
+              title="Word 문서로 내려받기">Word 다운로드</button>
     </div>
 
     <!-- ================================================= 조회 탭 내용 -->
