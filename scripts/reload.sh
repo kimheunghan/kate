@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$HOME/.local/bin:$PATH"
 
-PORT="$(grep -E '^APP_PORT=' .env | cut -d= -f2 || echo 16080)"
+PORT="$(grep -E '^APP_PORT=' .env | cut -d= -f2 || echo 16000)"
 
 # 소스/첨부파일 동기화 과정에서 달라질 수 있는 rootless UID를 먼저 보정한다.
 bash scripts/fix-runtime-permissions.sh

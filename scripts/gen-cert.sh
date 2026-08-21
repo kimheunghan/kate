@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =====================================================================
 #  자체 서명 인증서 생성 (HTTPS 용)
-#      bash scripts/gen-cert.sh 34.158.212.199
+#      bash scripts/gen-cert.sh aips.iptime.org
 #      bash scripts/gen-cert.sh 192.168.200.115 183.101.26.137
 #
 #  HTTP 로 서비스하면 Chrome 이 파일 다운로드를 '안전하지 않음'으로 차단한다.

@@ -70,7 +70,7 @@ services:
     ports:
       # 외부 공개 포트. .env 의 APP_PORT 로 지정합니다.
       # 192.168.200.115 는 16000~16999 만 개방되어 있으므로 그 범위에서 고르세요.
-      - "192.168.200.115:${APP_PORT:-16080}:8080"
+      - "192.168.200.115:${APP_PORT:-16000}:8080"
 
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
