@@ -171,7 +171,6 @@
               <th style="width:11%">이름</th>
               <th style="width:13%">아이디</th>
               <th class="center" style="width:10%">상태</th>
-              <th class="center" style="width:6%">항목</th>
               <th class="center" style="width:6%">첨부</th>
               <th style="width:15%">제출시각</th>
               <th style="width:15%">최종수정</th>
@@ -184,11 +183,10 @@
                 <td><b>${esc(r.user_name)}</b></td>
                 <td class="small muted">${esc(r.username)}</td>
                 <td class="center">${statusBadge(r.status)}</td>
-                <td class="center">${r.item_count}</td>
                 <td class="center">${r.file_count}</td>
                 <td class="small">${r.submitted_at ? fmtDateTime(r.submitted_at) : '-'}</td>
                 <td class="small">${r.report_id ? fmtDateTime(r.updated_at) : '-'}</td>
-              </tr>`).join('') : '<tr><td colspan="8" class="empty">조건에 맞는 작성자가 없습니다.</td></tr>'}
+              </tr>`).join('') : '<tr><td colspan="7" class="empty">조건에 맞는 작성자가 없습니다.</td></tr>'}
           </tbody>
         </table>
       </div>
