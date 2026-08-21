@@ -49,18 +49,23 @@
       </div>
 
       <label class="field">
-        <span>이메일 <em class="req">*</em></span>
-        <input type="email" id="email" autocomplete="email" placeholder="아이디·비밀번호 찾기에 사용됩니다" required>
+        <span>이메일</span>
+        <input type="email" id="email" autocomplete="email" placeholder="example@bimatrix.co.kr">
       </label>
 
       <label class="field">
-        <span>소속 기관 <em class="req">*</em></span>
+        <span>기관 <em class="req">*</em></span>
         <select id="org_id" required></select>
       </label>
 
       <label class="field">
-        <span>담당 업무</span>
-        <textarea id="signup_note" rows="2" placeholder="관리자가 승인 시 참고합니다."></textarea>
+        <span>담당 역할 <em class="req">*</em></span>
+        <select id="duty" required>
+          <option value="">선택하세요</option>
+          <option value="LEAD">총괄책임자</option>
+          <option value="MANAGER">실무책임자</option>
+          <option value="RESEARCHER">참여연구원</option>
+        </select>
       </label>
 
       <button type="submit" class="btn primary" id="submit">가입 신청</button>

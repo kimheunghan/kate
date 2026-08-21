@@ -51,8 +51,10 @@ services:
     environment:
       NODE_ENV: production
       APP_PORT: 8080
-      DB_HOST: db
-      DB_PORT: 5432
+      # pasta 방식에서는 컨테이너가 기관 네트워크에 붙지 않으므로
+      # DB 는 호스트에 열린 포트로 접속한다
+      DB_HOST: ${APP_DB_HOST:-host.containers.internal}
+      DB_PORT: ${APP_DB_PORT:-15432}
       DB_NAME: ${DB_NAME:-weekly_report}
       DB_USER: ${DB_USER:-wruser}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 를 .env 에 설정하세요}
@@ -62,6 +64,8 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      SSL_CERT_FILE: ${SSL_CERT_FILE:-}
+      SSL_KEY_FILE: ${SSL_KEY_FILE:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
@@ -82,6 +86,7 @@ services:
       TZ: Asia/Seoul
     volumes:
       - wr-uploads:/app/uploads
+      - ./certs:/app/certs:ro,z
     ports:
       - "${APP_PORT:-8080}:8080"
     healthcheck:
@@ -91,7 +96,10 @@ services:
       start_period: 20s
       retries: 3
     stop_grace_period: 15s
-    networks: [wr-net]
+    # pasta : 접속자의 실제 IP 가 그대로 전달된다.
+    # 기본 방식(rootlessport)은 출발지 주소를 중계기 주소로 바꿔 버려
+    # 활동 로그에 컨테이너 내부 주소만 남았다.
+    network_mode: pasta
 
 volumes:
   wr-pgdata:

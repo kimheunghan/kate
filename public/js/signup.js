@@ -51,8 +51,10 @@
     if (password.length < 8) return fail('비밀번호는 8자 이상이어야 합니다.');
     if (password !== password2) return fail('비밀번호가 서로 일치하지 않습니다.');
     if (!name) return fail('이름을 입력하세요.');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('올바른 이메일을 입력하세요.');
-    if (!$('#org_id').value) return fail('소속 기관을 선택하세요.');
+    // 이메일은 선택 입력. 적었을 때만 형태를 본다.
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('올바른 이메일을 입력하세요.');
+    if (!$('#org_id').value) return fail('기관을 선택하세요.');
+    if (!$('#duty').value) return fail('담당 역할을 선택하세요.');
 
     btn.disabled = true;
     btn.textContent = '신청 중...';
@@ -62,7 +64,7 @@
         username, password, name, email,
         phone: $('#phone').value.trim(),
         org_id: Number($('#org_id').value),
-        signup_note: $('#signup_note').value.trim(),
+        duty: $('#duty').value || null,
       }, { allowAnonymous: true });
 
       $('#form-body').classList.add('hidden');

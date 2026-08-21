@@ -31,7 +31,6 @@
         password: $('#password').value,
       }, { allowAnonymous: true });
 
-      if (res.user.must_change_pw) sessionStorage.setItem('wr_force_pw', '1');
       location.href = res.user.role === 'ADMIN' ? '/admin' : '/report';
     } catch (e2) {
       err.textContent = e2.message;
@@ -104,19 +103,27 @@
   $('#link-find-id').onclick = (e) => {
     e.preventDefault();
     modal('아이디 찾기', `
-      <p class="small muted">가입할 때 등록한 <b>이름과 이메일</b>로 찾습니다.</p>
+      <p class="small muted">가입할 때 등록한 <b>소속과 이름</b>으로 찾습니다.</p>
+      <label class="field"><span>소속</span>
+        <select id="fi-org"><option value="">불러오는 중...</option></select>
+      </label>
       <label class="field"><span>이름</span><input type="text" id="fi-name"></label>
-      <label class="field"><span>이메일</span><input type="email" id="fi-email"></label>
     `, async (ctx) => {
+      const orgId = ctx.back.querySelector('#fi-org').value;
       const name = ctx.back.querySelector('#fi-name').value.trim();
-      const email = ctx.back.querySelector('#fi-email').value.trim();
-      if (!name || !email) return ctx.fail('이름과 이메일을 모두 입력하세요.');
+      if (!orgId) return ctx.fail('소속을 선택하세요.');
+      if (!name) return ctx.fail('이름을 입력하세요.');
 
       try {
-        const res = await api.post('/api/auth/find-id', { name, email }, { allowAnonymous: true });
+        const res = await api.post('/api/auth/find-id', { name, org_id: Number(orgId) }, { allowAnonymous: true });
+        const many = res.accounts.length > 1;
         ctx.succeed(
-          '<b>찾은 아이디</b><br>' +
+          (many
+            ? `<b>같은 이름이 ${res.accounts.length}명 있습니다.</b>`
+              + '<div class="small muted" style="margin:2px 0 8px">본인 이름을 확인하세요.</div>'
+            : '<b>찾은 아이디</b><br>') +
           res.accounts.map((a) =>
+            (many ? `<span style="display:inline-block;min-width:96px">${esc(a.name)}</span>` : '') +
             `<span style="font-size:16px;letter-spacing:1px">${esc(a.username)}</span>` +
             (a.pending ? ' <span class="badge draft">승인대기</span>' : '')
           ).join('<br>') +
@@ -124,6 +131,19 @@
         );
       } catch (e2) { ctx.fail(e2.message); }
     }, '찾기');
+
+    // 소속 목록을 채운다 (회원가입 화면과 같은 목록)
+    api.get('/api/auth/signup-orgs', { allowAnonymous: true })
+      .then((r) => {
+        const sel = document.querySelector('#fi-org');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">선택하세요</option>'
+          + r.orgs.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+      })
+      .catch(() => {
+        const sel = document.querySelector('#fi-org');
+        if (sel) sel.innerHTML = '<option value="">소속 목록을 불러오지 못했습니다</option>';
+      });
   };
 
   // ------------------------------------------------------------------
@@ -134,7 +154,7 @@
     const intro = {
       EMAIL:  `<p class="small muted">본인 확인 후 가입 시 등록한 이메일로
                  <b>비밀번호 재설정 링크</b>를 보내드립니다. (${caps.reset_token_minutes}분 이내 유효)</p>`,
-      DIRECT: `<p class="small muted">가입 시 등록한 정보로 본인 확인 후
+      DIRECT: `<p class="small muted">아이디와 이름으로 본인 확인 후
                  <b>바로 새 비밀번호를 설정</b>할 수 있습니다.</p>`,
       ADMIN:  `<p class="small muted">본인 확인 후 <b>재설정 요청</b>이 접수됩니다.
                  <br>관리자가 확인 후 임시 비밀번호를 알려드립니다.</p>`,
@@ -144,15 +164,13 @@
       ${intro}
       <label class="field"><span>아이디</span><input type="text" id="fp-username"></label>
       <label class="field"><span>이름</span><input type="text" id="fp-name"></label>
-      <label class="field"><span>이메일</span><input type="email" id="fp-email"></label>
     `, async (ctx) => {
       const username = ctx.back.querySelector('#fp-username').value.trim();
       const name = ctx.back.querySelector('#fp-name').value.trim();
-      const email = ctx.back.querySelector('#fp-email').value.trim();
-      if (!username || !name || !email) return ctx.fail('아이디, 이름, 이메일을 모두 입력하세요.');
+      if (!username || !name) return ctx.fail('아이디와 이름을 모두 입력하세요.');
 
       try {
-        const res = await api.post('/api/auth/reset-request', { username, name, email }, { allowAnonymous: true });
+        const res = await api.post('/api/auth/reset-request', { username, name }, { allowAnonymous: true });
         // 임시 비밀번호를 화면에 알려주고 재설정 화면으로 안내
         if (res.temp_password) {
           ctx.succeed(`

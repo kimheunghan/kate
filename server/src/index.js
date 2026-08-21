@@ -61,6 +61,7 @@ app.use('/api', require('./routes/meta'));
 app.use('/api/reports/excel', require('./routes/excel'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api', require('./routes/files'));
+app.use('/api/admin', require('./routes/admin-export'));   // 엑셀 내려받기 (먼저 붙인다)
 app.use('/api/admin', require('./routes/admin'));
 
 // ---------------------------------------------------------------------
@@ -69,6 +70,15 @@ app.use('/api/admin', require('./routes/admin'));
 const publicDir = path.resolve(__dirname, '../../public');
 // maxAge 를 두면 CSS/JS 수정이 브라우저 캐시에 막혀 반영되지 않는다.
 // ETag 로 재검증만 하게 두면(변경 없을 때 304) 성능 손해 없이 즉시 반영된다.
+// .html 을 정적 파일로 그냥 내보내면 __V__ 자리가 그대로 나간다.
+// 주소로 /app.html 을 직접 쳐도 아래 sendPage 를 타도록 넘긴다.
+app.use((req, res, next) => {
+  if (!/\.html$/i.test(req.path)) return next();
+  const file = path.basename(req.path);
+  if (!fs.existsSync(path.join(publicDir, file))) return next();
+  return sendPage(res, file);
+});
+
 app.use(express.static(publicDir, {
   index: false,
   etag: true,
@@ -145,11 +155,34 @@ async function start() {
   await auth.ensureAdminAccount();
   await require('./lib/mailer').verify();
 
-  const server = app.listen(config.port, '0.0.0.0', () => {
-    console.log(`[app] 주간보고 시스템 기동 완료 → http://0.0.0.0:${config.port}`);
+  // 인증서가 지정되어 있으면 HTTPS 로 기동한다
+  let server;
+  let scheme = 'http';
+  const { certFile, keyFile } = config.ssl;
+  if (certFile && keyFile) {
+    if (!fs.existsSync(certFile) || !fs.existsSync(keyFile)) {
+      console.error(`[FATAL] 인증서 파일을 찾을 수 없습니다: ${certFile} / ${keyFile}`);
+      process.exit(1);
+    }
+    const https = require('https');
+    server = https.createServer(
+      { cert: fs.readFileSync(certFile), key: fs.readFileSync(keyFile) }, app
+    );
+    scheme = 'https';
+    console.log('[app] HTTPS 로 기동합니다.');
+  } else {
+    console.log('[app] HTTP 로 기동합니다. (SSL_CERT_FILE/SSL_KEY_FILE 을 지정하면 HTTPS)');
+    console.log('[app] ※ HTTP 에서는 Chrome 이 파일 다운로드를 차단할 수 있습니다.');
+  }
+
+  const onReady = () => {
+    console.log(`[app] 주간보고 시스템 기동 완료 → ${scheme}://0.0.0.0:${config.port}`);
     console.log(`[app] DB: ${config.db.user}@${config.db.host}:${config.db.port}/${config.db.database} (schema=${config.db.schema})`);
     console.log(`[app] 업로드 경로: ${config.upload.dir}`);
-  });
+  };
+
+  if (server) server.listen(config.port, '0.0.0.0', onReady);
+  else server = app.listen(config.port, '0.0.0.0', onReady);
 
   const shutdown = (sig) => {
     console.log(`[app] ${sig} 수신 - 종료합니다.`);

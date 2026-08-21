@@ -3,7 +3,9 @@
    ===================================================================== */
 (function () {
   'use strict';
-  const { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, $, $$ } = window.WR;
+  const { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, $, $$ } = window.WR;
+
+  const PAGE_SIZE = 10;                  // 목록 한 쪽에 보여 줄 건수
 
   const state = {
     me: null,
@@ -28,14 +30,6 @@
 
     $('#topbar').innerHTML = window.WR.renderTopbar(state.me, 'report');
     window.WR.bindTopbar();
-
-    if (sessionStorage.getItem('wr_force_pw')) {
-      sessionStorage.removeItem('wr_force_pw');
-      setTimeout(() => {
-        toast('초기 비밀번호입니다. 비밀번호를 변경해 주세요.', true);
-        window.WR.openPasswordModal();
-      }, 400);
-    }
 
     const [weeksRes, orgsRes] = await Promise.all([api.get('/api/weeks'), api.get('/api/orgs')]);
     state.weeks = weeksRes.weeks;
@@ -67,7 +61,7 @@
 
   function fillWeekSelects() {
     const opts = state.weeks.map((w) =>
-      `<option value="${w.id}"${w.is_open ? '' : ' data-closed="1"'}>${esc(w.label)}${w.is_open ? '' : ' [마감]'}</option>`
+      `<option value="${w.id}">${esc(w.label)}</option>`
     ).join('');
     $('#sel-week').innerHTML = opts;
     $('#f-week').innerHTML = '<option value="">전체</option>' + opts;
@@ -83,11 +77,16 @@
     $('#sel-org').innerHTML = opts;
     $('#f-org').innerHTML = '<option value="">전체</option>' + opts;
 
-    if (state.me.role !== 'ADMIN') {
-      $('#sel-org').value = state.me.org_id || '';
-      $('#sel-org').disabled = true;
-    } else if (state.me.org_id) {
-      $('#sel-org').value = state.me.org_id;
+    // 보고서는 언제나 "본인 소속 기관" 으로 저장된다.
+    // 총괄관리자도 마찬가지이므로 선택박스 없이 기관명만 보여준다.
+    const orgSel = $('#sel-org');
+    const orgText = $('#sel-org-text');
+    orgSel.value = state.me.org_id || '';
+    orgSel.classList.add('hidden');
+    if (orgText) {
+      orgText.textContent = state.me.org_name || '소속 없음';
+      orgText.title = '기관은 상단 [내 정보]에서 변경할 수 있습니다.';
+      orgText.classList.remove('hidden');
     }
   }
 
@@ -109,10 +108,8 @@
       ed.area.classList.add('active');
       state.toolbar.setEnabled(true);
       state.toolbar.syncState();
-      $('#toolbar-hint').classList.add('hidden');
     } else {
       state.toolbar.setEnabled(false);
-      $('#toolbar-hint').classList.remove('hidden');
     }
   }
 
@@ -126,10 +123,31 @@
     const role = state.me.role;
     const onlyMine = role !== 'ADMIN' && role !== 'ORG_ADMIN';
 
-    const orgFilter = $('#f-org');
-    if (orgFilter && orgFilter.closest('label')) {
-      orgFilter.closest('label').classList.toggle('hidden', role !== 'ADMIN');
+    // 내려받기 단추 정리 (지우지 않고 감추기만 한다)
+    //   작성자   : 저장만
+    //   관리자   : 저장 + 한글 다운로드
+    //   인쇄/PDF, Word 다운로드는 아무에게도 보이지 않는다
+    ['#btn-print', '#btn-export'].forEach((sel) => {
+      const b = $(sel);
+      if (b) b.classList.add('hidden');
+    });
+    const hwpxBtn = $('#btn-export-hwpx');
+    if (hwpxBtn) hwpxBtn.classList.toggle('hidden', onlyMine);
+
+    // 등록 내역 조회는 관리자만 본다. 작성자에게는 탭을 감춘다.
+    // (지우지 않고 감추기만 하므로 필요하면 이 줄만 빼면 다시 보인다)
+    const listTab = $$('.tabs button').find((b) => b.dataset.tab === 'list');
+    if (listTab) {
+      listTab.classList.toggle('hidden', onlyMine);
+      // 감춘 탭에 머물러 있으면 작성 화면으로 돌려보낸다
+      if (onlyMine && listTab.classList.contains('active')) {
+        $$('.tabs button').find((b) => b.dataset.tab === 'write').click();
+      }
     }
+
+    // 기관 필터는 전체 관리자만 (기관 관리자는 자기 기관으로 고정되므로 불필요)
+    const orgField = $('#f-org-field');
+    if (orgField) orgField.classList.toggle('hidden', role !== 'ADMIN');
     const note = $('#list-scope-note');
     if (note) {
       note.textContent = onlyMine
@@ -138,11 +156,8 @@
             ? `${state.me.org_name || '소속 기관'} 소속 전체 보고서가 표시됩니다.`
             : '전체 기관의 보고서가 표시됩니다.');
     }
-    // 작성자 열은 항상 표시한다 (본인 확인용). 기관 열만 작성자에게 숨긴다.
-    document.querySelectorAll('.col-org').forEach((el) => {
-      el.classList.toggle('hidden', onlyMine);
-    });
-    document.querySelectorAll('.col-author').forEach((el) => {
+    // 소속·참여인력 열은 권한과 무관하게 항상 표시한다
+    document.querySelectorAll('.col-org, .col-author').forEach((el) => {
       el.classList.remove('hidden');
     });
   }
@@ -190,29 +205,49 @@
     } catch (e) { toast(e.message, true); }
   }
 
+  const KOR_DOW = ['일', '월', '화', '수', '목', '금', '토'];
+
+  /** 2026-08-13 → 8/13.목 */
+  function fmtDay(iso) {
+    const [y, m, d] = String(iso || '').split('-').map(Number);
+    if (!y || !m || !d) return '';
+    return `${m}/${d}.${KOR_DOW[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}`;
+  }
+
+  function fmtRange(start, end) {
+    const a = fmtDay(start); const b = fmtDay(end);
+    return a && b ? `${a}~${b}` : '';
+  }
+
+  /** 표 제목에 대상 기간을 표시. 향후 계획은 다음 주차 기간을 쓴다. */
+  function updateTableHeads(week) {
+    const cur = week ? fmtRange(week.start_date, week.end_date) : '';
+    // weeks 는 최신순 정렬이므로 바로 앞 항목이 다음 주차
+    const idx = week ? state.weeks.findIndex((w) => w.id === week.id) : -1;
+    const nextWeek = idx > 0 ? state.weeks[idx - 1] : null;
+    const nxt = nextWeek ? fmtRange(nextWeek.start_date, nextWeek.end_date) : '';
+
+    $('#th-plan').innerHTML = `① 당초 계획${cur ? `<span class="th-date">(${cur})</span>` : ''}`;
+    $('#th-result').innerHTML = `② 추진 실적${cur ? `<span class="th-date">(${cur})</span>` : ''}`;
+    $('#th-next').innerHTML = `③ 향후 계획${nxt ? `<span class="th-date">(${nxt})</span>` : ''}`;
+  }
+
   function applyReport(report, weekId, orgId) {
     state.report = report;
     state.dirty = false;
 
     const week = state.weeks.find((w) => w.id === weekId);
     const org = state.orgs.find((o) => o.id === orgId);
-    const closed = week && !week.is_open;
-    const readOnly = report ? !report.can_edit : (closed && state.me.role !== 'ADMIN');
+    const readOnly = report ? !report.can_edit : false;
 
     $('#editor-title').textContent = `${org ? org.name : ''} · ${week ? week.label : ''}`;
-    $('#editor-badge').innerHTML =
-      (report ? statusBadge(report.status) : statusBadge('NONE')) +
-      (closed ? ' <span class="badge closed">마감</span>' : '');
+    updateTableHeads(week);
+    $('#editor-badge').innerHTML = report ? statusBadge(report.status) : statusBadge('NONE');
 
     const msgs = [];
-    if (closed) {
-      msgs.push(state.me.role === 'ADMIN'
-        ? '<div class="alert info">마감된 주차입니다. 관리자 권한으로 수정할 수 있습니다.</div>'
-        : '<div class="alert error">마감된 주차입니다. 조회만 가능합니다.</div>');
-    }
     if (report) {
       msgs.push(`<div class="alert success">등록된 보고서입니다. (작성자 ${esc(report.author_name || '-')} · 최종수정 ${fmtDateTime(report.updated_at)})</div>`);
-    } else if (!closed) {
+    } else {
       msgs.push('<div class="alert info">해당 주차에 등록된 보고서가 없습니다. 아래에서 새로 작성하세요.</div>');
     }
     $('#write-status').innerHTML = msgs.join('');
@@ -226,13 +261,15 @@
 
     // 버튼 활성/비활성
     $('#btn-add-row').disabled = readOnly;
-    $('#btn-copy-prev').disabled = readOnly;
+    $('#btn-del-row').disabled = readOnly;
     $('#btn-save').disabled = readOnly;
-    $('#btn-submit').disabled = readOnly;
-    $('#btn-delete').disabled = readOnly || !report;
+    // 남이 쓴 보고서를 열어 둔 상태에서는 엑셀 일괄등록도 막는다
+    $('#btn-excel-import').disabled = readOnly;
+    $('#btn-excel-import').title = readOnly
+      ? '본인이 작성한 보고서에서만 사용할 수 있습니다.' : '';
     $('#btn-print').disabled = !report;
     $('#btn-export').disabled = !report;
-    $('#btn-submit').textContent = report && report.status === 'SUBMITTED' ? '제출 내용 갱신' : '제출하기';
+    $('#btn-export-hwpx').disabled = !report;
   }
 
   // ==================================================================
@@ -244,7 +281,7 @@
     state.rows = [];
     if (!items || !items.length) {
       if (readOnly) {
-        $('#items-body').innerHTML = '<tr><td colspan="5" class="empty">등록된 항목이 없습니다.</td></tr>';
+        $('#items-body').innerHTML = '<tr><td colspan="4" class="empty">등록된 항목이 없습니다.</td></tr>';
         return;
       }
       addRow(null, readOnly);
@@ -263,68 +300,36 @@
       <td class="cell-no"></td>
       <td><div class="ed-plan"></div></td>
       <td><div class="ed-result"></div></td>
-      <td><div class="ed-next"></div></td>
-      <td class="cell-act">
-        <button class="btn sm danger btn-del-row" type="button">삭제</button>
-        <button class="btn sm btn-up" type="button">▲</button>
-        <button class="btn sm btn-down" type="button">▼</button>
-      </td>`;
+      <td><div class="ed-next"></div></td>`;
     tbody.appendChild(tr);
 
     const onChange = () => { state.dirty = true; };
     const onFocus = (ed) => setActiveEditor(ed);
+    // Tab / Shift+Tab 으로도 들여쓰기·내어쓰기 (툴바 버튼과 같은 동작)
+    const onIndent = (ed, delta) => {
+      setActiveEditor(ed);
+      state.toolbar._indent(delta);
+    };
 
     // 세 칸 모두 같은 편집기를 사용한다 (위쪽 공용 툴바가 그대로 적용됨)
     const planEd = new window.WR.Editor(tr.querySelector('.ed-plan'), {
       html: item ? item.plan_html : '',
-      placeholder: '이번 주 계획을 입력하세요', readOnly, onChange, onFocus,
+      placeholder: '이번 주 계획을 입력하세요', readOnly, onChange, onFocus, onIndent,
     });
     const resultEd = new window.WR.Editor(tr.querySelector('.ed-result'), {
       html: item ? item.result_html : '',
-      placeholder: '실제 수행한 내용을 입력하세요', readOnly, onChange, onFocus,
+      placeholder: '실제 수행한 내용을 입력하세요', readOnly, onChange, onFocus, onIndent,
     });
     const nextEd = new window.WR.Editor(tr.querySelector('.ed-next'), {
       html: item ? (item.next_plan_html || '') : '',
-      placeholder: '다음 주 계획을 입력하세요', readOnly, onChange, onFocus,
+      placeholder: '다음 주 계획을 입력하세요', readOnly, onChange, onFocus, onIndent,
     });
 
     const row = { itemId: item ? item.id : null, tr, planEd, resultEd, nextEd };
     state.rows.push(row);
 
-    if (readOnly) {
-      tr.querySelector('.cell-act').innerHTML = '<span class="muted small">-</span>';
-    } else {
-      tr.querySelector('.btn-del-row').onclick = () => {
-        if (state.rows.length === 1) { toast('최소 1개의 업무가 필요합니다.', true); return; }
-        if (!confirm('이 업무 행을 삭제할까요?\n(저장해야 실제로 반영됩니다)')) return;
-        state.rows = state.rows.filter((r) => r !== row);
-        tr.remove();
-        state.dirty = true;
-        renumber();
-      };
-      tr.querySelector('.btn-up').onclick = () => moveRow(row, -1);
-      tr.querySelector('.btn-down').onclick = () => moveRow(row, 1);
-    }
-
     renumber();
     return row;
-  }
-
-  function moveRow(row, delta) {
-    const i = state.rows.indexOf(row);
-    const j = i + delta;
-    if (j < 0 || j >= state.rows.length) return;
-
-    // 에디터 DOM 을 옮기면 내용이 유지되므로 HTML 을 주고받는다
-    const other = state.rows[j];
-    const swap = (a, b) => {
-      const p1 = a.planEd.getHtml(), r1 = a.resultEd.getHtml(), n1 = a.nextEd.getHtml(), id1 = a.itemId;
-      a.planEd.setHtml(b.planEd.getHtml()); a.resultEd.setHtml(b.resultEd.getHtml());
-      a.nextEd.setHtml(b.nextEd.getHtml()); a.itemId = b.itemId;
-      b.planEd.setHtml(p1); b.resultEd.setHtml(r1); b.nextEd.setHtml(n1); b.itemId = id1;
-    };
-    swap(row, other);
-    state.dirty = true;
   }
 
   function renumber() {
@@ -340,6 +345,30 @@
     })).filter((it) => it.plan_html || it.result_html || it.next_plan_html);
   }
 
+  /**
+   * 비어 있는 첫 칸을 찾는다. 다 채워져 있으면 null.
+   * 화면에 보이는 글자가 없으면 비어 있는 것으로 본다.
+   */
+  function findEmptyCell() {
+    const blank = (html) => String(html || '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;|[\s\u00a0\u200b]/g, '') === '';
+
+    for (let i = 0; i < state.rows.length; i++) {
+      const r = state.rows[i];
+      const cells = [
+        ['① 당초 계획', r.planEd],
+        ['② 추진 실적', r.resultEd],
+        ['③ 향후 계획', r.nextEd],
+      ];
+      // 아무것도 안 쓴 줄은 저장에서 빠지므로 검사하지 않는다
+      if (cells.every(([, ed]) => blank(ed.getHtml()))) continue;
+      const empty = cells.find(([, ed]) => blank(ed.getHtml()));
+      if (empty) return { no: i + 1, label: empty[0], editor: empty[1] };
+    }
+    return null;
+  }
+
   function bindEditorPanel() {
     $('#btn-load').onclick = () => {
       if (state.dirty && !confirm('저장하지 않은 변경사항이 있습니다. 그래도 불러올까요?')) return;
@@ -348,142 +377,107 @@
     $('#sel-week').onchange = () => $('#btn-load').click();
     $('#sel-org').onchange = () => $('#btn-load').click();
     $('#btn-add-row').onclick = () => { addRow(null, false); state.dirty = true; };
-    $('#btn-copy-prev').onclick = copyFromPreviousWeek;
+
+    // － : 편집 중인 항목을 지운다. 편집 중인 칸이 없으면 마지막 항목.
+    //      항목이 하나만 남았을 때만 확인을 받는다 (그 외에는 바로 삭제).
+    $('#btn-del-row').onclick = () => {
+      if (!state.rows.length) return;
+
+      const plain = (ed) => (ed ? ed.area.textContent.replace(/\s+/g, ' ').trim() : '');
+
+      if (state.rows.length === 1) {
+        const only = state.rows[0];
+        const filled = [only.planEd, only.resultEd, only.nextEd].some((ed) => plain(ed));
+        if (!filled) { toast('최소 1개의 항목이 필요합니다.', true); return; }
+        if (!confirm('주간보고 작성 내용이 전부 삭제됩니다.')) return;
+        [only.planEd, only.resultEd, only.nextEd].forEach((ed) => ed.setHtml(''));
+        state.dirty = true;
+        toast('내용을 비웠습니다.');
+        return;
+      }
+
+      const active = state.activeEditor;
+      let target = active
+        ? state.rows.find((r) => r.planEd === active || r.resultEd === active || r.nextEd === active)
+        : null;
+      const byActive = !!target;
+      if (!target) target = state.rows[state.rows.length - 1];
+
+      const no = state.rows.indexOf(target) + 1;
+      if (byActive) setActiveEditor(null);
+      state.rows = state.rows.filter((r) => r !== target);
+      target.tr.remove();
+      state.dirty = true;
+      renumber();
+      toast(`${no}번 항목을 삭제했습니다.`);
+    };
   }
 
   // ==================================================================
-  // Excel 여러 주차 일괄등록
+  // ==================================================================
+  // Excel 일괄등록 — 화면에서 고른 주차로 바로 등록된다
   // ==================================================================
   function bindExcelImport() {
     $('#btn-excel-template').onclick = () => {
-      location.href = '/api/reports/excel/template';
+      window.WR.downloadFile('/api/reports/excel/template', '주간보고_양식.xlsx');
     };
-    $('#btn-excel-import').onclick = () => $('#excel-file-input').click();
+    $('#btn-excel-import').onclick = () => {
+      if (!Number($('#sel-week').value)) { toast('보고 주차를 먼저 선택하세요.', true); return; }
+      $('#excel-file-input').click();
+    };
     $('#excel-file-input').onchange = async (e) => {
       const file = e.target.files && e.target.files[0];
       e.target.value = '';
       if (!file) return;
+
+      const weekId = Number($('#sel-week').value);
+      const weekLabel = $('#sel-week').selectedOptions[0]?.textContent.trim() || '';
+      if (!weekId) { toast('보고 주차를 먼저 선택하세요.', true); return; }
+
+      // 화면에 쓰던 내용이 있으면 지워도 되는지 먼저 묻는다
+      const strip = (h) => String(h || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
+      const hasContent = collectItems()
+        .some((it) => strip(it.plan_html) || strip(it.result_html) || strip(it.next_plan_html));
+      if (hasContent
+          && !confirm(`${weekLabel} 화면에 작성한 내용이 있습니다.\n엑셀 내용으로 바꿀까요?\n\n(저장을 눌러야 실제로 등록됩니다)`)) return;
+
       const form = new FormData();
       form.append('file', file);
-      try {
-        toast('Excel 파일을 분석하고 있습니다.');
-        const preview = await api.post('/api/reports/excel/preview', form);
-        openExcelPreview(preview, file.name);
-      } catch (err) { toast(err.message, true); }
-    };
-  }
 
-  function openExcelPreview(preview, fileName) {
-    const groups = preview.groups || [];
-    const errors = preview.errors || [];
-    const validCount = groups.filter((g) => g.valid).length;
-    const existingCount = groups.filter((g) => g.report_id).length;
-    const rows = groups.map((g) => `
-      <tr>
-        <td>${esc(g.week_label || `${g.start_date}~${g.end_date}`)}</td>
-        <td class="center">${g.items.length}</td>
-        <td class="center">${g.status === 'SUBMITTED' ? '제출완료' : '임시저장'}</td>
-        <td class="center">${g.report_id ? `기존 ${g.existing_items}건` : '신규'}</td>
-        <td>${g.valid ? (g.error ? `<span class="warn-text">${esc(g.error)}</span>` : '등록 가능') : `<span class="danger-text">${esc(g.error || '등록 불가')}</span>`}</td>
-      </tr>`).join('');
-    const errorRows = errors.map((e) => `<li>${e.row}행: ${esc(e.message)}</li>`).join('');
-
-    const back = document.createElement('div');
-    back.className = 'modal-back';
-    back.innerHTML = `
-      <div class="modal" style="max-width:900px">
-        <header>Excel 일괄등록 미리보기</header>
-        <div class="body">
-          <p><b>${esc(fileName)}</b> · ${groups.length}개 주차 · 등록 가능 ${validCount}개${existingCount ? ` · 기존 보고서 ${existingCount}개` : ''}</p>
-          ${errors.length ? `<div class="alert error"><b>제외된 행 ${errors.length}건</b><ul class="compact-list">${errorRows}</ul></div>` : ''}
-          <div class="table-scroll">
-            <table class="grid">
-              <thead><tr><th>주차</th><th class="center">업무</th><th class="center">상태</th><th class="center">구분</th><th>검증</th></tr></thead>
-              <tbody>${rows || '<tr><td colspan="5" class="empty">등록 가능한 내용이 없습니다.</td></tr>'}</tbody>
-            </table>
-          </div>
-          <label class="field mt16"><span>기존 보고서 처리</span>
-            <select id="xl-mode">
-              <option value="replace" selected>기존 계획·실적을 Excel 내용으로 교체</option>
-              <option value="skip">기존 보고서는 건너뛰기</option>
-            </select>
-          </label>
-          <div class="alert info">저장 전 검증 결과입니다. 교체를 선택해도 기존 첨부파일은 삭제되지 않고 보고서에 유지됩니다.</div>
-          <div class="alert error hidden" id="xl-error"></div>
-        </div>
-        <footer>
-          <button class="btn" id="xl-cancel">취소</button>
-          <button class="btn primary" id="xl-save" ${validCount ? '' : 'disabled'}>일괄 저장</button>
-        </footer>
-      </div>`;
-    document.body.appendChild(back);
-    const close = () => back.remove();
-    back.querySelector('#xl-cancel').onclick = close;
-    back.addEventListener('click', (e) => { if (e.target === back) close(); });
-    back.querySelector('#xl-save').onclick = async () => {
-      const button = back.querySelector('#xl-save');
-      const mode = back.querySelector('#xl-mode').value;
-      if (mode === 'replace' && !confirm('기존 보고서의 계획·실적을 Excel 내용으로 교체합니다. 계속할까요?')) return;
-      button.disabled = true;
+      const btn = $('#btn-excel-import');
+      btn.disabled = true;
+      btn.textContent = '읽는 중...';
       try {
-        const result = await api.post('/api/reports/excel/commit', {
-          mode,
-          groups: groups.filter((g) => g.valid).map((g) => ({
-            start_date: g.start_date, end_date: g.end_date, status: g.status, items: g.items,
-          })),
-        });
-        close();
-        toast(`${result.saved.length}개 주차 저장, ${result.skipped.length}개 주차 건너뜀`);
-        await loadCurrent();
+        // 엑셀은 화면으로 불러오기만 한다. 등록은 [저장] 을 눌러야 이뤄진다.
+        const res = await api.post('/api/reports/excel/preview', form);
+        renderItems(res.items, false);
+        state.dirty = true;
+        toast(`엑셀에서 ${res.count}건을 불러왔습니다. 확인 후 [저장]을 누르세요.`);
       } catch (err) {
-        button.disabled = false;
-        const el = back.querySelector('#xl-error');
-        el.textContent = err.message; el.classList.remove('hidden');
+        toast(err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Excel 일괄등록';
       }
     };
   }
 
-  async function copyFromPreviousWeek() {
-    const weekId = Number($('#sel-week').value);
-    const orgId = Number($('#sel-org').value);
-    const idx = state.weeks.findIndex((w) => w.id === weekId);
-    const prev = state.weeks[idx + 1];      // weeks 는 최신순 정렬
-    if (!prev) { toast('직전 주차 정보가 없습니다.', true); return; }
-
-    try {
-      const res = await api.get(`/api/reports/lookup?week_id=${prev.id}&org_id=${orgId}`);
-      if (!res.report || !res.report.items.length) {
-        toast(`직전 주차(${prev.label})에 등록된 보고서가 없습니다.`, true);
-        return;
-      }
-      if (!confirm(`직전 주차(${prev.label})의 [향후 계획]을 이번 주 [당초 계획]으로 가져옵니다.\n현재 작성 중인 내용은 대체됩니다. 계속할까요?`)) return;
-
-      // 새 행으로 복사 (id 는 비워서 새 항목으로 저장되게)
-      // 지난주 "향후 계획" 이 이번 주 "당초 계획" 이 된다 (없으면 지난주 계획을 그대로)
-      const copied = res.report.items.map((it) => ({
-        id: null,
-        plan_html: it.next_plan_html || it.plan_html,
-        result_html: '',
-        next_plan_html: '',
-      }));
-      renderItems(copied, false);
-      state.dirty = true;
-      toast(`${copied.length}개 항목을 가져왔습니다. 실적을 입력하세요.`);
-    } catch (e) { toast(e.message, true); }
-  }
 
   // ==================================================================
   // 저장 / 삭제
   // ==================================================================
   function bindSaveButtons() {
-    $('#btn-save').onclick = () => save('DRAFT');
-    $('#btn-submit').onclick = () => {
+    $('#btn-save').onclick = () => {
       const items = collectItems();
       if (!items.length) { toast('내용을 하나 이상 입력하세요.', true); return; }
-      const stripTags = (h) => String(h || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
-      const noResult = items.filter((it) => !stripTags(it.result_html));
-      if (noResult.length && !confirm('추진 실적이 비어 있는 항목이 있습니다. 그래도 제출할까요?')) return;
-      if (!confirm('제출하시겠습니까?\n제출 후에도 마감 전까지는 수정할 수 있습니다.')) return;
+
+      // 세 칸(당초 계획·추진 실적·향후 계획)을 모두 채워야 한다
+      const missing = findEmptyCell();
+      if (missing) {
+        toast(`${missing.no}번 항목의 ${missing.label} 을(를) 입력하세요.`, true);
+        missing.editor.area.focus();
+        return;
+      }
       save('SUBMITTED');
     };
     $('#btn-print').onclick = () => {
@@ -494,15 +488,9 @@
       if (!state.report) return;
       downloadReport(state.report.id);
     };
-    $('#btn-delete').onclick = async () => {
+    $('#btn-export-hwpx').onclick = () => {
       if (!state.report) return;
-      if (!confirm('이 주간보고를 삭제합니다.\n등록된 항목과 첨부파일도 함께 삭제되며 되돌릴 수 없습니다. 계속할까요?')) return;
-      try {
-        await api.del(`/api/reports/${state.report.id}`);
-        toast('삭제되었습니다.');
-        state.dirty = false;
-        await loadCurrent();
-      } catch (e) { toast(e.message, true); }
+      downloadReportHwpx(state.report.id);
     };
   }
 
@@ -512,7 +500,7 @@
     const orgId = Number($('#sel-org').value);
     const payload = { week_id: weekId, org_id: orgId, note: $('#note').value, status, items: collectItems() };
 
-    const btns = [$('#btn-save'), $('#btn-submit')];
+    const btns = [$('#btn-save')];
     btns.forEach((b) => { b.disabled = true; });
 
     try {
@@ -522,7 +510,7 @@
 
       state.dirty = false;
       applyReport(res.report, weekId, orgId);
-      if (!opts.silent) toast(status === 'SUBMITTED' ? '제출되었습니다.' : '임시저장되었습니다.');
+      if (!opts.silent) toast('저장되었습니다.');
       return res.report;
     } catch (e) {
       toast(e.message, true);
@@ -552,9 +540,9 @@
   }
 
   async function uploadFiles(fileList) {
-    // 아직 저장 전이면 임시저장부터 수행 (첨부는 보고서 id 가 필요)
+    // 아직 저장 전이면 먼저 저장한다 (첨부는 보고서 id 가 필요)
     if (!state.report) {
-      toast('보고서를 먼저 임시저장합니다...');
+      toast('보고서를 먼저 저장합니다...');
       const saved = await save('DRAFT', { silent: true });
       if (!saved) return;
     }
@@ -581,18 +569,26 @@
     ul.innerHTML = '';
     $('#dropzone').classList.toggle('hidden', !!readOnly);
 
-    if (!list || !list.length) {
-      $('#files-note').textContent = readOnly ? '첨부된 자료가 없습니다.' : '';
-      return;
-    }
-    $('#files-note').textContent = `총 ${list.length}건`;
+    // 건수는 아래 별도 줄이 아니라 제목 옆 괄호에 표시한다
+    const cnt = $('#files-count');
+    if (cnt) cnt.textContent = list && list.length ? `(${list.length}건)` : '';
+
+    if (!list || !list.length) return;
 
     list.forEach((a) => {
       const li = document.createElement('li');
       li.innerHTML = `
-        <span class="fname"><a href="/api/attachments/${a.id}/download">${esc(a.original_name)}</a></span>
+        <span class="fname"><a href="#" data-dl="${a.id}">${esc(a.original_name)}</a></span>
         <span class="fmeta">${fmtBytes(a.byte_size)} · ${fmtDateTime(a.created_at)}</span>
         ${readOnly ? '' : '<button class="btn sm danger" type="button">삭제</button>'}`;
+      const link = li.querySelector('[data-dl]');
+      if (link) {
+        link.onclick = (e) => {
+          e.preventDefault();
+          window.WR.downloadFile(`/api/attachments/${a.id}/download`, a.original_name);
+        };
+      }
+
       const btn = li.querySelector('button');
       if (btn) {
         btn.onclick = async () => {
@@ -612,19 +608,38 @@
   // ==================================================================
   // 조회 탭
   // ==================================================================
+  // 주차를 고르면 그 주차 한 파일, 안 고르면 주차마다 한 파일씩 묶은 ZIP
+  function updateWeekDownloadButton() {
+    const btn = $('#btn-week-hwpx');
+    if (!btn) return;
+    const one = !!$('#f-week').value;
+    $('#dl-label').textContent = one ? '해당 주차 한글 다운로드(HWPX)' : '전체 주차 ZIP 다운로드';
+    btn.title = one
+      ? '선택한 주차의 보고서를 한글 문서 한 개로 내려받습니다.'
+      : '주차마다 한글 문서를 만들어 ZIP 한 개로 묶어 내려받습니다.';
+    $('#dl-note').innerHTML = one
+      ? '<span class="mark">※</span> 선택한 주차만 한글 문서로 내려받습니다.'
+      : '<span class="mark">※</span> 한 주차만 받으시려면 위에서 주차를 먼저 선택하세요.';
+  }
+
   function bindListTab() {
     $('#btn-search').onclick = () => searchList(1);
-    $('#f-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') searchList(1); });
-    ['#f-week', '#f-org', '#f-status'].forEach((s) => { $(s).onchange = () => searchList(1); });
+    ['#f-week', '#f-org'].forEach((s) => { $(s).onchange = () => searchList(1); });
+    $('#f-week').addEventListener('change', updateWeekDownloadButton);
+    updateWeekDownloadButton();
+
+    $('#btn-week-hwpx').onclick = () => {
+      const weekId = $('#f-week').value;
+      if (!weekId) toast('전체 주차는 ZIP으로 묶어 다운로드됩니다.');
+      downloadWeekHwpx(weekId, $('#f-org') ? $('#f-org').value : '');
+    };
   }
 
   async function searchList(page) {
     state.listPage = page || 1;
-    const p = new URLSearchParams({ page: state.listPage, size: 20 });
+    const p = new URLSearchParams({ page: state.listPage, size: PAGE_SIZE });
     if ($('#f-week').value)   p.set('week_id', $('#f-week').value);
     if ($('#f-org').value)    p.set('org_id', $('#f-org').value);
-    if ($('#f-status').value) p.set('status', $('#f-status').value);
-    if ($('#f-q').value.trim()) p.set('q', $('#f-q').value.trim());
 
     try {
       const res = await api.get('/api/reports?' + p.toString());
@@ -632,30 +647,36 @@
     } catch (e) { toast(e.message, true); }
   }
 
+  /** 내용 요약에서 한 번에 보여줄 항목 줄 수 (넘치면 '외 N건') */
+  const MAX_SUMMARY_LINES = 5;
+
   function renderList(res) {
     const tbody = $('#list-body');
     if (!res.reports.length) {
       const cols = document.querySelectorAll('#tab-list thead th:not(.hidden)').length || 9;
       tbody.innerHTML = `<tr><td colspan="${cols}" class="empty">조회된 보고서가 없습니다.</td></tr>`;
-      $('#list-pager').innerHTML = '';
+      $('#list-count').textContent = '보고서 목록 (총 0건)';
+      $('#list-pager-bottom').innerHTML = '';
       return;
     }
 
     tbody.innerHTML = res.reports.map((r) => `
       <tr>
-        <td>${esc(r.week_label)}${r.is_open ? '' : ' <span class="badge closed">마감</span>'}</td>
         <td class="col-org">${esc(r.org_name)}</td>
         <td class="col-author">${esc(r.author_name || '-')}</td>
-        <td class="small summary"><div class="summary-text">${esc(r.summary || '')}</div></td>
+        <td>${esc(r.week_label)}</td>
+        <td class="small summary">${
+          (r.summary_lines || []).slice(0, MAX_SUMMARY_LINES)
+            .map((line) => `<div class="sum-line">${esc(line)}</div>`).join('')
+          + ((r.summary_lines || []).length > MAX_SUMMARY_LINES
+              ? `<div class="sum-more">… 외 ${(r.summary_lines || []).length - MAX_SUMMARY_LINES}건</div>` : '')
+        }</td>
         <td class="center">${statusBadge(r.status)}</td>
-        <td class="center">${r.item_count}</td>
         <td class="center">${r.file_count}</td>
         <td class="small">${fmtDateTime(r.updated_at)}</td>
         <td class="center nowrap">
           <button class="btn sm" data-open="${r.id}">열기</button>
-          <button class="btn sm" data-print="${r.id}">인쇄</button>
-          <button class="btn sm" data-export="${r.id}"
-                  title="한글문서(HWP) 변환은 현재 [Word 다운로드] 하신 후 한글에서 Word문서를 열어서 다른 이름(확장자 .hwp)으로 저장하시기 바랍니다.">Word</button>
+          <button class="btn sm" data-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받기">한글</button>
         </td>
       </tr>`).join('');
 
@@ -666,23 +687,19 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
       };
     });
-    tbody.querySelectorAll('[data-print]').forEach((b) => {
-      b.onclick = () => openPrint(b.dataset.print);
-    });
-    tbody.querySelectorAll('[data-export]').forEach((b) => {
-      b.onclick = () => downloadReport(b.dataset.export);
+    tbody.querySelectorAll('[data-hwpx]').forEach((b) => {
+      b.onclick = () => downloadReportHwpx(b.dataset.hwpx);
     });
 
     // 행은 이 시점에 새로 만들어지므로 열 숨김을 다시 적용해야 헤더와 어긋나지 않는다
     applyListScopeUi();
 
     const pages = Math.ceil(res.total / res.size);
-    $('#list-pager').innerHTML = pages <= 1 ? `<span class="small muted">총 ${res.total}건</span>` : `
-      <button class="btn sm" ${res.page <= 1 ? 'disabled' : ''} id="pg-prev">이전</button>
-      <span class="small muted">${res.page} / ${pages} (총 ${res.total}건)</span>
-      <button class="btn sm" ${res.page >= pages ? 'disabled' : ''} id="pg-next">다음</button>`;
-    if ($('#pg-prev')) $('#pg-prev').onclick = () => searchList(res.page - 1);
-    if ($('#pg-next')) $('#pg-next').onclick = () => searchList(res.page + 1);
+    $('#list-count').textContent = `보고서 목록 (총 ${res.total}건)`;
+    // 쪽 이동은 표 아래 가운데 (몇 쪽인지도 거기 나온다)
+    window.WR.renderPager($('#list-pager-bottom'), {
+      page: res.page, pages, onGo: (n) => searchList(n),
+    });
   }
 
   init();

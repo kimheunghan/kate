@@ -35,7 +35,7 @@ router.get('/status', async (req, res, next) => {
     }
 
     const { rows: wrows } = await db.query(
-      `SELECT id, label, start_date, end_date, is_open FROM wr.report_weeks WHERE id = $1`, [weekId]
+      `SELECT id, label, start_date, end_date FROM wr.report_weeks WHERE id = $1`, [weekId]
     );
 
     const orgId = auth.scopeOrg(req.user, req.query.org_id);
@@ -51,7 +51,8 @@ router.get('/status', async (req, res, next) => {
     const { rows } = await db.query(
       `SELECT * FROM wr.v_submission_status
         WHERE ${where.join(' AND ')}
-        ORDER BY sort_order NULLS LAST, org_name, user_name`,
+        -- 기관 → 담당 역할(총괄책임자→실무책임자→참여연구원) → 이름(가나다)
+        ORDER BY sort_order NULLS LAST, org_name, wr.duty_order(duty), user_name`,
       params
     );
 
@@ -97,7 +98,7 @@ router.get('/overview', async (req, res, next) => {
   try {
     const n = Math.min(Math.max(Number(req.query.weeks) || 8, 1), 26);
     const { rows: weeks } = await db.query(
-      `SELECT id, label, start_date, is_open
+      `SELECT id, label, start_date
          FROM wr.report_weeks
         WHERE start_date <= CURRENT_DATE
         ORDER BY start_date DESC
@@ -216,11 +217,19 @@ router.get('/users', async (req, res, next) => {
   try {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.name, u.email, u.phone, u.role, u.org_id, u.is_active,
-              u.must_change_pw, u.approval_status, u.last_login_at, u.created_at, o.name AS org_name
+              u.must_change_pw, u.approval_status, u.duty, u.last_login_at, u.created_at, o.name AS org_name,
+              (SELECT count(*)::int FROM wr.reports r
+                WHERE r.author_id = u.id AND r.org_id = u.org_id) AS report_count
          FROM wr.users u LEFT JOIN wr.organizations o ON o.id = u.org_id
         WHERE ($1::int IS NULL OR u.org_id = $1::int)
-        ORDER BY u.role DESC, o.sort_order NULLS LAST, u.username`,
-      [auth.scopeOrg(req.user, req.query.org_id)]
+          AND ($2::text IS NULL
+               OR u.name ILIKE '%' || $2 || '%'
+               OR u.username ILIKE '%' || $2 || '%'
+               OR u.email ILIKE '%' || $2 || '%')
+        -- 기관 → 담당 역할(총괄책임자→실무책임자→참여연구원) → 이름(가나다)
+        ORDER BY o.sort_order NULLS LAST, o.name, wr.duty_order(u.duty), u.name, u.username`,
+      [auth.scopeOrg(req.user, req.query.org_id),
+       req.query.q ? String(req.query.q).trim() : null]
     );
     res.json({ users: rows });
   } catch (err) { next(err); }
@@ -325,7 +334,7 @@ router.post('/reset-requests/:id(\\d+)', async (req, res, next) => {
 
     await db.tx(async (client) => {
       await client.query(
-        `UPDATE wr.users SET password_hash = $1, must_change_pw = TRUE WHERE id = $2`,
+        `UPDATE wr.users SET password_hash = $1, must_change_pw = FALSE WHERE id = $2`,
         [auth.hashPassword(password), reqRows[0].user_id]
       );
       await client.query(
@@ -340,6 +349,51 @@ router.post('/reset-requests/:id(\\d+)', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/**
+ * 같은 기관에 이름이 같은 사람이 이미 있는지 찾는다.
+ * 아이디는 유일하지만 이름은 겹칠 수 있어, 현황 화면에서 누가 누구인지 구분되지 않는다.
+ */
+function baseName(name) {
+  return String(name || '').replace(/-[A-Z]$/, '');   // '홍길동-B' → '홍길동'
+}
+
+async function findSameName(name, orgId, exceptId) {
+  // 이름이 정확히 같은 경우뿐 아니라 이미 접미사가 붙은 동명이인(홍길동-A)도 함께 찾는다.
+  // 그래야 세 번째 동명이인이 들어와도 -C 를 제안할 수 있다.
+  const base = baseName(name);
+  const { rows } = await db.query(
+    `SELECT id, username, name, email
+       FROM wr.users
+      WHERE org_id = $1
+        AND (name = $2 OR name ~ ('^' || $2 || '-[A-Z]$'))
+        AND ($3::int IS NULL OR id <> $3::int)
+      ORDER BY id`,
+    [orgId, base, exceptId || null]
+  );
+  return rows;
+}
+
+/** 동명이인 구분용 접미사 제안. 홍길동 → 홍길동-A / -B / -C … */
+function suggestSuffixed(baseName, existing) {
+  const used = new Set();
+  for (const u of existing) {
+    const m = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-([A-Z])$`).exec(u.name);
+    if (m) used.add(m[1]);
+  }
+  const next = (from) => {
+    for (let c = from.charCodeAt(0); c <= 'Z'.charCodeAt(0); c++) {
+      const ch = String.fromCharCode(c);
+      if (!used.has(ch)) { used.add(ch); return ch; }
+    }
+    return null;
+  };
+  // 접미사 없는 기존 사용자가 있으면 그 사람을 -A 로, 새 사용자를 다음 글자로
+  const plain = existing.find((u) => u.name === baseName);
+  const renameExistingTo = plain ? `${baseName}-${next('A')}` : null;
+  return { renameExistingTo, renameExistingId: plain ? plain.id : null,
+           newName: `${baseName}-${next('A')}` };
+}
+
 router.post('/users', async (req, res, next) => {
   try {
     const username = String(req.body?.username || '').trim();
@@ -351,22 +405,42 @@ router.post('/users', async (req, res, next) => {
     // 기관 관리자는 자기 기관에만, 그리고 전체 관리자는 만들 수 없다
     if (req.user.role === 'ORG_ADMIN') {
       orgId = req.user.org_id;
-      if (role === 'ADMIN') return res.status(403).json({ error: '전체 관리자 계정은 만들 수 없습니다.' });
+      if (role === 'ADMIN') return res.status(403).json({ error: '총괄관리자 계정은 만들 수 없습니다.' });
     }
 
-    if (!/^[A-Za-z0-9._-]{3,50}$/.test(username)) {
-      return res.status(400).json({ error: '아이디는 영문/숫자/._- 조합 3~50자여야 합니다.' });
+    // 비어 있는 것과 형식이 틀린 것을 구분해 안내한다 (회원가입과 같은 기준)
+    if (!username) return res.status(400).json({ error: '아이디를 입력하세요.' });
+    if (!/^[A-Za-z0-9._-]{4,50}$/.test(username)) {
+      return res.status(400).json({ error: '아이디는 영문/숫자/._- 조합 4~50자여야 합니다.' });
     }
-    if (password.length < 8) return res.status(400).json({ error: '비밀번호는 8자 이상이어야 합니다.' });
     if (!name) return res.status(400).json({ error: '이름을 입력하세요.' });
-    if (role !== 'ADMIN' && !orgId) return res.status(400).json({ error: '소속 기관을 선택하세요.' });
+    if (!password) return res.status(400).json({ error: '초기 비밀번호를 입력하세요.' });
+    if (password.length < 8) return res.status(400).json({ error: '초기 비밀번호는 8자 이상이어야 합니다.' });
+    if (role !== 'ADMIN' && !orgId) return res.status(400).json({ error: '기관을 선택하세요.' });
+    if (!['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty)) {
+      return res.status(400).json({ error: '담당 역할을 선택하세요.' });
+    }
+
+    // 같은 기관 동명이인 확인 (allow_duplicate_name 이 true 면 그대로 진행)
+    if (orgId && req.body?.allow_duplicate_name !== true) {
+      const dup = await findSameName(name, orgId);
+      if (dup.length) {
+        return res.status(409).json({
+          error: '같은 기관에 이름이 같은 사용자가 있습니다.',
+          duplicate_name: true,
+          duplicates: dup.map((d) => ({ id: d.id, username: d.username, name: d.name, email: d.email })),
+          suggestion: suggestSuffixed(baseName(name), dup),
+        });
+      }
+    }
 
     const { rows } = await db.query(
-      `INSERT INTO wr.users (username, password_hash, name, email, role, org_id, must_change_pw)
-       VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+      `INSERT INTO wr.users (username, password_hash, name, email, role, org_id, duty, must_change_pw)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE)
        ON CONFLICT (username) DO NOTHING
-       RETURNING id, username, name, email, role, org_id, is_active`,
-      [username, auth.hashPassword(password), name, req.body?.email || null, role, orgId]
+       RETURNING id, username, name, email, role, org_id, duty, is_active`,
+      [username, auth.hashPassword(password), name, req.body?.email || null, role, orgId,
+       ['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty) ? req.body.duty : null]
     );
     if (!rows[0]) return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
 
@@ -386,7 +460,7 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
         return res.status(403).json({ error: '다른 기관 사용자는 수정할 수 없습니다.' });
       }
       if (t[0].role === 'ADMIN' || role === 'ADMIN') {
-        return res.status(403).json({ error: '전체 관리자 권한은 변경할 수 없습니다.' });
+        return res.status(403).json({ error: '총괄관리자 권한은 변경할 수 없습니다.' });
       }
     }
 
@@ -397,8 +471,35 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
       );
       const { rows: target } = await db.query(`SELECT role, is_active FROM wr.users WHERE id = $1`, [id]);
       if (target[0]?.role === 'ADMIN' && target[0]?.is_active && rows[0].c === 0) {
-        return res.status(409).json({ error: '마지막 관리자 계정입니다. 다른 관리자를 먼저 지정하세요.' });
+        return res.status(409).json({ error: '마지막 총괄관리자 계정입니다. 다른 총괄관리자를 먼저 지정하세요.' });
       }
+    }
+
+    // 소속을 바꿀 때, 이 사용자가 이전 기관에서 쓴 보고서도 함께 옮길 수 있다.
+    // (보고서는 작성 당시 소속을 스냅샷으로 갖고 있어 자동으로 따라가지 않는다)
+    let movedReports = 0;
+    const wantMove = req.body?.move_reports === true;
+    const newOrgId = req.body?.org_id ? Number(req.body.org_id) : null;
+    if (wantMove && newOrgId) {
+      const { rows: before } = await db.query(`SELECT org_id FROM wr.users WHERE id = $1`, [id]);
+      const oldOrgId = before[0]?.org_id;
+      if (oldOrgId && Number(oldOrgId) !== newOrgId) {
+        // 보고서 유일성은 (주차 × 작성자) 기준이라 기관을 옮겨도 충돌하지 않는다
+        const mv = await db.query(
+          `UPDATE wr.reports SET org_id = $1 WHERE author_id = $2 AND org_id = $3`,
+          [newOrgId, id, oldOrgId]
+        );
+        movedReports = mv.rowCount;
+      }
+    }
+
+    const DUTIES = ['LEAD', 'MANAGER', 'RESEARCHER'];
+    let duty;
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'duty')) {
+      if (!DUTIES.includes(req.body.duty)) {
+        return res.status(400).json({ error: '담당 역할을 선택하세요.' });
+      }
+      duty = req.body.duty;
     }
 
     const { rows } = await db.query(
@@ -407,9 +508,10 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
               email     = COALESCE($2, email),
               role      = COALESCE($3, role),
               org_id    = CASE WHEN $4::boolean THEN $5::int ELSE org_id END,
-              is_active = COALESCE($6, is_active)
+              is_active = COALESCE($6, is_active),
+              duty      = CASE WHEN $8::boolean THEN $9::varchar ELSE duty END
         WHERE id = $7
-        RETURNING id, username, name, email, role, org_id, is_active`,
+        RETURNING id, username, name, email, role, org_id, is_active, duty`,
       [
         req.body?.name ? String(req.body.name).trim() : null,
         req.body?.email ?? null,
@@ -418,11 +520,16 @@ router.put('/users/:id(\\d+)', async (req, res, next) => {
         req.body?.org_id ? Number(req.body.org_id) : null,
         req.body?.is_active != null ? Boolean(req.body.is_active) : null,
         id,
+        duty !== undefined,
+        duty ?? null,
       ]
     );
     if (!rows[0]) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
-    await audit.log(req, 'USER_UPDATE', { targetType: 'user', targetId: id, detail: rows[0].username });
-    res.json({ user: rows[0] });
+    await audit.log(req, 'USER_UPDATE', {
+      targetType: 'user', targetId: id,
+      detail: rows[0].username + (movedReports ? ` / 보고서 ${movedReports}건 기관 이동` : ''),
+    });
+    res.json({ user: rows[0], moved_reports: movedReports });
   } catch (err) { next(err); }
 });
 
@@ -437,7 +544,7 @@ router.post('/users/:id(\\d+)/password', async (req, res, next) => {
     const pw = String(req.body?.password || '');
     if (pw.length < 8) return res.status(400).json({ error: '비밀번호는 8자 이상이어야 합니다.' });
     const { rows } = await db.query(
-      `UPDATE wr.users SET password_hash = $1, must_change_pw = TRUE WHERE id = $2 RETURNING username`,
+      `UPDATE wr.users SET password_hash = $1, must_change_pw = FALSE WHERE id = $2 RETURNING username`,
       [auth.hashPassword(pw), Number(req.params.id)]
     );
     if (!rows[0]) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
@@ -504,15 +611,14 @@ router.put('/reports/:id(\\d+)/org', async (req, res, next) => {
 });
 
 // =====================================================================
-//  주차 관리 (마감 제어 / 임의 주차 추가)
+//  주차 목록
 // =====================================================================
 router.get('/weeks', async (req, res, next) => {
   try {
-    // 당해 연도 12월 말까지 전부 보여준다 (마감 처리를 미리 해둘 수 있어야 하므로)
+    // 주차 자체가 사업 기간(~2027-03-31)까지만 만들어져 있으므로 전부 보여준다
     const { rows } = await db.query(
       `SELECT w.*, (SELECT count(*)::int FROM wr.reports r WHERE r.week_id = w.id) AS report_count
          FROM wr.report_weeks w
-        WHERE w.start_date <= (date_trunc('year', CURRENT_DATE) + INTERVAL '1 year' - INTERVAL '1 day')
         ORDER BY w.start_date DESC
         LIMIT 200`
     );
@@ -520,32 +626,64 @@ router.get('/weeks', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/weeks/:id(\\d+)', adminOnly, async (req, res, next) => {
-  try {
-    const { rows } = await db.query(
-      `UPDATE wr.report_weeks SET is_open = $1 WHERE id = $2 RETURNING *`,
-      [Boolean(req.body?.is_open), Number(req.params.id)]
-    );
-    if (!rows[0]) return res.status(404).json({ error: '주차를 찾을 수 없습니다.' });
-    await audit.log(req, 'WEEK_TOGGLE', {
-      targetType: 'week', targetId: rows[0].id, detail: `${rows[0].label} is_open=${rows[0].is_open}`,
-    });
-    res.json({ week: rows[0] });
-  } catch (err) { next(err); }
-});
 
 // =====================================================================
 //  감사 로그
 // =====================================================================
+// GET /api/admin/audit?page=&size=&from=&to=&action=&q=
+//   from/to : 날짜 (YYYY-MM-DD). to 는 그날 끝까지 포함한다.
+//   action  : 동작 코드 (LOGIN, REPORT_SAVE …)
+//   q       : 사용자ID·이름·내용·IP 를 한 번에 훑는다
 router.get('/audit', adminOnly, async (req, res, next) => {
   try {
-    const limit = Math.min(Number(req.query.limit) || 100, 500);
-    const { rows } = await db.query(
-      `SELECT id, username, action, target_type, target_id, detail, ip, created_at
-         FROM wr.audit_logs ORDER BY id DESC LIMIT $1`,
-      [limit]
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const size = Math.min(Math.max(Number(req.query.size) || 10, 1), 200);
+
+    const where = [];
+    const params = [];
+    const add = (sql, v) => { params.push(v); where.push(sql.replace('$$', `$${params.length}`)); };
+
+    // 날짜만 오면 그날 처음·끝으로 넓힌다. 시각까지 오면 그대로 쓴다.
+    const asStart = (v) => (String(v).includes('T') ? String(v) : `${v}T00:00:00`);
+    const asEnd   = (v) => (String(v).includes('T') ? String(v) : `${v}T23:59:59`);
+    if (req.query.from) add('a.created_at >= $$::timestamptz', asStart(req.query.from));
+    if (req.query.to)   add('a.created_at <= $$::timestamptz', asEnd(req.query.to));
+    if (req.query.action) add('a.action = $$', String(req.query.action));
+    if (req.query.q) {
+      const kw = `%${String(req.query.q).trim()}%`;
+      params.push(kw);
+      const n = params.length;
+      where.push(`(a.username ILIKE $${n} OR COALESCE(a.user_name, u.name) ILIKE $${n}
+                 OR a.detail ILIKE $${n} OR a.ip ILIKE $${n})`);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const { rows: cnt } = await db.query(
+      `SELECT count(*)::int AS total
+         FROM wr.audit_logs a LEFT JOIN wr.users u ON u.id = a.user_id ${whereSql}`,
+      params
     );
-    res.json({ logs: rows });
+
+    params.push(size, (page - 1) * size);
+    const { rows } = await db.query(
+      `SELECT a.id, a.username,
+              -- 기록에 남은 이름을 먼저 쓴다 (계정이 지워져도 보인다)
+              COALESCE(a.user_name, u.name) AS user_name,
+              a.action, a.target_type, a.target_id, a.detail, a.ip, a.created_at
+         FROM wr.audit_logs a
+         LEFT JOIN wr.users u ON u.id = a.user_id
+        ${whereSql}
+        ORDER BY a.id DESC
+        LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+
+    // 선택 상자에 채울 동작 목록 (기록에 실제로 남은 것만)
+    const { rows: acts } = await db.query(
+      `SELECT DISTINCT action FROM wr.audit_logs ORDER BY action`
+    );
+
+    res.json({ logs: rows, total: cnt[0].total, page, size, actions: acts.map((a) => a.action) });
   } catch (err) { next(err); }
 });
 

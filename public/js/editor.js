@@ -23,9 +23,128 @@
     ['Consolas', 'Consolas'],
   ];
 
+  /**
+   * <ul>/<ol> 을 줄머리에 기호를 붙인 보통 줄로 바꾼다.
+   * 예전에 목록으로 저장된 내용도 열 때 바꿔 두면 편집 중에 깨지지 않는다.
+   * @param {HTMLElement} area  편집 영역
+   * @param {Element[]} blocks  대상 (없으면 영역 전체)
+   * @returns {Element[]} 바뀐 뒤의 줄 목록
+   */
+  function listsToLines(area, blocks) {
+    const src = blocks && blocks.length ? blocks : Array.from(area.children);
+    const out = [];
+
+    src.forEach((b) => {
+      if (!b || (b.tagName !== 'UL' && b.tagName !== 'OL')) { if (b) out.push(b); return; }
+
+      const ordered = b.tagName === 'OL';
+      // 목록 자체의 왼쪽 여백은 줄 들여쓰기로 옮긴다 (24px 은 기본값이라 뺀다)
+      const base = Math.max(0, (parseFloat(b.style.paddingLeft) || 0) - 24)
+                 + (parseFloat(b.style.marginLeft) || 0);
+      const listMk = b.dataset.mk || b.style.listStyleType || '';
+      let no = 1;
+      const made = [];
+
+      Array.from(b.children).forEach((li) => {
+        if (li.tagName !== 'LI') return;
+        const div = document.createElement('div');
+        const pad = base + (parseFloat(li.style.marginLeft) || 0);
+        if (pad) div.style.paddingLeft = `${pad}px`;
+
+        const mk = li.dataset.mk || li.style.listStyleType || listMk;
+        const q = /['"]\s*(\S+)/.exec(mk);
+        const mark = ordered
+          ? `${no++}.${NB}`
+          : `${q ? q[1] : (BULLET_CHAR[mk] || '•')}${NB}`;
+
+        while (li.firstChild) div.appendChild(li.firstChild);
+        div.insertBefore(document.createTextNode(mark), div.firstChild);
+        made.push(div);
+      });
+
+      made.forEach((d) => area.insertBefore(d, b));
+      b.remove();
+      out.push(...made);
+    });
+
+    return out;
+  }
+
+  /** 다음 줄에 이어 붙일 기호. 번호면 하나 올린다. */
+  const SPACE_PX = 4;                    // 공백 한 칸 폭 (문서로 내보낼 때와 같은 값)
+  const INDENT_SPACES = 2;               // 들여쓰기 한 단계 = 공백 두 칸
+  const NB = '\u00a0';                    // 줄 끝에서도 지워지지 않는 공백
+
+  function nextMarker(mark) {
+    const m = /^([\s\u00a0]*)(\d{1,3})([.)])([\s\u00a0]+)$/.exec(mark);
+    if (m) return `${m[1]}${Number(m[2]) + 1}${m[3]}${NB}`;
+    // 기호 뒤에는 늘 공백을 붙인다. 줄 끝에서 지워지지 않는 공백을 쓴다.
+    // (공백 없이 '■글자' 로 저장된 줄에서도 다음 줄에 '■ ' 가 나오게 한다)
+    return mark.replace(/[\s\u00a0]*$/, NB);
+  }
+
+  /**
+   * 들여쓰기 값을 한 단계(8px) 의 배수로 맞춘다.
+   * 예전에는 화면에서 잰 공백 폭(4.5px 같은 값)으로 밀어 18px 같은 값이
+   * 남았고, 문서로 내보낼 때 공백 수가 한 칸씩 어긋났다.
+   */
+  function snapIndents(area) {
+    const step = SPACE_PX * INDENT_SPACES;
+    Array.from(area.children).forEach((el) => {
+      if (!el.style) return;
+      ['paddingLeft', 'marginLeft'].forEach((prop) => {
+        const px = parseFloat(el.style[prop]) || 0;
+        if (!px) return;
+        const snapped = Math.max(step, Math.round(px / step) * step);
+        if (snapped !== px) el.style[prop] = `${snapped}px`;
+      });
+    });
+  }
+
+  /** 그 칸 안의 첫 글자 노드 (없으면 null) */
+  function firstTextNode(el) {
+    for (const n of el.childNodes) {
+      if (n.nodeType === 3) return n;
+      if (n.nodeType === 1) {
+        const t = firstTextNode(n);
+        if (t) return t;
+      }
+    }
+    return null;
+  }
+
+  /** 눈에 보이는 글자가 없는 칸인가 (공백·줄바꿈만 있으면 빈 것으로 본다) */
+  const isBlank = (el) => el.textContent.replace(/[\s\u00a0\u200b]/g, '') === '';
+
+  // 글머리표 종류. value 는 CSS list-style-type 값.
+  //  브라우저가 그리는 네모(square)는 글자보다 훨씬 작다. 본문에서 손으로
+  //  찍는 ■ 와 크기를 맞추려고 글자로 직접 지정한다. 점·원은 기본 그대로.
+  // 글머리표는 HTML 목록이 아니라 '글자' 로 넣는다.
+  // 목록으로 만들면 브라우저가 편집 중에 목록을 제멋대로 다시 짜면서
+  // 기호가 바뀌거나 줄이 위로 붙어 버린다. 글자로 넣으면 백스페이스·
+  // 엔터·복사붙여넣기 어디서도 그대로 남는다.
+  const BULLET_CHAR = { disc: '•', square: '■', circle: '○', dash: '−' };
+  // 줄머리에 이미 붙어 있는 기호 (바꿀 때 먼저 떼어낸다)
+  //  ■ • ○ 처럼 글머리표로만 쓰는 기호는 뒤에 공백이 없어도 알아본다.
+  //  (예전에 공백이 지워져 '■글자' 로 저장된 것도 살린다)
+  //  − 나 숫자는 '−5', '1.5' 같은 보통 글과 헷갈리므로 공백을 요구한다.
+  const MARKER_RE = /^[\s\u00a0]*(?:[•■○◦▪‣·][\s\u00a0]*|(?:[−–—-]|\d{1,3}[.)])[\s\u00a0]+)/;
+  const BULLETS = [
+    ['',        '글머리표'],
+    ['disc',    '•  점'],
+    ['square',  '■  사각'],
+    ['circle',  '○  원'],
+    ['dash',    '−  대시'],
+    ['decimal', '1.  번호'],
+    ['off',     '해제'],
+  ];
+
+  // 브라우저 기본 명령(execCommand fontSize)은 1~7 단계만 지원해
+  // 8·10·12·14·18·24·36pt 밖에 못 쓴다. pt 를 직접 지정하는 방식으로 처리한다.
   const SIZES = [
-    ['', '크기'], ['1', '8pt'], ['2', '10pt'], ['3', '12pt'],
-    ['4', '14pt'], ['5', '18pt'], ['6', '24pt'], ['7', '36pt'],
+    ['', '크기'],
+    ...[8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 32, 36]
+      .map((n) => [String(n), `${n}pt`]),
   ];
 
   const PASTE_TAGS = new Set([
@@ -119,6 +238,9 @@
       this.area.spellcheck = false;
       this.area.setAttribute('data-placeholder', opts.placeholder || '내용을 입력하세요');
       this.area.innerHTML = opts.html || '';
+      // 예전에 목록으로 저장된 내용은 글자 줄로 바꿔 둔다
+      listsToLines(this.area, null);
+      snapIndents(this.area);
       host.appendChild(this.area);
 
       if (!this.readOnly) this._bind();
@@ -131,7 +253,11 @@
       return h;
     }
 
-    setHtml(html) { this.area.innerHTML = html || ''; }
+    setHtml(html) {
+      this.area.innerHTML = html || '';
+      listsToLines(this.area, null);
+      snapIndents(this.area);
+    }
 
     isEmpty() { return !this.area.textContent.trim() && !this.area.querySelector('img'); }
 
@@ -178,7 +304,12 @@
     _changed() { if (this.opts.onChange) this.opts.onChange(this); }
 
     _bind() {
-      this.area.addEventListener('input', () => { this.saveRange(); this._changed(); });
+      this.area.addEventListener('input', () => {
+        this._dropTrailingBreaks();
+        this._restoreMarkers();
+        this.saveRange();
+        this._changed();
+      });
 
       const track = () => {
         this.saveRange();
@@ -220,9 +351,273 @@
       this.area.addEventListener('keydown', (e) => {
         if (e.key === 'Tab') {
           e.preventDefault();
-          this.exec(e.shiftKey ? 'outdent' : 'indent');
+          if (this.opts.onIndent) this.opts.onIndent(this, e.shiftKey ? -1 : 1);
+          return;
+        }
+        // 엔터로 새 줄을 만들면 들여쓰기를 물려받지 않고 맨 앞에서 시작한다.
+        // 들여쓴 줄 끝에서 엔터를 치고 붙여넣으면 통째로 밀려 들어가기 때문이다.
+        // 줄 가운데서 엔터를 쳐 글이 나뉘는 경우는 그대로 둔다.
+        // 줄 맨 앞에서 백스페이스를 누르면 윗줄과 붙지 않고
+        // 그 줄의 들여쓰기를 한 칸 되돌린다. 커서는 그 자리에 남는다.
+        if (e.key === 'Backspace' && this._atLineStartWithIndent()) {
+          e.preventDefault();
+          if (this.opts.onIndent) this.opts.onIndent(this, -1);
+          return;
+        }
+        if (e.key === 'Enter' && !e.shiftKey) {
+          // 글머리표 줄에서 엔터를 치면 다음 줄에도 같은 기호를 이어 붙인다.
+          // 기호만 있고 내용이 없는 줄이면 기호를 떼어 목록을 끝낸다.
+          const block = this._currentBlock();
+          if (block) {
+            const m = MARKER_RE.exec(block.textContent);
+            if (m) {
+              const rest = block.textContent.slice(m[0].length);
+              if (rest.replace(/[\s\u00a0\u200b]/g, '') === '') {
+                // 기호만 남은 줄 → 기호와 들여쓰기를 떼고 그 자리에 선다
+                e.preventDefault();
+                this._clearLine(block);
+                return;
+              }
+              setTimeout(() => this._afterEnter(nextMarker(m[0]), block.style.paddingLeft), 0);
+              return;
+            }
+          }
+          setTimeout(() => this._afterEnter(), 0);
         }
       });
+    }
+
+    /**
+     * 지워진 글머리표 기호를 되살린다.
+     * 백스페이스로 줄을 지우면 브라우저가 목록을 다시 짜면서 스타일을
+     * 흘려버려 ■ 가 • 로 돌아가는 일이 있다. data-mk 값으로 되돌린다.
+     */
+    _restoreMarkers() {
+      this.area.querySelectorAll('[data-mk]').forEach((el) => {
+        const want = el.dataset.mk;
+        if (want && el.style.listStyleType !== want) el.style.listStyleType = want;
+      });
+    }
+
+    /** 커서가 놓인 글머리표 항목 (없으면 null) */
+    _currentListItem() {
+      const sel = global.getSelection();
+      if (!sel || !sel.rangeCount) return null;
+      let node = sel.getRangeAt(0).startContainer;
+      if (node.nodeType === 3) node = node.parentNode;
+      if (!node || !node.closest) return null;
+      const li = node.closest('li');
+      return li && this.area.contains(li) ? li : null;
+    }
+
+    /**
+     * 빈 글머리표 항목에서 목록을 끝내고 맨 앞에서 새 줄을 시작한다.
+     * 가운데 항목이면 목록을 둘로 나눠 뒤쪽을 그대로 살린다.
+     */
+    _exitList(li) {
+      const list = li.parentNode;
+      if (!list || !this.area.contains(list)) return;
+
+      // 편집 영역 바로 아래에 놓일 자리를 찾는다 (목록이 중첩돼 있을 수 있다)
+      let top = list;
+      while (top.parentNode && top.parentNode !== this.area) top = top.parentNode;
+      if (top.parentNode !== this.area) return;
+
+      const line = document.createElement('div');
+      line.appendChild(document.createElement('br'));
+
+      // 뒤에 남은 항목이 있으면 새 목록으로 떼어 낸다
+      const after = [];
+      for (let n = li.nextSibling; n; n = n.nextSibling) after.push(n);
+
+      this.area.insertBefore(line, top.nextSibling);
+      if (after.length) {
+        const rest = list.cloneNode(false);
+        after.forEach((n) => rest.appendChild(n));
+        this.area.insertBefore(rest, line.nextSibling);
+      }
+      li.remove();
+      if (!list.querySelector('li')) top.remove();
+
+      const range = document.createRange();
+      range.setStart(line, 0);
+      range.collapse(true);
+      const sel = global.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      this.saveRange();
+      this.touch();
+    }
+
+    /** 엔터를 친 뒤 정리 : 목록 빠져나오기(보조) + 새 줄 들여쓰기 없애기 */
+    _afterEnter(carry, pad) {
+      const sel = global.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      let node = sel.getRangeAt(0).startContainer;
+      if (node.nodeType === 3) node = node.parentNode;
+      if (!node || !node.closest) return;
+
+      const li = node.closest('li');
+      if (li && this.area.contains(li)) {
+        // 엔터를 치기 전 판단이 빗나갔을 때를 위한 보조 처리.
+        // 빈 항목이 둘 연달아 있으면 빈 줄에서 또 엔터를 친 것이다.
+        const prev = li.previousElementSibling;
+        if (isBlank(li) && prev && prev.tagName === 'LI' && isBlank(prev)) {
+          li.remove();
+          this._exitList(prev);
+          return;
+        }
+        // 목록 안이면 들여쓰기가 곧 단계이므로 손대지 않는다
+        return;
+      }
+
+      // 편집 영역 바로 아래 칸(문단)까지 올라간다
+      while (node && node !== this.area && node.parentNode !== this.area) node = node.parentNode;
+      if (!node || node === this.area || !node.style) return;
+      if (node.tagName === 'UL' || node.tagName === 'OL') return;
+      // 글이 들어 있는 줄(가운데서 나뉜 경우)은 그대로 둔다
+      if (!isBlank(node)) return;
+
+      if (carry) {
+        // 앞 줄의 기호와 들여쓰기를 이어받는다
+        if (pad) node.style.paddingLeft = pad;
+        const t = document.createTextNode(carry);
+        node.insertBefore(t, node.firstChild);
+        const range = document.createRange();
+        range.setStart(t, carry.length);
+        range.collapse(true);
+        const s2 = global.getSelection();
+        s2.removeAllRanges();
+        s2.addRange(range);
+        this.saveRange();
+        this._renumber();
+        this.touch();
+        return;
+      }
+
+      node.style.removeProperty('padding-left');
+      node.style.removeProperty('margin-left');
+      if (!node.getAttribute('style')) node.removeAttribute('style');
+      this.saveRange();
+    }
+
+    /** 커서가 줄 맨 앞에 있고 그 줄에 들여쓰기가 있는가 */
+    _atLineStartWithIndent() {
+      const sel = global.getSelection();
+      if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+      const range = sel.getRangeAt(0);
+      if (range.startOffset !== 0) return false;
+
+      const block = this._currentBlock();
+      if (!block || !block.style) return false;
+      const pad = parseFloat(block.style.paddingLeft) || parseFloat(block.style.marginLeft) || 0;
+      if (!pad) return false;
+
+      // 커서 앞에 글자가 하나도 없어야 '줄 맨 앞' 이다
+      const before = range.cloneRange();
+      before.selectNodeContents(block);
+      before.setEnd(range.startContainer, range.startOffset);
+      return before.toString().replace(/[\s\u00a0\u200b]/g, '') === '';
+    }
+
+    /**
+     * 글이 있는 줄 끝에 남은 <br> 을 없앤다.
+     * 백스페이스로 빈 줄을 지우면 브라우저가 <br> 만 앞줄로 옮겨 붙여,
+     * 글은 없는데 한 줄이 더 있는 것처럼 벌어져 보인다.
+     */
+    _dropTrailingBreaks() {
+      Array.from(this.area.children).forEach((el) => {
+        if (!el.lastElementChild || el.lastElementChild.tagName !== 'BR') return;
+        if (isBlank(el)) return;                    // 빈 줄의 <br> 은 남겨 둔다
+        el.removeChild(el.lastElementChild);
+      });
+    }
+
+    /**
+     * 번호 매긴 줄을 다시 세어 붙인다.
+     * 들여쓰기가 같은 줄끼리 한 묶음으로 보고, 사이에 글머리표 줄이 끼어도
+     * 이어서 센다. 1. 2. 4. 5. 처럼 어긋난 번호가 1. 2. 3. 4. 로 정리된다.
+     */
+    _renumber() {
+      const NUM_RE = /^([\s\u00a0]*)(\d{1,3})([.)])([\s\u00a0]+)/;
+      const sel = global.getSelection();
+      const saved = sel && sel.rangeCount
+        ? { node: sel.getRangeAt(0).startContainer, offset: sel.getRangeAt(0).startOffset }
+        : null;
+
+      const counters = new Map();          // 들여쓰기 → 다음 번호
+      let moved = false;
+
+      Array.from(this.area.children).forEach((el) => {
+        const t = firstTextNode(el);
+        if (!t) return;
+        const m = NUM_RE.exec(t.nodeValue);
+        if (!m) return;
+
+        const level = Math.round(parseFloat(el.style.paddingLeft) || 0);
+        const next = (counters.get(level) || 0) + 1;
+        counters.set(level, next);
+        if (String(next) === m[2]) return;
+
+        t.nodeValue = `${m[1]}${next}${m[3]}${m[4]}` + t.nodeValue.slice(m[0].length);
+        moved = true;
+
+        // 커서가 이 줄에 있으면 늘거나 준 만큼 자리를 맞춘다
+        if (saved && saved.node === t) {
+          saved.offset = Math.max(0, saved.offset + (String(next).length - m[2].length));
+        }
+      });
+
+      if (moved && saved && saved.node && saved.node.parentNode) {
+        try {
+          const range = document.createRange();
+          const max = saved.node.nodeType === 3
+            ? saved.node.nodeValue.length : saved.node.childNodes.length;
+          range.setStart(saved.node, Math.min(saved.offset, max));
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch (err) { /* 자리를 못 잡으면 그대로 둔다 */ }
+        this.saveRange();
+      }
+    }
+
+    /** 커서가 놓인 줄 (편집 영역 바로 아래 칸) */
+    _currentBlock() {
+      const sel = global.getSelection();
+      if (!sel || !sel.rangeCount) return null;
+      let n = sel.getRangeAt(0).startContainer;
+      if (n.nodeType === 3) n = n.parentNode;
+      while (n && n !== this.area && n.parentNode !== this.area) n = n.parentNode;
+      return n && n !== this.area && n.parentNode === this.area ? n : null;
+    }
+
+    /** 줄머리 기호와 들여쓰기를 떼어 빈 줄로 만든다 */
+    _clearLine(block) {
+      const t = firstTextNode(block);
+      if (t) t.nodeValue = t.nodeValue.replace(MARKER_RE, '');
+
+      // 들여쓰기는 그 칸의 첫 줄에 맞춘다.
+      // 0 으로 밀어 버리면 '1.' 로 시작하는 줄보다 더 왼쪽으로 나가 어긋난다.
+      const first = this.area.firstElementChild;
+      const base = first && first !== block ? first.style.paddingLeft : '';
+      block.style.removeProperty('margin-left');
+      if (base) block.style.paddingLeft = base;
+      else block.style.removeProperty('padding-left');
+      if (!block.getAttribute('style')) block.removeAttribute('style');
+      if (block.textContent === '' && !block.querySelector('br')) {
+        block.appendChild(document.createElement('br'));
+      }
+      const range = document.createRange();
+      range.setStart(block, 0);
+      range.collapse(true);
+      const sel = global.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      this.saveRange();
+      this._renumber();
+      this.touch();
     }
   }
 
@@ -299,7 +694,7 @@
 
     _build() {
       this._select(FONTS, '글꼴', (v) => v && this._exec('fontName', v));
-      this._select(SIZES, '크기', (v) => v && this._exec('fontSize', v));
+      this._select(SIZES, '글자 크기', (v) => v && this._applyFontSize(v));
       this._sep();
 
       this._btn('굵게 (Ctrl+B)', '<b>가</b>', () => this._exec('bold'), 'bold');
@@ -326,10 +721,9 @@
       this._btn('오른쪽 정렬', '⯈', () => this._exec('justifyRight'), 'justifyRight');
       this._sep();
 
-      this._btn('글머리 기호', '• 목록', () => this._exec('insertUnorderedList'), 'insertUnorderedList');
-      this._btn('번호 매기기', '1. 목록', () => this._exec('insertOrderedList'), 'insertOrderedList');
-      this._btn('내어쓰기', '◀', () => this._exec('outdent'));
-      this._btn('들여쓰기', '▶', () => this._exec('indent'));
+      this._select(BULLETS, '글머리표 / 번호 매기기', (v) => v && this._applyBullet(v));
+      this._btn('내어쓰기', '◀', () => this._indent(-1));
+      this._btn('들여쓰기', '▶', () => this._indent(1));
       this._sep();
 
       this._btn('인용', '❝', () => this._exec('formatBlock', 'blockquote'));
@@ -405,6 +799,301 @@
         fr.readAsDataURL(f);
       };
       input.click();
+    }
+
+    /**
+     * 선택한 글자에 크기(pt)를 적용한다.
+     * execCommand 로는 1~7 단계(8·10·12·14·18·24·36pt)밖에 못 쓰므로
+     * 선택 영역을 span 으로 감싸 원하는 pt 를 직접 지정한다.
+     */
+    _applyFontSize(pt) {
+      const ed = this.getActive();
+      if (!ed || ed.readOnly) return;
+      ed.area.focus();
+      ed.restoreRange();
+
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount || sel.isCollapsed) {
+        global.WR.toast('크기를 바꿀 글자를 먼저 선택하세요.', true);
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      if (!ed.area.contains(range.commonAncestorContainer)) return;
+
+      const span = document.createElement('span');
+      span.style.fontSize = `${pt}pt`;
+
+      try {
+        const frag = range.extractContents();
+        // 안쪽에 남은 크기 지정을 지워 바깥 값이 적용되게 한다
+        frag.querySelectorAll('*').forEach((el) => {
+          if (el.tagName === 'FONT') el.removeAttribute('size');
+          if (!el.style) return;
+          el.style.removeProperty('font-size');
+          if (!el.getAttribute('style')) el.removeAttribute('style');
+        });
+        span.appendChild(frag);
+        range.insertNode(span);
+
+        const r2 = document.createRange();
+        r2.selectNodeContents(span);
+        sel.removeAllRanges();
+        sel.addRange(r2);
+      } catch (e) {
+        console.error('[editor] 글자 크기 적용 실패:', e);
+        return;
+      }
+
+      ed.saveRange();
+      ed.touch();
+    }
+
+    // ---------------- 들여쓰기 / 내어쓰기 ----------------
+    // execCommand('indent') 는 Chrome 에서 <blockquote> 를 만들어 인용문처럼 보이고,
+    // 엑셀에서 들어온 padding-left 들여쓰기는 outdent 로 되돌려지지 않는다.
+    // 그래서 선택된 줄의 여백을 직접 조절한다. (엑셀 등록과 같은 방식)
+    /**
+     * 들여쓰기 한 칸 = 실제 공백 한 칸 폭.
+     * 글꼴·크기에 따라 다르므로 편집 영역의 실제 글꼴로 측정한다.
+     * (고정값을 쓰면 스페이스로 조절할 때와 간격이 어긋난다)
+     */
+    /** 선택 영역에 걸친 최상위 블록들 (편집 영역의 직계 자식) */
+    _selectedBlocks(ed) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return [];
+      const range = sel.getRangeAt(0);
+
+      const topOf = (node) => {
+        let n = node;
+        if (n === ed.area) return null;
+        while (n && n.parentNode && n.parentNode !== ed.area) n = n.parentNode;
+        return n && n.parentNode === ed.area ? n : null;
+      };
+
+      let start = topOf(range.startContainer);
+      let end = topOf(range.endContainer) || start;
+      const kids = Array.from(ed.area.childNodes);
+
+      // 블록이 하나도 없으면(맨 텍스트) div 로 감싼다
+      if (!start) {
+        if (!ed.area.childNodes.length) return [];
+        const wrap = document.createElement('div');
+        while (ed.area.firstChild) wrap.appendChild(ed.area.firstChild);
+        ed.area.appendChild(wrap);
+        return [wrap];
+      }
+
+      let i = kids.indexOf(start);
+      let j = kids.indexOf(end);
+      if (i === -1) return [];
+      if (j === -1) j = i;
+
+      const out = [];
+      for (let k = Math.min(i, j); k <= Math.max(i, j); k++) {
+        const n = kids[k];
+        if (n.nodeType === 1) out.push(n);
+        else if (n.nodeType === 3 && n.textContent.trim()) {
+          const d = document.createElement('div');
+          n.parentNode.insertBefore(d, n);
+          d.appendChild(n);
+          out.push(d);
+        }
+      }
+      return out;
+    }
+
+    /** delta = +1 들여쓰기 / -1 내어쓰기 */
+    _indent(delta) {
+      const ed = this.getActive();
+      if (!ed || ed.readOnly) return;
+      ed.area.focus();
+      ed.restoreRange();
+
+      // 한 번에 공백 두 칸씩 민다. 한 칸(약 4px)씩이면 눌러도 티가 나지 않는다.
+      // 폭은 문서로 내보낼 때와 같은 값(4px = 공백 한 칸)으로 고정한다.
+      // 화면에서 잰 폭(4.5px 같은 값)을 쓰면 한글 문서에서 공백 수가 어긋난다.
+      const step = SPACE_PX * INDENT_SPACES;
+
+      // 한 칸 미는 공통 처리
+      const shift = (el, prop) => {
+        const cur = parseFloat(el.style[prop]) || 0;
+        const next = Math.max(0, Math.round((cur + delta * step) * 100) / 100);
+        if (next) el.style[prop] = `${next}px`;
+        else el.style.removeProperty(prop === 'marginLeft' ? 'margin-left' : 'padding-left');
+        if (!el.getAttribute('style')) el.removeAttribute('style');
+      };
+
+      // 글머리표 항목은 하나씩 민다. 목록(<ul>) 을 밀면 그 안의 줄이
+      // 고르지 않은 것까지 전부 같이 움직인다.
+      const items = this._selectedListItemsIn(ed);
+
+      // 일반 줄. 항목을 따로 밀 목록은 여기서 뺀다 (두 번 밀리지 않게)
+      const blocks = this._selectedBlocks(ed).filter((el) => {
+        if (el.tagName !== 'UL' && el.tagName !== 'OL') return true;
+        return !items.some((li) => el.contains(li));
+      });
+
+      if (!items.length && !blocks.length) return;
+
+      // 일반 줄과 글머리표 항목이 함께 걸려 있으면 둘 다 움직인다
+      items.forEach((li) => shift(li, 'marginLeft'));
+      blocks.forEach((el) => {
+        // 목록은 padding-left 가 글머리표 위치를 결정하므로 margin 으로 민다
+        shift(el, (el.tagName === 'UL' || el.tagName === 'OL') ? 'marginLeft' : 'paddingLeft');
+      });
+
+      ed.saveRange();
+      ed.touch();
+    }
+
+    /**
+     * 고른 줄들을 그 자리에서 목록으로 만든다.
+     * 위아래에 있는 다른 목록과 합치지 않는다.
+     */
+    _makeList(ed, wantOrdered, type) {
+      const blocks = this._selectedBlocks(ed)
+        .filter((el) => el.tagName !== 'UL' && el.tagName !== 'OL');
+      if (!blocks.length) return false;
+
+      const list = document.createElement(wantOrdered ? 'ol' : 'ul');
+      list.style.paddingLeft = '24px';
+      if (!wantOrdered && type) { list.style.listStyleType = type; list.dataset.mk = type; }
+      ed.area.insertBefore(list, blocks[0]);
+
+      let last = null;
+      blocks.forEach((b) => {
+        const li = document.createElement('li');
+        // 줄에 준 들여쓰기는 항목 여백으로 옮겨 자리를 지킨다
+        const pad = parseFloat(b.style.paddingLeft) || parseFloat(b.style.marginLeft) || 0;
+        if (pad) li.style.marginLeft = `${pad}px`;
+        if (b.textContent === '') li.appendChild(document.createElement('br'));
+        while (b.firstChild) li.appendChild(b.firstChild);
+        list.appendChild(li);
+        b.remove();
+        last = li;
+      });
+
+      if (last) {
+        const range = document.createRange();
+        range.selectNodeContents(last);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        ed.saveRange();
+      }
+      return true;
+    }
+
+    /** 선택 영역이 들어 있는 목록(UL/OL) 노드를 찾는다 */
+    _currentList(ed) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return null;
+      let n = sel.getRangeAt(0).startContainer;
+      if (n.nodeType === 3) n = n.parentElement;
+      while (n && n !== ed.area) {
+        if (n.tagName === 'UL' || n.tagName === 'OL') return n;
+        n = n.parentElement;
+      }
+      return null;
+    }
+
+    /** 편집 영역 안에서 선택 범위에 걸린 글머리표 항목 전부 */
+    _selectedListItemsIn(ed) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return [];
+      const range = sel.getRangeAt(0);
+
+      // 드래그 없이 커서만 둔 경우에는 그 줄 하나만 고른다.
+      // (범위가 비어 있으면 옆 줄까지 걸린 것으로 잡히는 브라우저가 있다)
+      if (range.collapsed) {
+        let n = range.startContainer;
+        if (n.nodeType === 3) n = n.parentElement;
+        const li = n && n.closest ? n.closest('li') : null;
+        return li && ed.area.contains(li) ? [li] : [];
+      }
+
+      return Array.from(ed.area.querySelectorAll('li'))
+        .filter((li) => range.intersectsNode(li))
+        // 목록이 겹쳐 있으면 안쪽 항목만 남긴다.
+        // 바깥 항목을 밀면 그 안에 든 줄이 전부 따라 움직인다.
+        .filter((li, i, all) => !all.some((o) => o !== li && li.contains(o)));
+    }
+
+    /** 선택 범위에 걸린 글머리표 항목들 (그 목록의 바로 아래 항목만) */
+    _selectedListItems(list) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount || !list) return [];
+      const range = sel.getRangeAt(0);
+      const own = Array.from(list.children).filter((n) => n.tagName === 'LI');
+
+      // 커서만 둔 경우에는 그 줄 하나만 (옆 줄까지 걸리는 브라우저가 있다)
+      if (range.collapsed) {
+        let n = range.startContainer;
+        if (n.nodeType === 3) n = n.parentElement;
+        const li = n && n.closest ? n.closest('li') : null;
+        const mine = own.find((o) => o === li || o.contains(li));
+        return mine ? [mine] : [];
+      }
+      return own.filter((li) => range.intersectsNode(li));
+    }
+
+    /** 줄머리의 기호를 떼어낸다 */
+    _stripMarker(el) {
+      const t = firstTextNode(el);
+      if (t) t.nodeValue = t.nodeValue.replace(MARKER_RE, '');
+    }
+
+    /** 줄머리에 기호를 붙인다 */
+    _prependMarker(el, mark) {
+      const t = firstTextNode(el);
+      if (t) t.nodeValue = mark + t.nodeValue;
+      else el.insertBefore(document.createTextNode(mark), el.firstChild);
+    }
+
+    /**
+     * 고른 줄에 글머리표를 넣거나 뺀다.
+     * HTML 목록을 만들지 않고 줄머리에 글자를 붙인다.
+     */
+    _applyBullet(kind) {
+      const ed = this.getActive();
+      if (!ed || ed.readOnly) return;
+      ed.area.focus();
+      ed.restoreRange();
+
+      const blocks = listsToLines(ed.area, this._selectedBlocks(ed));
+      if (!blocks.length) return;
+
+      let no = 1;
+      blocks.forEach((b) => {
+        this._stripMarker(b);
+        if (kind === 'off') return;
+        this._prependMarker(b, kind === 'decimal' ? `${no++}.${NB}` : `${BULLET_CHAR[kind] || '•'}${NB}`);
+      });
+
+      // 커서는 기호 바로 뒤에 둔다.
+      // 칸 끝에 두면 <br> 뒤로 밀려, 글자가 기호와 공백 사이로 끼어든다.
+      const last = blocks[blocks.length - 1];
+      const range = document.createRange();
+      const head = firstTextNode(last);
+      const onlyMarker = MARKER_RE.test(last.textContent)
+        && last.textContent.replace(MARKER_RE, '').replace(/[\s\u00a0\u200b]/g, '') === '';
+      if (onlyMarker && head) {
+        // 기호만 있는 줄 : 기호 끝에 커서를 둔다
+        range.setStart(head, head.nodeValue.length);
+        range.collapse(true);
+      } else {
+        range.selectNodeContents(last);
+        range.collapse(false);
+      }
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      ed.saveRange();
+      ed._renumber();
+      ed.touch();
+      this.syncState();
     }
 
     // ---------------- 서식 복사 (Word 의 서식 붓과 동일한 사용감) ----------------
@@ -515,6 +1204,9 @@
       }
     }
   }
+
+  // 어떤 판이 돌고 있는지 콘솔에서 바로 확인할 수 있게 남긴다
+  console.log('[편집기] 글머리표: 글자 방식 (목록 태그를 쓰지 않음)');
 
   global.WR = global.WR || {};
   global.WR.Editor = Editor;

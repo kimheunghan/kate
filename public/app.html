@@ -16,25 +16,25 @@
     <!-- ============================================================ 탭 -->
     <div class="panel">
       <div class="tabs">
-        <button data-tab="write" class="active">보고서 작성 / 수정</button>
+        <button data-tab="write" class="active">주간보고서 작성</button>
         <button data-tab="list">등록 내역 조회</button>
       </div>
 
       <!-- ------------------------------------------------- 작성 탭 -->
       <div class="body" id="tab-write">
-        <div class="row">
-          <label class="field" style="flex:2 1 320px">
+        <div class="search-bar">
+          <label class="sb-field sb-week" style="flex:1 1 340px">
             <span>보고 주차</span>
             <select id="sel-week"></select>
           </label>
-          <label class="field" id="org-field" style="flex:1 1 220px">
+          <button class="btn primary sb-btn" id="btn-load">검색</button>
+          <!-- 기관은 검색줄 오른쪽 끝에 붙인다 -->
+          <label class="sb-field sb-right" id="org-field" style="flex:0 0 auto">
             <span>기관</span>
-            <select id="sel-org"></select>
+            <!-- 보고서는 항상 본인 소속으로 저장되므로 기관명만 보여준다 -->
+            <select id="sel-org" class="hidden"></select>
+            <div id="sel-org-text" class="sb-static"></div>
           </label>
-          <div class="field narrow" style="flex:0 0 auto">
-            <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
-            <button class="btn" id="btn-load">불러오기</button>
-          </div>
         </div>
         <div id="write-status"></div>
       </div>
@@ -46,30 +46,37 @@
         <h2 id="editor-title">주간 추진실적</h2>
         <span id="editor-badge"></span>
         <div class="spacer"></div>
-        <button class="btn sm" id="btn-excel-template">Excel 양식</button>
+        <!-- Excel 양식 내려받기 : 지금은 감춰 둔다. 기능은 그대로라 hidden 만 떼면 다시 보인다. -->
+        <button class="btn sm hidden" id="btn-excel-template">Excel 양식</button>
         <button class="btn sm primary" id="btn-excel-import">Excel 일괄등록</button>
         <input type="file" id="excel-file-input" accept=".xlsx" class="hidden">
-        <button class="btn sm" id="btn-copy-prev" title="직전 주차 보고서의 업무명과 계획을 그대로 가져옵니다">직전 주차 불러오기</button>
-        <button class="btn sm" id="btn-add-row">＋ 업무 추가</button>
       </header>
 
       <!-- 공용 편집 툴바: 현재 편집 중인 칸에 적용됩니다 -->
       <div id="shared-toolbar"></div>
-      <div class="toolbar-hint" id="toolbar-hint">계획 또는 실적 칸을 클릭하면 위 편집 도구를 사용할 수 있습니다.</div>
+
+      <!-- 왼쪽: 편집 도구 안내 / 오른쪽: 업무 추가·삭제 -->
+      <div class="toolbar-hint">
+        <span id="toolbar-hint-text"><span class="mark">※</span> 계획 또는 실적 칸을 클릭 시 위 편집 도구가 활성화됩니다.</span>
+        <span class="row-ctl">
+          <b>업무 추가 / 삭제</b>
+          <button class="btn sm icon" id="btn-add-row" title="업무 항목 추가">+</button>
+          <button class="btn sm icon danger" id="btn-del-row" title="업무 항목 삭제">−</button>
+        </span>
+      </div>
 
       <div class="body">
         <div class="table-scroll">
           <table class="report-table">
             <colgroup>
-              <col class="c-no"><col class="c-cell"><col class="c-cell"><col class="c-cell"><col class="c-act">
+              <col class="c-no"><col class="c-cell"><col class="c-cell"><col class="c-cell">
             </colgroup>
             <thead>
               <tr>
                 <th>순번</th>
-                <th>① 당초 계획</th>
-                <th>② 추진 실적</th>
-                <th>③ 향후 계획</th>
-                <th>관리</th>
+                <th id="th-plan">① 당초 계획</th>
+                <th id="th-result">② 추진 실적</th>
+                <th id="th-next">③ 향후 계획</th>
               </tr>
             </thead>
             <tbody id="items-body"></tbody>
@@ -78,7 +85,7 @@
 
         <label class="field mt16">
           <span>특이사항 / 비고 (선택)</span>
-          <textarea id="note" rows="2" placeholder="이슈, 협조 요청사항 등을 입력하세요."></textarea>
+          <textarea id="note" rows="2" placeholder="이슈, 협조 요청사항 등"></textarea>
         </label>
       </div>
     </div>
@@ -86,7 +93,7 @@
     <!-- ================================================ 증적자료 첨부 -->
     <div class="panel" id="files-panel">
       <header>
-        <h2>증적자료 첨부</h2>
+        <h2>증적자료 첨부 <span id="files-count" class="title-count"></span></h2>
         <span class="muted small">문서, 소스파일, 캡처 등 (실행파일은 zip 으로 압축해서 올려주세요)</span>
       </header>
       <div class="body">
@@ -96,28 +103,21 @@
         </div>
         <input type="file" id="file-input" multiple class="hidden">
         <ul class="file-list" id="file-list"></ul>
-        <p class="small muted mt8" id="files-note"></p>
       </div>
     </div>
 
     <!-- ==================================================== 저장 버튼 -->
     <div class="panel no-print" id="save-panel">
       <div class="body">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn primary" id="btn-save">임시저장</button>
-          <button class="btn primary" id="btn-submit">제출하기</button>
+        <!-- 오른쪽 정렬, 주 동작(저장)을 맨 오른쪽에 둔다 -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end">
           <button class="btn" id="btn-print">인쇄 / PDF</button>
           <button class="btn" id="btn-export"
-                  title="한글문서(HWP) 변환은 현재 [Word 다운로드] 하신 후 한글에서 Word문서를 열어서 다른 이름(확장자 .hwp)으로 저장하시기 바랍니다.">
-            Word 다운로드 <span class="mark">※</span>
-          </button>
-          <div class="spacer" style="flex:1"></div>
-          <button class="btn danger" id="btn-delete">보고서 삭제</button>
+                  title="Word 문서로 내려받기">Word 다운로드</button>
+          <button class="btn" id="btn-export-hwpx"
+                  title="아래한글 문서(HWPX)로 내려받기">한글 다운로드</button>
+          <button class="btn primary" id="btn-save">저장</button>
         </div>
-        <p class="hint-note">
-          <span class="mark">※</span>
-          한글문서(HWP) 변환은 현재 [Word 다운로드] 하신 후 한글에서 Word문서를 열어서 다른 이름(확장자 .hwp)으로 저장하시기 바랍니다.
-        </p>
       </div>
     </div>
 
@@ -125,45 +125,51 @@
     <div class="panel hidden" id="tab-list">
       <header>
         <h2>등록 내역</h2>
+        <span class="small muted" id="list-scope-note"></span>
         <div class="spacer"></div>
       </header>
       <div class="body">
-        <div class="row">
-          <label class="field"><span>주차</span><select id="f-week"><option value="">전체</option></select></label>
-          <label class="field"><span>기관</span><select id="f-org"><option value="">전체</option></select></label>
-          <label class="field"><span>상태</span>
-            <select id="f-status">
-              <option value="">전체</option>
-              <option value="SUBMITTED">제출완료</option>
-              <option value="DRAFT">임시저장</option>
-            </select>
+        <div class="search-bar">
+          <label class="sb-field" style="flex:2 1 340px">
+            <span>주차</span>
+            <select id="f-week"><option value="">전체</option></select>
           </label>
-          <label class="field" style="flex:2 1 240px"><span>검색어 (업무명·내용)</span><input type="text" id="f-q" placeholder="예: 온톨로지"></label>
-          <div class="field narrow">
-            <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
-            <button class="btn primary" id="btn-search">검색</button>
+          <label class="sb-field" id="f-org-field" style="flex:1 1 220px">
+            <span>기관</span>
+            <select id="f-org"><option value="">전체</option></select>
+          </label>
+          <button class="btn primary sb-btn" id="btn-search">조회</button>
+        </div>
+
+        <div class="list-head">
+          <h3 class="sec-title" id="list-count">보고서 목록</h3>
+          <div class="list-tools">
+            <span class="dl-note" id="dl-note"></span>
+            <button class="btn sm dl-btn" id="btn-week-hwpx">
+              <span class="dl-ico" aria-hidden="true">⤓</span>
+              <span id="dl-label">전체 주차 ZIP 다운로드</span>
+            </button>
           </div>
         </div>
 
-        <div class="table-scroll mt8">
-          <table class="grid">
+        <div class="table-scroll">
+          <table class="grid fixed">
             <thead>
               <tr>
-                <th style="width:230px">주차</th>
-                <th style="width:150px">기관</th>
-                <th style="width:100px">작성자</th>
+                <th class="col-org" style="width:10%">기관</th>
+                <th class="col-author" style="width:7%">참여인력</th>
+                <th style="width:18%">주차</th>
                 <th>내용 요약</th>
-                <th class="center" style="width:90px">상태</th>
-                <th class="center" style="width:70px">항목</th>
-                <th class="center" style="width:70px">첨부</th>
-                <th style="width:140px">최종수정</th>
-                <th class="center" style="width:210px">관리</th>
+                <th class="center" style="width:7%">상태</th>
+                <th class="center" style="width:5%">첨부</th>
+                <th style="width:10%">최종수정</th>
+                <th class="center" style="width:11%">상세보기 / 다운로드</th>
               </tr>
             </thead>
             <tbody id="list-body"></tbody>
           </table>
         </div>
-        <div id="list-pager" class="mt8" style="display:flex;gap:6px;justify-content:center;align-items:center"></div>
+        <div class="pager" id="list-pager-bottom"></div>
       </div>
     </div>
 

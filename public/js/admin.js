@@ -3,9 +3,28 @@
    ===================================================================== */
 (function () {
   'use strict';
-  const { api, toast, esc, fmtDateTime, statusBadge, openPrint, downloadReport, $, $$ } = window.WR;
+  const { api, toast, esc, fmtDateTime, statusBadge, $, $$ } = window.WR;
 
   const state = { me: null, orgs: [], tab: 'status' };
+
+  /** 담당 역할 표기 */
+  const PAGE_SIZE = 10;                  // 목록 한 쪽에 보여 줄 건수
+  const AUDIT_MAX = 5000;                // 활동 로그 엑셀 최대 건수 (서버와 같은 값)
+  const page = { status: 1, users: 1, audit: 1 };   // 화면별 현재 쪽
+
+  /** 배열에서 현재 쪽에 해당하는 부분만 잘라 낸다 */
+  function slicePage(rows, which) {
+    const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+    if (page[which] > pages) page[which] = pages;
+    const from = (page[which] - 1) * PAGE_SIZE;
+    return { part: rows.slice(from, from + PAGE_SIZE), pages };
+  }
+
+  const DUTY_LABEL = { LEAD: '총괄책임자', MANAGER: '실무책임자', RESEARCHER: '참여연구원' };
+  // 담당 역할은 반드시 선택해야 한다. 빈 항목은 고르라는 안내일 뿐 저장되지 않는다.
+  const dutyOptions = (sel) => ['', 'LEAD', 'MANAGER', 'RESEARCHER']
+    .map((v) => `<option value="${v}" ${sel === v || (!sel && !v) ? 'selected' : ''}>${
+      v ? DUTY_LABEL[v] : '선택하세요'}</option>`).join('');
   const body = () => $('#tab-body');
 
   async function init() {
@@ -27,34 +46,29 @@
       };
     });
     render();
-    refreshPendingBadge();
-  }
-
-  /** 가입 승인 탭에 대기건수 배지를 표시 */
-  async function refreshPendingBadge() {
-    try {
-      const res = await api.get('/api/admin/approvals');
-      const n = res.pending.signups + res.pending.resets;
-      const el = $('#cnt-approvals');
-      el.textContent = n;
-      el.classList.toggle('hidden', n === 0);
-    } catch (e) { /* 배지는 실패해도 무시 */ }
   }
 
   function render() {
-    body().innerHTML = '<div class="empty">불러오는 중...</div>';
     const fn = {
       status: renderStatus,
       matrix: renderMatrix,
-      orgs: renderOrgs,
-      approvals: renderApprovals,
       users: renderUsers,
-      weeks: renderWeeks,
       audit: renderAudit,
     }[state.tab];
-    Promise.resolve().then(fn).catch((e) => {
-      body().innerHTML = `<div class="alert error">불러오지 못했습니다: ${esc(e.message)}</div>`;
-    });
+
+    // 자료가 금방 오면 '불러오는 중' 을 아예 보여주지 않는다.
+    // 곧바로 지웠다 그리면 글자가 한 번 깜빡여 느리게 느껴진다.
+    let shown = false;
+    const timer = setTimeout(() => {
+      shown = true;
+      body().innerHTML = '<div class="empty">불러오는 중...</div>';
+    }, 250);
+
+    Promise.resolve().then(fn)
+      .catch((e) => {
+        body().innerHTML = `<div class="alert error">불러오지 못했습니다: ${esc(e.message)}</div>`;
+      })
+      .finally(() => { clearTimeout(timer); void shown; });
   }
 
   // ==================================================================
@@ -78,60 +92,69 @@
 
     const orgLocked = !!scopedOrgId && state.me.role === 'ORG_ADMIN';
 
+    const { part: stRows, pages: stPages } = slicePage(rows, 'status');
+
     body().innerHTML = `
-      <p class="small muted">선택한 주차에 <b>가입한 작성자 전원</b>이 나옵니다. 아직 안 낸 사람도 <b>미등록</b> 으로 표시됩니다.</p>
-      <div class="row">
-        <label class="field" style="flex:2 1 300px"><span>보고 주차</span>
+      <div class="search-bar">
+        <label class="sb-field sb-week" style="flex:1 1 300px">
+          <span>보고 주차</span>
           <select id="st-week">
             ${weeksRes.weeks.map((w) =>
-              `<option value="${w.id}" ${w.id === week.id ? 'selected' : ''}>${esc(w.label)}${w.is_open ? '' : ' [마감]'}</option>`).join('')}
+              `<option value="${w.id}" ${w.id === week.id ? 'selected' : ''}>${esc(w.label)}</option>`).join('')}
           </select>
         </label>
-        <label class="field" style="flex:1 1 160px"><span>기관</span>
+        <button class="btn primary sb-btn" id="st-refresh">조회</button>
+
+        <label class="sb-field" style="flex:0 0 140px">
+          <span>상태</span>
+          <select id="st-status">
+            <option value="">전체</option>
+            <option value="NONE"      ${f.status === 'NONE' ? 'selected' : ''}>미등록만</option>
+            <option value="SUBMITTED" ${f.status === 'SUBMITTED' ? 'selected' : ''}>제출완료만</option>
+          </select>
+        </label>
+        <label class="sb-field" style="flex:0 0 160px">
+          <span>이름 검색</span>
+          <input type="text" id="st-q" value="${esc(f.q || '')}" placeholder="예: 홍길동">
+        </label>
+
+        <!-- 기관은 작성 화면과 동일하게 오른쪽 끝에 배치 -->
+        <label class="sb-field sb-right" style="flex:0 0 auto">
+          <span>기관</span>
           <select id="st-org" ${orgLocked ? 'disabled' : ''}>
             <option value="">전체</option>
             ${orgsRes.orgs.map((o) =>
               `<option value="${o.id}" ${String(f.org) === String(o.id) || scopedOrgId === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
           </select>
         </label>
-        <label class="field narrow" style="flex:0 0 140px"><span>상태</span>
-          <select id="st-status">
-            <option value="">전체</option>
-            <option value="NONE"      ${f.status === 'NONE' ? 'selected' : ''}>미등록만</option>
-            <option value="DRAFT"     ${f.status === 'DRAFT' ? 'selected' : ''}>임시저장만</option>
-            <option value="SUBMITTED" ${f.status === 'SUBMITTED' ? 'selected' : ''}>제출완료만</option>
-          </select>
-        </label>
-        <label class="field" style="flex:1 1 160px"><span>이름 검색</span>
-          <input type="text" id="st-q" value="${esc(f.q || '')}" placeholder="예: 홍길동"></label>
-        <div class="field narrow">
-          <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
-          <button class="btn primary" id="st-refresh">조회</button>
-        </div>
       </div>
 
       <div class="stat-row mt8">
         <div class="stat"><div class="k">대상 인원</div><div class="v">${summary.total}</div></div>
         <div class="stat ok"><div class="k">제출완료</div><div class="v">${summary.submitted}</div></div>
-        <div class="stat warn"><div class="k">임시저장</div><div class="v">${summary.draft}</div></div>
         <div class="stat bad"><div class="k">미등록</div><div class="v">${summary.none}</div></div>
         <div class="stat"><div class="k">제출률</div><div class="v">${summary.rate}%</div></div>
       </div>
 
-      ${byOrg.length > 1 ? `
+      <div class="hint-row">
+        <span class="small muted">
+          <span class="mark">※</span> 해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.</span>
+        <button class="btn sm dl-btn" id="st-xlsx">⤓ 엑셀 다운로드</button>
+      </div>
+
+      ${byOrg.length ? `
       <h3 class="sec-title">기관별 소계</h3>
       <div class="table-scroll">
-        <table class="grid">
-          <thead><tr><th>기관</th><th class="center" style="width:90px">대상</th>
-            <th class="center" style="width:90px">제출</th><th class="center" style="width:90px">임시</th>
-            <th class="center" style="width:90px">미등록</th><th class="center" style="width:90px">제출률</th></tr></thead>
+        <table class="grid fixed">
+          <thead><tr><th>기관</th><th class="center" style="width:14%">대상</th>
+            <th class="center" style="width:14%">제출</th>
+            <th class="center" style="width:14%">미등록</th><th class="center" style="width:14%">제출률</th></tr></thead>
           <tbody>
             ${byOrg.map((o) => `
               <tr>
                 <td><b>${esc(o.org_name || '(소속없음)')}</b></td>
                 <td class="center">${o.total_users}</td>
                 <td class="center">${o.submitted}</td>
-                <td class="center">${o.draft}</td>
                 <td class="center">${o.none_cnt}</td>
                 <td class="center"><b>${o.total_users ? Math.round((o.submitted / o.total_users) * 100) : 0}%</b></td>
               </tr>`).join('')}
@@ -139,118 +162,60 @@
         </table>
       </div>` : ''}
 
-      <h3 class="sec-title">작성자별 제출 현황 (${rows.length}명)</h3>
+      <h3 class="sec-title">작성자 제출 현황 (${rows.length}명)</h3>
       <div class="table-scroll">
-        <table class="grid">
+        <table class="grid fixed">
           <thead>
             <tr>
-              <th style="width:110px">이름</th>
-              <th style="width:120px">아이디</th>
-              <th style="width:170px">기관</th>
-              <th class="center" style="width:100px">상태</th>
-              <th class="center" style="width:60px">항목</th>
-              <th class="center" style="width:60px">첨부</th>
-              <th style="width:140px">최종수정</th>
-              <th class="center" style="width:270px">관리</th>
+              <th style="width:18%">기관</th>
+              <th style="width:11%">이름</th>
+              <th style="width:13%">아이디</th>
+              <th class="center" style="width:10%">상태</th>
+              <th class="center" style="width:6%">첨부</th>
+              <th style="width:15%">제출시각</th>
+              <th style="width:15%">최종수정</th>
             </tr>
           </thead>
           <tbody>
-            ${rows.length ? rows.map((r) => `
+            ${stRows.length ? stRows.map((r) => `
               <tr>
+                <td>${esc(r.org_name || '-')}</td>
                 <td><b>${esc(r.user_name)}</b></td>
                 <td class="small muted">${esc(r.username)}</td>
-                <td>${esc(r.org_name || '-')}</td>
                 <td class="center">${statusBadge(r.status)}</td>
-                <td class="center">${r.item_count}</td>
                 <td class="center">${r.file_count}</td>
+                <td class="small">${r.submitted_at ? fmtDateTime(r.submitted_at) : '-'}</td>
                 <td class="small">${r.report_id ? fmtDateTime(r.updated_at) : '-'}</td>
-                <td class="center nowrap">
-                  ${r.report_id ? `
-                    <button class="btn sm" data-open="${r.report_id}">열기</button>
-                    <button class="btn sm" data-print="${r.report_id}">인쇄</button>
-                    <button class="btn sm" data-export="${r.report_id}"
-                      title="한글문서(HWP) 변환은 현재 [Word 다운로드] 하신 후 한글에서 Word문서를 열어서 다른 이름(확장자 .hwp)으로 저장하시기 바랍니다.">Word</button>
-                    <button class="btn sm" data-moveorg="${r.report_id}"
-                      title="잘못된 기관으로 등록된 보고서를 올바른 기관으로 옮깁니다 (업무·첨부는 그대로 유지)">소속변경</button>`
-                    : '<span class="muted small">미제출</span>'}
-                </td>
-              </tr>`).join('') : '<tr><td colspan="8" class="empty">조건에 맞는 작성자가 없습니다.</td></tr>'}
+              </tr>`).join('') : '<tr><td colspan="7" class="empty">조건에 맞는 작성자가 없습니다.</td></tr>'}
           </tbody>
         </table>
-      </div>`;
+      </div>
+      <div class="pager" id="st-pager"></div>`;
+
+    // 엑셀 내려받기 (화면에 걸어 둔 조건 그대로)
+    $('#st-xlsx').onclick = () => {
+      const p = new URLSearchParams();
+      if ($('#st-week').value) p.set('week_id', $('#st-week').value);
+      if ($('#st-org').value) p.set('org_id', $('#st-org').value);
+      window.WR.downloadFile(`/api/admin/export/status?${p}`, '등록현황.xlsx');
+    };
+
+    window.WR.renderPager($('#st-pager'), {
+      page: page.status, pages: stPages,
+      onGo: (n) => { page.status = n; renderStatus(weekId, f); },
+    });
 
     const readFilters = () => ({
       org: $('#st-org').value, status: $('#st-status').value, q: $('#st-q').value.trim(),
     });
-    $('#st-week').onchange = () => renderStatus(Number($('#st-week').value), readFilters());
-    $('#st-refresh').onclick = () => renderStatus(Number($('#st-week').value), readFilters());
+    $('#st-week').onchange = () => { page.status = 1; renderStatus(Number($('#st-week').value), readFilters()); };
+    $('#st-refresh').onclick = () => { page.status = 1; renderStatus(Number($('#st-week').value), readFilters()); };
     ['#st-org', '#st-status'].forEach((sel) => {
-      $(sel).onchange = () => renderStatus(Number($('#st-week').value), readFilters());
+      $(sel).onchange = () => { page.status = 1; renderStatus(Number($('#st-week').value), readFilters()); };
     });
     $('#st-q').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') renderStatus(Number($('#st-week').value), readFilters());
+      if (e.key === 'Enter') { page.status = 1; renderStatus(Number($('#st-week').value), readFilters()); }
     });
-    bindOpenPrint();
-  }
-
-  function bindOpenPrint() {
-    body().querySelectorAll('[data-open]').forEach((b) => {
-      b.onclick = () => { location.href = `/report?report=${b.dataset.open}`; };
-    });
-    body().querySelectorAll('[data-print]').forEach((b) => {
-      b.onclick = () => openPrint(b.dataset.print);
-    });
-    body().querySelectorAll('[data-export]').forEach((b) => {
-      b.onclick = () => downloadReport(b.dataset.export);
-    });
-    body().querySelectorAll('[data-moveorg]').forEach((b) => {
-      b.onclick = () => moveReportOrg(Number(b.dataset.moveorg));
-    });
-  }
-
-  /** 보고서를 다른 기관으로 옮긴다 (소속을 잘못 지정해 등록한 경우) */
-  async function moveReportOrg(reportId) {
-    let orgs;
-    try { orgs = await api.get('/api/orgs'); } catch (e) { return toast(e.message, true); }
-
-    const back = document.createElement('div');
-    back.className = 'modal-back';
-    back.innerHTML = `
-      <div class="modal" style="max-width:400px">
-        <header>보고서 소속 변경</header>
-        <div class="body">
-          <div class="alert error hidden" id="mo-err"></div>
-          <p class="small muted">잘못된 기관으로 등록된 보고서를 바로잡는 기능입니다.<br>
-            업무·첨부는 그대로 유지되고 <b>기관만</b> 바뀝니다.</p>
-          <label class="field"><span>옮길 기관</span>
-            <select id="mo-org">
-              ${orgs.orgs.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}
-            </select>
-          </label>
-        </div>
-        <footer>
-          <button class="btn" id="mo-cancel">취소</button>
-          <button class="btn primary" id="mo-ok">옮기기</button>
-        </footer>
-      </div>`;
-    document.body.appendChild(back);
-
-    const close = () => back.remove();
-    back.querySelector('#mo-cancel').onclick = close;
-    back.addEventListener('click', (e) => { if (e.target === back) close(); });
-
-    back.querySelector('#mo-ok').onclick = async () => {
-      try {
-        const res = await api.put(`/api/admin/reports/${reportId}/org`,
-          { org_id: Number(back.querySelector('#mo-org').value) });
-        close();
-        toast(`"${res.org_name}" 으로 옮겼습니다.`);
-        render();
-      } catch (e) {
-        const el = back.querySelector('#mo-err');
-        el.textContent = e.message; el.classList.remove('hidden');
-      }
-    };
   }
 
   // ==================================================================
@@ -266,21 +231,30 @@
       if (!c || !c.total_users) return '<td class="cell-n">·</td>';
       const rate = Math.round((c.submitted / c.total_users) * 100);
       const cls = rate >= 100 ? 'cell-s' : (rate > 0 ? 'cell-d' : 'cell-n');
-      return `<td class="${cls}" title="제출 ${c.submitted} / 임시 ${c.draft} / 미등록 ${c.none_cnt}">
+      return `<td class="${cls}" title="제출 ${c.submitted} / 미등록 ${c.none_cnt}">
                 <b>${c.submitted}</b><span class="muted">/${c.total_users}</span>
-                <div class="rate">${rate}%</div></td>`;
+                <div class="rate">(${rate}%)</div></td>`;
     };
 
     body().innerHTML = `
-      <p class="small muted">최근 몇 주간 <b>기관별로 몇 명이 제출했는지</b> 흐름을 봅니다.
-        칸의 숫자는 <b>제출 인원 / 대상 인원</b> 이며, 대상 인원은 그 기관에 가입한 작성자 수입니다.</p>
-      <div class="row">
-        <label class="field narrow" style="flex:0 0 180px"><span>표시 주차 수</span>
+      <div class="search-bar">
+        <label class="sb-field" style="flex:0 0 180px">
+          <span>표시 주차 수</span>
           <select id="mx-n">
             ${[4, 8, 12, 16, 26].map((k) => `<option value="${k}" ${k === weeks ? 'selected' : ''}>최근 ${k}주</option>`).join('')}
           </select>
         </label>
+        <button class="btn sm dl-btn sb-right" id="mx-xlsx">⤓ 엑셀 다운로드</button>
       </div>
+
+      <div class="legend-row">
+        <span class="legend">
+          <span><i class="sw cell-s"></i>전원 제출</span>
+          <span><i class="sw cell-d"></i>일부 제출</span>
+          <span><i class="sw cell-n"></i>제출 없음</span>
+        </span>
+      </div>
+
       <div class="table-scroll mt8">
         <table class="matrix">
           <thead>
@@ -301,300 +275,106 @@
                 const t = res.totals[w.id] || { submitted: 0, total_users: 0 };
                 const rate = t.total_users ? Math.round((t.submitted / t.total_users) * 100) : 0;
                 return `<td><b>${t.submitted}</b><span class="muted">/${t.total_users}</span>
-                          <div class="rate">${rate}%</div></td>`;
+                          <div class="rate">(${rate}%)</div></td>`;
               }).join('')}
             </tr>
           </tbody>
         </table>
-      </div>`;
+      </div>
+      <p class="small muted" style="margin:10px 2px 0">
+        <span class="mark">※</span> 주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.
+        (칸의 숫자 = <b>제출 / 대상</b>, ( )은 <b>제출률</b> 현황)</p>`;
 
     $('#mx-n').onchange = () => renderMatrix(Number($('#mx-n').value));
+    $('#mx-xlsx').onclick = () =>
+      window.WR.downloadFile(`/api/admin/export/matrix?weeks=${$('#mx-n').value}`, '주차별현황.xlsx');
   }
 
-  // ==================================================================
-  // 3. 기관 관리
-  // ==================================================================
-  async function renderOrgs() {
-    const res = await api.get('/api/admin/orgs');
-    state.orgs = res.orgs;
-
-    body().innerHTML = `
-      <div class="row">
-        <label class="field" style="flex:2 1 260px"><span>기관명</span><input type="text" id="o-name" placeholder="예) ㈜비아이매트릭스"></label>
-        <label class="field narrow" style="flex:0 0 120px"><span>정렬순서</span><input type="number" id="o-sort" value="0"></label>
-        <div class="field narrow">
-          <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
-          <button class="btn primary" id="o-add">기관 추가</button>
-        </div>
-      </div>
-
-      <div class="table-scroll mt8">
-        <table class="grid">
-          <thead><tr>
-            <th style="width:60px" class="center">순서</th><th>기관명</th>
-            <th class="center" style="width:90px">사용자</th><th class="center" style="width:90px">보고서</th>
-            <th class="center" style="width:90px">사용여부</th><th class="center" style="width:200px">관리</th>
-          </tr></thead>
-          <tbody>
-            ${res.orgs.map((o) => `
-              <tr data-id="${o.id}">
-                <td class="center">${o.sort_order}</td>
-                <td><b>${esc(o.name)}</b></td>
-                <td class="center">${o.user_count}</td>
-                <td class="center">${o.report_count}</td>
-                <td class="center">${o.is_active ? '<span class="badge submitted">사용</span>' : '<span class="badge none">중지</span>'}</td>
-                <td class="center nowrap">
-                  <button class="btn sm" data-edit="${o.id}">수정</button>
-                  <button class="btn sm" data-toggle="${o.id}">${o.is_active ? '사용중지' : '사용'}</button>
-                  <button class="btn sm danger" data-del="${o.id}">삭제</button>
-                </td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
-
-    $('#o-add').onclick = async () => {
-      const name = $('#o-name').value.trim();
-      if (!name) return toast('기관명을 입력하세요.', true);
-      try {
-        await api.post('/api/admin/orgs', { name, sort_order: Number($('#o-sort').value) || 0 });
-        toast('추가되었습니다.'); renderOrgs();
-      } catch (e) { toast(e.message, true); }
-    };
-
-    body().querySelectorAll('[data-edit]').forEach((b) => {
-      b.onclick = async () => {
-        const o = res.orgs.find((x) => x.id === Number(b.dataset.edit));
-        const name = prompt('기관명', o.name);
-        if (name === null) return;
-        const sort = prompt('정렬순서', o.sort_order);
-        if (sort === null) return;
-        try {
-          await api.put(`/api/admin/orgs/${o.id}`, { name: name.trim(), sort_order: Number(sort) || 0 });
-          toast('수정되었습니다.'); renderOrgs();
-        } catch (e) { toast(e.message, true); }
-      };
-    });
-
-    body().querySelectorAll('[data-toggle]').forEach((b) => {
-      b.onclick = async () => {
-        const o = res.orgs.find((x) => x.id === Number(b.dataset.toggle));
-        try {
-          await api.put(`/api/admin/orgs/${o.id}`, { is_active: !o.is_active });
-          renderOrgs();
-        } catch (e) { toast(e.message, true); }
-      };
-    });
-
-    body().querySelectorAll('[data-del]').forEach((b) => {
-      b.onclick = async () => {
-        if (!confirm('이 기관을 삭제할까요?')) return;
-        try {
-          await api.del(`/api/admin/orgs/${b.dataset.del}`);
-          toast('삭제되었습니다.'); renderOrgs();
-        } catch (e) { toast(e.message, true); }
-      };
-    });
-  }
-
-  // ==================================================================
-  // 3-2. 가입 승인 / 비밀번호 재설정 요청
-  // ==================================================================
-  async function renderApprovals() {
-    const [res, orgsRes] = await Promise.all([
-      api.get('/api/admin/approvals'),
-      api.get('/api/orgs'),
-    ]);
-    const pendingSignups = res.signups.filter((s) => s.approval_status === 'PENDING');
-    const rejected = res.signups.filter((s) => s.approval_status === 'REJECTED');
-
-    body().innerHTML = `
-      <div class="stat-row">
-        <div class="stat bad"><div class="k">가입 승인 대기</div><div class="v">${pendingSignups.length}</div></div>
-        <div class="stat warn"><div class="k">비밀번호 재설정 요청</div><div class="v">${res.resets.length}</div></div>
-        <div class="stat"><div class="k">반려된 신청</div><div class="v">${rejected.length}</div></div>
-      </div>
-
-      <h3 class="sec-title">가입 승인 대기</h3>
-      <p class="small muted">현재 <b>자동 승인</b>이 켜져 있으면 신규 가입자는 대기 없이 바로 사용합니다.
-        승인제로 바꾸려면 서버 <code>.env</code> 의 <code>SIGNUP_AUTO_APPROVE=false</code> 로 설정 후 재기동하세요.</p>
-      <div class="table-scroll">
-        <table class="grid">
-          <thead><tr>
-            <th style="width:130px">아이디</th><th style="width:100px">이름</th>
-            <th style="width:190px">이메일</th><th style="width:130px">연락처</th>
-            <th style="width:170px">신청 기관</th><th>담당 업무</th>
-            <th style="width:140px">신청일시</th><th class="center" style="width:170px">처리</th>
-          </tr></thead>
-          <tbody>
-            ${pendingSignups.length ? pendingSignups.map((u) => `
-              <tr>
-                <td><b>${esc(u.username)}</b></td>
-                <td>${esc(u.name)}</td>
-                <td class="small">${esc(u.email || '-')}</td>
-                <td class="small">${esc(u.phone || '-')}</td>
-                <td>
-                  <select data-org-for="${u.id}" style="font-size:12.5px;padding:4px 6px">
-                    ${orgsRes.orgs.map((o) => `<option value="${o.id}" ${o.id === u.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
-                  </select>
-                </td>
-                <td class="small">${esc(u.signup_note || '-')}</td>
-                <td class="small">${fmtDateTime(u.created_at)}</td>
-                <td class="center nowrap">
-                  <button class="btn sm primary" data-approve="${u.id}">승인</button>
-                  <button class="btn sm danger" data-reject="${u.id}">반려</button>
-                </td>
-              </tr>`).join('') : '<tr><td colspan="8" class="empty">대기 중인 가입 신청이 없습니다.</td></tr>'}
-          </tbody>
-        </table>
-      </div>
-
-      <h3 class="sec-title">비밀번호 재설정 요청</h3>
-      <p class="small muted">메일 서버가 없어 자동 발송이 불가합니다. 임시 비밀번호를 발급한 뒤 신청자에게 직접 전달하세요.
-        (신청자는 첫 로그인 시 비밀번호 변경 안내를 받습니다)</p>
-      <div class="table-scroll">
-        <table class="grid">
-          <thead><tr>
-            <th style="width:130px">아이디</th><th style="width:100px">이름</th>
-            <th style="width:190px">이메일</th><th style="width:170px">기관</th>
-            <th style="width:140px">요청일시</th><th style="width:130px">요청 IP</th>
-            <th class="center" style="width:210px">처리</th>
-          </tr></thead>
-          <tbody>
-            ${res.resets.length ? res.resets.map((r) => `
-              <tr>
-                <td><b>${esc(r.username)}</b></td>
-                <td>${esc(r.name)}</td>
-                <td class="small">${esc(r.email || '-')}</td>
-                <td>${esc(r.org_name || '-')}</td>
-                <td class="small">${fmtDateTime(r.created_at)}</td>
-                <td class="small muted">${esc(r.requested_ip || '-')}</td>
-                <td class="center nowrap">
-                  <button class="btn sm primary" data-issue="${r.id}">임시 비밀번호 발급</button>
-                  <button class="btn sm danger" data-rreject="${r.id}">반려</button>
-                </td>
-              </tr>`).join('') : '<tr><td colspan="7" class="empty">대기 중인 요청이 없습니다.</td></tr>'}
-          </tbody>
-        </table>
-      </div>
-
-      ${rejected.length ? `
-        <h3 class="sec-title">반려된 신청</h3>
-        <div class="table-scroll">
-          <table class="grid">
-            <thead><tr><th style="width:130px">아이디</th><th style="width:100px">이름</th>
-              <th style="width:190px">이메일</th><th style="width:140px">신청일시</th>
-              <th class="center" style="width:170px">처리</th></tr></thead>
-            <tbody>
-              ${rejected.map((u) => `
-                <tr>
-                  <td>${esc(u.username)}</td><td>${esc(u.name)}</td>
-                  <td class="small">${esc(u.email || '-')}</td>
-                  <td class="small">${fmtDateTime(u.created_at)}</td>
-                  <td class="center"><button class="btn sm" data-approve="${u.id}">승인으로 변경</button></td>
-                </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>` : ''}`;
-
-    // ---- 가입 승인 / 반려 ----
-    body().querySelectorAll('[data-approve]').forEach((b) => {
-      b.onclick = async () => {
-        const id = Number(b.dataset.approve);
-        const sel = body().querySelector(`[data-org-for="${id}"]`);
-        try {
-          await api.post(`/api/admin/users/${id}/approval`, {
-            approve: true,
-            org_id: sel ? Number(sel.value) : null,
-          });
-          toast('승인되었습니다. 이제 로그인할 수 있습니다.');
-          renderApprovals(); refreshPendingBadge();
-        } catch (e) { toast(e.message, true); }
-      };
-    });
-
-    body().querySelectorAll('[data-reject]').forEach((b) => {
-      b.onclick = async () => {
-        if (!confirm('이 가입 신청을 반려할까요?\n신청자는 로그인할 수 없게 됩니다.')) return;
-        try {
-          await api.post(`/api/admin/users/${b.dataset.reject}/approval`, { approve: false });
-          toast('반려되었습니다.');
-          renderApprovals(); refreshPendingBadge();
-        } catch (e) { toast(e.message, true); }
-      };
-    });
-
-    // ---- 비밀번호 재설정 처리 ----
-    body().querySelectorAll('[data-issue]').forEach((b) => {
-      b.onclick = async () => {
-        const pw = prompt('발급할 임시 비밀번호를 입력하세요 (8자 이상).\n발급 후 신청자에게 직접 전달하세요.', randomPw());
-        if (!pw) return;
-        try {
-          const r = await api.post(`/api/admin/reset-requests/${b.dataset.issue}`, { password: pw });
-          alert(`"${r.username}" 계정의 임시 비밀번호가 설정되었습니다.\n\n    ${pw}\n\n신청자에게 전달하세요. 첫 로그인 시 변경 안내가 표시됩니다.`);
-          renderApprovals(); refreshPendingBadge();
-        } catch (e) { toast(e.message, true); }
-      };
-    });
-
-    body().querySelectorAll('[data-rreject]').forEach((b) => {
-      b.onclick = async () => {
-        if (!confirm('이 재설정 요청을 반려할까요?')) return;
-        try {
-          await api.post(`/api/admin/reset-requests/${b.dataset.rreject}`, { reject: true });
-          toast('반려되었습니다.');
-          renderApprovals(); refreshPendingBadge();
-        } catch (e) { toast(e.message, true); }
-      };
-    });
-  }
-
-  /** 임시 비밀번호 후보 생성 (관리자가 그대로 쓰거나 고쳐 쓸 수 있게) */
-  function randomPw() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-    const buf = new Uint32Array(12);
-    crypto.getRandomValues(buf);
-    return Array.from(buf, (n) => chars[n % chars.length]).join('');
-  }
-
-  // ==================================================================
   // 4. 사용자 관리
   // ==================================================================
-  async function renderUsers() {
-    const [usersRes, orgsRes] = await Promise.all([api.get('/api/admin/users'), api.get('/api/orgs')]);
+  async function renderUsers(filters) {
+    const f = filters || {};
+    const q = new URLSearchParams();
+    if (f.q) q.set('q', f.q);
+    if (f.org) q.set('org_id', f.org);
+
+    const [usersRes, orgsRes] = await Promise.all([
+      api.get('/api/admin/users' + (q.toString() ? `?${q}` : '')),
+      api.get('/api/orgs'),
+    ]);
     const orgOpts = orgsRes.orgs.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
 
+    const { part: uRows, pages: uPages } = slicePage(usersRes.users, 'users');
+
     body().innerHTML = `
-      <div class="row">
-        <label class="field" style="flex:1 1 140px"><span>아이디</span><input type="text" id="u-username" placeholder="영문/숫자"></label>
-        <label class="field" style="flex:1 1 120px"><span>이름</span><input type="text" id="u-name"></label>
-        <label class="field" style="flex:1 1 160px"><span>초기 비밀번호</span><input type="text" id="u-pw" placeholder="8자 이상"></label>
-        <label class="field" style="flex:1 1 160px"><span>소속 기관</span><select id="u-org">${orgOpts}</select></label>
-        <label class="field narrow" style="flex:0 0 120px"><span>권한</span>
-          <select id="u-role"><option value="USER">작성자</option><option value="ADMIN">관리자</option></select>
+      <h3 class="sec-title">사용자 추가</h3>
+      <div class="search-bar">
+        <label class="sb-field" style="flex:1 1 140px">
+          <span>아이디</span><input type="text" id="u-username" placeholder="영문/숫자 4자 이상">
         </label>
-        <div class="field narrow">
-          <span style="display:block;height:0;overflow:hidden">&nbsp;</span>
-          <button class="btn primary" id="u-add">사용자 추가</button>
-        </div>
+        <label class="sb-field" style="flex:1 1 120px">
+          <span>이름</span><input type="text" id="u-name">
+        </label>
+        <label class="sb-field" style="flex:1 1 160px">
+          <span>초기 비밀번호</span><input type="text" id="u-pw" placeholder="8자 이상">
+        </label>
+        <label class="sb-field" style="flex:1 1 160px">
+          <span>기관</span><select id="u-org">${orgOpts}</select>
+        </label>
+        <label class="sb-field" style="flex:0 0 140px">
+          <span>담당 역할</span>
+          <select id="u-duty">${dutyOptions('')}</select>
+        </label>
+        <label class="sb-field" style="flex:0 0 130px">
+          <span>권한</span>
+          <select id="u-role">
+            <option value="USER">작성자</option>
+            <option value="ORG_ADMIN">기관관리자</option>
+            <option value="ADMIN">총괄관리자</option>
+          </select>
+        </label>
+        <button class="btn primary sb-btn" id="u-add">사용자 추가</button>
       </div>
-      <p class="small muted">추가된 계정은 최초 로그인 시 비밀번호 변경 안내가 표시됩니다.</p>
+
+      <h3 class="sec-title">사용자 목록 (${usersRes.users.length}명)</h3>
+      <div class="search-bar">
+        <label class="sb-field" style="flex:1 1 240px">
+          <span>검색 (이름·아이디·이메일)</span>
+          <input type="text" id="u-q" value="${esc(f.q || '')}" placeholder="예: 홍길동">
+        </label>
+        <label class="sb-field" style="flex:0 0 200px">
+          <span>기관</span>
+          <select id="u-forg">
+            <option value="">전체</option>
+            ${orgsRes.orgs.map((o) =>
+              `<option value="${o.id}" ${String(f.org) === String(o.id) ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+          </select>
+        </label>
+        <button class="btn primary sb-btn" id="u-search">조회</button>
+      </div>
 
       <div class="table-scroll mt8">
-        <table class="grid">
+        <table class="grid fixed">
           <thead><tr>
-            <th style="width:130px">아이디</th><th style="width:110px">이름</th>
-            <th style="width:180px">소속 기관</th><th class="center" style="width:80px">권한</th>
-            <th class="center" style="width:80px">상태</th><th style="width:150px">최근 로그인</th>
-            <th class="center" style="width:230px">관리</th>
+            <th style="width:19%">기관</th><th style="width:11%">이름</th>
+            <th style="width:13%">아이디</th>
+            <th class="center" style="width:11%">담당 역할</th>
+            <th class="center" style="width:9%">권한</th>
+            <th class="center" style="width:8%">상태</th><th style="width:15%">최근 로그인</th>
+            <th class="center" style="width:14%">사용자 권한 및 삭제</th>
           </tr></thead>
           <tbody>
-            ${usersRes.users.map((u) => `
+            ${uRows.map((u) => `
               <tr>
-                <td><b>${esc(u.username)}</b></td>
-                <td>${esc(u.name)}</td>
                 <td>${esc(u.org_name || '-')}</td>
-                <td class="center">${u.role === 'ADMIN' ? '<span class="badge draft">관리자</span>' : '<span class="badge none">작성자</span>'}</td>
+                <td><b>${esc(u.name)}</b></td>
+                <td class="small muted">${esc(u.username)}</td>
+                <td class="center small">${u.duty ? DUTY_LABEL[u.duty] : '-'}</td>
+                <td class="center">${
+                  u.role === 'ADMIN'     ? '<span class="badge role-admin">총괄관리자</span>' :
+                  u.role === 'ORG_ADMIN' ? '<span class="badge role-org">기관관리자</span>' :
+                                           '<span class="badge role-user">작성자</span>'
+                }</td>
                 <td class="center">${
                   u.approval_status === 'PENDING'  ? '<span class="badge draft">승인대기</span>' :
                   u.approval_status === 'REJECTED' ? '<span class="badge closed">반려</span>'   :
@@ -602,26 +382,55 @@
                 }</td>
                 <td class="small">${fmtDateTime(u.last_login_at)}</td>
                 <td class="center nowrap">
-                  <button class="btn sm" data-uedit="${u.id}">수정</button>
-                  <button class="btn sm" data-upw="${u.id}">비밀번호</button>
-                  <button class="btn sm" data-utoggle="${u.id}">${u.is_active ? '중지' : '활성'}</button>
+                  <button class="btn sm" data-uedit="${u.id}">권한</button>
                   <button class="btn sm danger" data-udel="${u.id}">삭제</button>
                 </td>
               </tr>`).join('')}
           </tbody>
         </table>
-      </div>`;
+      </div>
+      <div class="pager" id="u-pager"></div>`;
+
+    window.WR.renderPager($('#u-pager'), {
+      page: page.users, pages: uPages,
+      onGo: (n) => { page.users = n; renderUsers(f); },
+    });
+
+    const readUserFilters = () => ({ q: $('#u-q').value.trim(), org: $('#u-forg').value });
+    $('#u-search').onclick = () => { page.users = 1; renderUsers(readUserFilters()); };
+    $('#u-forg').onchange = () => { page.users = 1; renderUsers(readUserFilters()); };
+    $('#u-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { page.users = 1; renderUsers(readUserFilters()); } });
 
     $('#u-add').onclick = async () => {
+      const payload = {
+        username: $('#u-username').value.trim(),
+        name: $('#u-name').value.trim(),
+        password: $('#u-pw').value,
+        org_id: $('#u-role').value === 'ADMIN' ? ($('#u-org').value || null) : $('#u-org').value,
+        role: $('#u-role').value,
+        duty: $('#u-duty').value || null,
+      };
+
+      // 어느 칸이 문제인지 바로 알 수 있게 항목별로 확인하고 그 칸에 커서를 둔다
+      const problem =
+        !payload.username ? ['#u-username', '아이디를 입력하세요.'] :
+        !/^[A-Za-z0-9._-]{4,50}$/.test(payload.username)
+          ? ['#u-username', '아이디는 영문/숫자/._- 조합 4자 이상이어야 합니다.'] :
+        !payload.name ? ['#u-name', '이름을 입력하세요.'] :
+        !payload.password ? ['#u-pw', '초기 비밀번호를 입력하세요.'] :
+        payload.password.length < 8 ? ['#u-pw', '초기 비밀번호는 8자 이상이어야 합니다.'] :
+        (payload.role !== 'ADMIN' && !payload.org_id) ? ['#u-org', '기관을 선택하세요.'] :
+        !payload.duty ? ['#u-duty', '담당 역할을 선택하세요.'] : null;
+
+      if (problem) {
+        toast(problem[1], true);
+        $(problem[0]).focus();
+        return;
+      }
+
       try {
-        await api.post('/api/admin/users', {
-          username: $('#u-username').value.trim(),
-          name: $('#u-name').value.trim(),
-          password: $('#u-pw').value,
-          org_id: $('#u-role').value === 'ADMIN' ? ($('#u-org').value || null) : $('#u-org').value,
-          role: $('#u-role').value,
-        });
-        toast('사용자가 추가되었습니다.');
+        await addUserWithDuplicateCheck(payload);
+        toast(`"${payload.name}" 사용자가 추가되었습니다.`);
         renderUsers();
       } catch (e) { toast(e.message, true); }
     };
@@ -630,28 +439,6 @@
 
     body().querySelectorAll('[data-uedit]').forEach((b) => {
       b.onclick = () => openUserEdit(find(b.dataset.uedit), orgsRes.orgs);
-    });
-
-    body().querySelectorAll('[data-upw]').forEach((b) => {
-      b.onclick = async () => {
-        const u = find(b.dataset.upw);
-        const pw = prompt(`"${u.username}" 계정의 새 비밀번호를 입력하세요 (8자 이상)`);
-        if (!pw) return;
-        try {
-          await api.post(`/api/admin/users/${u.id}/password`, { password: pw });
-          toast('비밀번호가 초기화되었습니다.');
-        } catch (e) { toast(e.message, true); }
-      };
-    });
-
-    body().querySelectorAll('[data-utoggle]').forEach((b) => {
-      b.onclick = async () => {
-        const u = find(b.dataset.utoggle);
-        try {
-          await api.put(`/api/admin/users/${u.id}`, { is_active: !u.is_active });
-          renderUsers();
-        } catch (e) { toast(e.message, true); }
-      };
     });
 
     body().querySelectorAll('[data-udel]').forEach((b) => {
@@ -666,6 +453,43 @@
     });
   }
 
+  /**
+   * 사용자 추가. 같은 기관에 이름이 같은 사람이 있으면 서버가 409 로 알려준다.
+   * 이때 구분용 접미사(-A, -B)를 붙일지 관리자에게 확인받는다.
+   */
+  async function addUserWithDuplicateCheck(payload) {
+    try {
+      await api.post('/api/admin/users', payload);
+      return;
+    } catch (e) {
+      if (!e.body || !e.body.duplicate_name) throw e;
+
+      const { duplicates, suggestion } = e.body;
+      const who = duplicates
+        .map((d) => `    · ${d.name} (${d.username}${d.email ? ', ' + d.email : ''})`)
+        .join('\n');
+
+      const ok = confirm(
+        `같은 기관에 "${payload.name}" 님이 이미 ${duplicates.length}명 있습니다.\n\n${who}\n\n` +
+        `[확인] 구분되도록 이름을 바꿔 등록합니다.\n` +
+        (suggestion.renameExistingTo
+          ? `    기존: ${payload.name} → ${suggestion.renameExistingTo}\n`
+          : '') +
+        `    신규: ${payload.name} → ${suggestion.newName}\n\n` +
+        `[취소] 등록을 멈춥니다. 이름을 직접 고쳐 다시 시도하세요.`
+      );
+      if (!ok) throw new Error('등록을 취소했습니다.');
+
+      // 기존 사용자에게도 접미사를 붙여 둘 다 구분되게 한다
+      if (suggestion.renameExistingId && suggestion.renameExistingTo) {
+        await api.put(`/api/admin/users/${suggestion.renameExistingId}`,
+          { name: suggestion.renameExistingTo });
+      }
+      await api.post('/api/admin/users',
+        { ...payload, name: suggestion.newName, allow_duplicate_name: true });
+    }
+  }
+
   function openUserEdit(u, orgs) {
     const back = document.createElement('div');
     back.className = 'modal-back';
@@ -675,18 +499,30 @@
         <div class="body">
           <label class="field"><span>이름</span><input type="text" id="e-name" value="${esc(u.name)}"></label>
           <label class="field"><span>이메일</span><input type="email" id="e-email" value="${esc(u.email || '')}"></label>
-          <label class="field"><span>소속 기관</span>
+          <label class="field"><span>기관</span>
             <select id="e-org">
               <option value="">(없음)</option>
               ${orgs.map((o) => `<option value="${o.id}" ${o.id === u.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
             </select>
           </label>
-          <label class="field"><span>권한</span>
-            <select id="e-role">
-              <option value="USER"  ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
-              <option value="ADMIN" ${u.role === 'ADMIN' ? 'selected' : ''}>관리자</option>
-            </select>
+          <label class="field"><span>담당 역할</span>
+            <select id="e-duty">${dutyOptions(u.duty || '')}</select>
           </label>
+          <label class="field"><span>비밀번호 재설정</span>
+            <input type="text" id="e-pw" autocomplete="off" data-lpignore="true"
+                   placeholder="변경할 때만 입력 (8자 이상)">
+          </label>
+          <p class="small muted" style="margin:-6px 0 12px">
+            <span class="mark">※</span> 비워 두면 기존 비밀번호가 유지됩니다.</p>
+          <div class="field-hl">
+            <label class="field"><span>권한</span>
+              <select id="e-role">
+                <option value="USER"      ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
+                <option value="ORG_ADMIN" ${u.role === 'ORG_ADMIN' ? 'selected' : ''}>기관관리자</option>
+                <option value="ADMIN"     ${u.role === 'ADMIN' ? 'selected' : ''}>총괄관리자</option>
+              </select>
+            </label>
+          </div>
         </div>
         <footer>
           <button class="btn" id="e-cancel">취소</button>
@@ -700,80 +536,408 @@
     back.addEventListener('click', (e) => { if (e.target === back) close(); });
 
     $('#e-ok', back).onclick = async () => {
+      const payload = {
+        name: $('#e-name', back).value.trim(),
+        email: $('#e-email', back).value.trim() || null,
+        org_id: $('#e-org', back).value ? Number($('#e-org', back).value) : null,
+        role: $('#e-role', back).value,
+        duty: $('#e-duty', back).value || null,
+      };
+
+      // 소속을 바꾸면, 이 사람이 이전 기관에서 쓴 보고서를 함께 옮길지 확인한다.
+      // (보고서는 작성 당시 소속을 그대로 갖고 있어 자동으로 따라가지 않는다)
+      if (payload.org_id && Number(payload.org_id) !== Number(u.org_id)) {
+        const from = u.org_name || '소속 없음';
+        const to = $('#e-org', back).selectedOptions[0]?.textContent.trim() || '';
+        const cnt = u.report_count || 0;
+        if (cnt > 0) {
+          payload.move_reports = confirm(
+            `"${u.name}" 님의 기관을 "${from}" → "${to}" 로 바꿉니다.\n\n` +
+            `"${from}" 에서 작성한 보고서가 ${cnt}건 있습니다.\n\n` +
+            `[확인] 이 보고서들도 "${to}" 실적으로 함께 옮깁니다.\n` +
+            `[취소] 보고서는 "${from}" 실적으로 그대로 두고 기관만 바꿉니다.\n\n` +
+            `업무·첨부는 어느 쪽이든 삭제되지 않습니다.`
+          );
+        }
+      }
+
+      if (!payload.duty) {
+        toast('담당 역할을 선택하세요.', true);
+        $('#e-duty', back).focus();
+        return;
+      }
+
+      const newPw = $('#e-pw', back).value.trim();
+      if (newPw && newPw.length < 8) {
+        toast('비밀번호는 8자 이상이어야 합니다.', true);
+        $('#e-pw', back).focus();
+        return;
+      }
+
       try {
-        await api.put(`/api/admin/users/${u.id}`, {
-          name: $('#e-name', back).value.trim(),
-          email: $('#e-email', back).value.trim() || null,
-          org_id: $('#e-org', back).value ? Number($('#e-org', back).value) : null,
-          role: $('#e-role', back).value,
-        });
-        close(); toast('저장되었습니다.'); renderUsers();
+        const res = await api.put(`/api/admin/users/${u.id}`, payload);
+
+        // 비밀번호는 별도 엔드포인트에서 처리한다 (해싱·변경 안내 플래그 포함)
+        if (newPw) {
+          await api.post(`/api/admin/users/${u.id}/password`, { password: newPw });
+        }
+
+        close();
+        const parts = ['저장되었습니다.'];
+        if (res.moved_reports) parts.push(`보고서 ${res.moved_reports}건을 함께 옮겼습니다.`);
+        if (newPw) parts.push('비밀번호가 변경되었습니다.');
+        toast(parts.join(' '));
+
+        if (newPw) {
+          alert(`"${u.name}" 님의 비밀번호를 바꿨습니다.\n\n    ${newPw}\n\n` +
+                `본인에게 전달하세요. 첫 로그인 시 변경 안내가 표시됩니다.`);
+        }
+        renderUsers();
       } catch (e) { toast(e.message, true); }
     };
   }
 
   // ==================================================================
-  // 5. 주차 / 마감 관리
+  // 5. 활동 로그
   // ==================================================================
-  async function renderWeeks() {
-    const res = await api.get('/api/admin/weeks');
-    body().innerHTML = `
-      <p class="small muted">주차를 <b>마감</b>하면 해당 주차의 보고서는 일반 사용자가 등록·수정할 수 없습니다. (관리자는 계속 수정 가능)</p>
-      <div class="table-scroll mt8">
-        <table class="grid">
-          <thead><tr>
-            <th style="width:280px">주차</th><th style="width:120px">시작</th><th style="width:120px">종료</th>
-            <th class="center" style="width:100px">등록건수</th><th class="center" style="width:100px">상태</th>
-            <th class="center" style="width:120px">관리</th>
-          </tr></thead>
-          <tbody>
-            ${res.weeks.map((w) => `
-              <tr>
-                <td><b>${esc(w.label)}</b></td>
-                <td class="small">${w.start_date}</td>
-                <td class="small">${w.end_date}</td>
-                <td class="center">${w.report_count}</td>
-                <td class="center">${w.is_open ? '<span class="badge submitted">진행중</span>' : '<span class="badge closed">마감</span>'}</td>
-                <td class="center"><button class="btn sm" data-w="${w.id}" data-open="${w.is_open}">${w.is_open ? '마감하기' : '마감해제'}</button></td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
+  // 동작 코드를 우리말로 풀어 쓴다
+  const ACTION_TEXT = {
+    LOGIN: '로그인', LOGOUT: '로그아웃', LOGIN_FAIL: '로그인 실패',
+    SIGNUP: '회원가입', FIND_ID: '아이디 찾기',
+    PASSWORD_CHANGE: '비밀번호 변경', PROFILE_UPDATE: '내 정보 수정',
+    RESET_REQUEST: '비밀번호 재설정 요청', RESET_DIRECT: '비밀번호 재설정 진행',
+    RESET_COMPLETE: '비밀번호 재설정 완료', RESET_DONE: '비밀번호 재설정 완료',
+    RESET_REJECT: '비밀번호 재설정 반려',
+    RESET_MAIL_SENT: '재설정 메일 발송', RESET_MAIL_FAIL: '재설정 메일 실패',
+    REPORT_SAVE: '보고서 저장', REPORT_UPDATE: '보고서 수정',
+    REPORT_DELETE: '보고서 삭제', REPORT_STATUS: '보고서 상태 변경',
+    REPORT_EXPORT: 'Word 다운로드', REPORT_EXPORT_HWPX: '한글 다운로드',
+    REPORT_EXPORT_HWPX_WEEK: '주차 한글 다운로드',
+    REPORT_EXPORT_HWPX_ALL: '전체 주차 ZIP 다운로드',
+    REPORT_MOVE_ORG: '보고서 기관 이관', REPORT_ORG_CHANGE: '보고서 기관 변경',
+    EXCEL_IMPORT: '엑셀 일괄등록', EXCEL_PREVIEW: '엑셀 미리보기',
+    FILE_UPLOAD: '증적자료 첨부', FILE_DELETE: '증적자료 삭제',
+    USER_CREATE: '사용자 추가', USER_UPDATE: '사용자 수정',
+    USER_DELETE: '사용자 삭제', USER_PASSWORD_RESET: '비밀번호 초기화',
+    EXPORT_STATUS: '등록 현황 엑셀', EXPORT_MATRIX: '주차별 현황 엑셀',
+    EXPORT_USERS: '사용자 목록 엑셀', EXPORT_AUDIT: '활동 로그 엑셀',
+    ORG_CREATE: '기관 추가', ORG_UPDATE: '기관 수정', ORG_DELETE: '기관 삭제',
+    WEEK_TOGGLE: '주차 마감 전환',
+  };
 
-    body().querySelectorAll('[data-w]').forEach((b) => {
-      b.onclick = async () => {
-        try {
-          await api.put(`/api/admin/weeks/${b.dataset.w}`, { is_open: b.dataset.open !== 'true' });
-          renderWeeks();
-        } catch (e) { toast(e.message, true); }
+  // ===================================================================
+  //  기간 고르기 — 달력 하나에서 시작일과 종료일을 집는다
+  //  (숙박·항공 예약 사이트에서 쓰는 방식. 타자 없이 클릭만으로)
+  // ===================================================================
+  const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+
+  /** 두 자리로 맞춘다 */
+  const p2 = (n) => String(n).padStart(2, '0');
+  const ymd = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+  const parseYmd = (s) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+  };
+  const sameDay = (a, b) => a && b && ymd(a) === ymd(b);
+
+  /**
+   * 달력을 띄워 기간을 고르게 한다.
+   * @param {HTMLElement} anchor  이 요소 아래에 띄운다
+   * @param {{from:string, to:string, onApply:(from:string,to:string)=>void}} opt
+   *   from/to 는 'YYYY-MM-DDTHH:MM' 모양
+   */
+  function openRangeCalendar(anchor, opt) {
+    document.querySelectorAll('.cal-pop').forEach((el) => el.remove());
+
+    let start = parseYmd(opt.from);
+    let end = parseYmd(opt.to);
+    let cursor = new Date(start || new Date());
+    cursor.setDate(1);
+
+    const hhmm = (s, dflt) => {
+      const m = /T(\d{2}):(\d{2})/.exec(String(s || ''));
+      return m ? `${m[1]}:${m[2]}` : dflt;
+    };
+    let fromTime = hhmm(opt.from, '00:00');
+    let toTime = hhmm(opt.to, '23:59');
+
+    const pop = document.createElement('div');
+    pop.className = 'cal-pop';
+    document.body.appendChild(pop);
+
+    const r = anchor.getBoundingClientRect();
+    pop.style.left = `${Math.min(r.left + window.scrollX, window.innerWidth - 320)}px`;
+    pop.style.top = `${r.bottom + window.scrollY + 6}px`;
+
+    const timeOptions = (sel) => {
+      const out = [];
+      for (let h = 0; h < 24; h++) {
+        for (const m of ['00', '30']) {
+          const v = `${p2(h)}:${m}`;
+          out.push(`<option value="${v}" ${sel === v ? 'selected' : ''}>${v}</option>`);
+        }
+      }
+      if (!out.some((o) => o.includes(`value="${sel}"`))) {
+        out.push(`<option value="${sel}" selected>${sel}</option>`);
+      }
+      return out.join('');
+    };
+
+    function draw() {
+      const y = cursor.getFullYear();
+      const mo = cursor.getMonth();
+      const first = new Date(y, mo, 1);
+      const lead = first.getDay();
+      const days = new Date(y, mo + 1, 0).getDate();
+      const prevDays = new Date(y, mo, 0).getDate();
+      const today = new Date();
+
+      const cells = [];
+      for (let i = lead - 1; i >= 0; i--) cells.push({ d: new Date(y, mo - 1, prevDays - i), other: true });
+      for (let i = 1; i <= days; i++) cells.push({ d: new Date(y, mo, i), other: false });
+      while (cells.length % 7) cells.push({ d: new Date(y, mo + 1, cells.length - lead - days + 1), other: true });
+
+      pop.innerHTML = `
+        <div class="cal-head">
+          <button type="button" data-mv="-1" title="이전 달">‹</button>
+          <span class="ym">${y}년 ${p2(mo + 1)}월</span>
+          <button type="button" data-mv="1" title="다음 달">›</button>
+        </div>
+        <div class="cal-grid">
+          ${DOW.map((w, i) => `<div class="dow${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</div>`).join('')}
+          ${cells.map(({ d, other }) => {
+            const isStart = sameDay(d, start);
+            const isEnd = sameDay(d, end);
+            const between = start && end && d > start && d < end;
+            const cls = ['day'];
+            if (other) cls.push('other');
+            if (between) cls.push('in');
+            if (isStart || isEnd) {
+              cls.push('edge');
+              if (isStart && isEnd) cls.push('only');
+              else if (isStart) cls.push('start');
+              else cls.push('end');
+            }
+            if (sameDay(d, today)) cls.push('today');
+            return `<button type="button" class="${cls.join(' ')}" data-d="${ymd(d)}">${d.getDate()}</button>`;
+          }).join('')}
+        </div>
+        <div class="cal-time">
+          <span>시각</span>
+          <select id="cal-t1">${timeOptions(fromTime)}</select>
+          <span>~</span>
+          <select id="cal-t2">${timeOptions(toTime)}</select>
+        </div>
+        <div class="cal-foot">
+          <span class="picked">${start ? ymd(start) : '시작일 선택'} ~ ${end ? ymd(end) : '종료일 선택'}</span>
+          <span style="display:flex;gap:6px">
+            <button class="btn sm" type="button" id="cal-cancel">취소</button>
+            <button class="btn sm primary" type="button" id="cal-ok" ${start ? '' : 'disabled'}>적용</button>
+          </span>
+        </div>`;
+
+      pop.querySelectorAll('[data-mv]').forEach((b) => {
+        b.onclick = () => { cursor.setMonth(cursor.getMonth() + Number(b.dataset.mv)); draw(); };
+      });
+      pop.querySelectorAll('[data-d]').forEach((b) => {
+        b.onclick = () => {
+          const d = parseYmd(b.dataset.d);
+          if (!start || (start && end)) { start = d; end = null; }
+          else if (d < start) { end = start; start = d; }
+          else { end = d; }
+          draw();
+        };
+      });
+      pop.querySelector('#cal-t1').onchange = (e) => { fromTime = e.target.value; };
+      pop.querySelector('#cal-t2').onchange = (e) => { toTime = e.target.value; };
+      pop.querySelector('#cal-cancel').onclick = close;
+      pop.querySelector('#cal-ok').onclick = () => {
+        const s = start;
+        const e = end || start;
+        close();
+        opt.onApply(`${ymd(s)}T${fromTime}`, `${ymd(e)}T${toTime}`);
       };
-    });
+    }
+
+    function close() {
+      pop.remove();
+      document.removeEventListener('mousedown', onOutside, true);
+    }
+    function onOutside(ev) {
+      if (!pop.contains(ev.target) && ev.target !== anchor && !anchor.contains(ev.target)) close();
+    }
+    setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
+
+    draw();
   }
 
-  // ==================================================================
-  // 6. 활동 로그
-  // ==================================================================
+  // 빠른 선택 단추. 어느 것이든 '시작일 00:00 ~ 종료일 23:59' 로 잡는다.
+  // 그 밖의 기간은 [직접입력] 에서 달력으로 고른다.
+  const QUICK = {
+    '':   { label: '전체' },
+    m1:   { label: '1개월', months: 1 },
+    d7:   { label: '1주',   days: 6 },
+  };
+
+  /** 빠른 선택에 맞는 시작·종료를 만든다 */
+  function quickRange(kind) {
+    const q = QUICK[kind];
+    if (!q || (!q.months && q.days === undefined)) return { from: '', to: '' };
+    const now = new Date();
+    const start = new Date(now);
+    if (q.months) start.setMonth(start.getMonth() - q.months);
+    else start.setDate(start.getDate() - q.days);
+    return { from: `${ymd(start)}T00:00`, to: `${ymd(now)}T23:59` };
+  }
+
+  /** 화면에 보여 줄 기간 글귀 */
+  function rangeText(from, to) {
+    if (!from && !to) return '';
+    const cut = (s) => String(s).replace('T', ' ');
+    return `${cut(from)} ~ ${cut(to)}`;
+  }
+
+  // 활동 로그 검색 조건 (화면을 다시 그려도 유지된다)
+  const auditFilter = { quick: '', from: '', to: '', action: '', q: '' };
+
   async function renderAudit() {
-    const res = await api.get('/api/admin/audit?limit=200');
+    const q = new URLSearchParams({ page: page.audit, size: PAGE_SIZE });
+    ['from', 'to', 'action', 'q'].forEach((k) => { if (auditFilter[k]) q.set(k, auditFilter[k]); });
+
+    const res = await api.get(`/api/admin/audit?${q}`);
+    const aRows = res.logs;
+    const aPages = Math.max(1, Math.ceil(res.total / res.size));
+
     body().innerHTML = `
+      <div class="search-bar">
+        <label class="sb-field" style="flex:0 0 auto">
+          <span>기간</span>
+          <div class="range-box">
+            <span class="quick-range">
+              ${Object.entries(QUICK).map(([k, v]) =>
+                `<button type="button" data-q="${k}" class="${(auditFilter.quick || '') === k ? 'on' : ''}">${v.label}</button>`).join('')}
+              <button type="button" id="al-pick" class="${auditFilter.quick === 'custom' ? 'on' : ''}">직접입력</button>
+            </span>
+            <button type="button" class="range-display" id="al-range">
+              <span class="cal-ico">📅</span>
+              ${auditFilter.from
+                ? `<span>${esc(rangeText(auditFilter.from, auditFilter.to))}</span>`
+                : '<span class="none">기간 선택</span>'}
+            </button>
+          </div>
+        </label>
+        <label class="sb-field" style="flex:0 0 190px">
+          <span>행위</span>
+          <select id="al-action">
+            <option value="">전체</option>
+            ${res.actions.map((code) =>
+              `<option value="${esc(code)}" ${auditFilter.action === code ? 'selected' : ''}>${
+                esc(ACTION_TEXT[code] || code)}</option>`).join('')}
+          </select>
+        </label>
+        <label class="sb-field" style="flex:1 1 200px">
+          <span>검색어</span>
+          <input type="text" id="al-q" value="${esc(auditFilter.q)}"
+                 placeholder="사용자ID·이름·내용·IP">
+        </label>
+        <button class="btn primary sb-btn" id="al-search">조회</button>
+        <button class="btn sb-btn" id="al-reset">초기화</button>
+      </div>
+
+      <div class="list-head">
+        <h3 class="sec-title">활동 로그 (총 ${res.total}건)</h3>
+        <span class="pager-side">
+          <span class="small muted">
+            <span class="mark">※</span> 최신순 최대 ${AUDIT_MAX.toLocaleString()}건까지 내려받습니다.</span>
+          <button class="btn sm dl-btn" id="a-xlsx">⤓ 엑셀 다운로드</button>
+        </span>
+      </div>
+
       <div class="table-scroll">
-        <table class="grid">
+        <table class="grid fixed">
           <thead><tr>
-            <th style="width:150px">일시</th><th style="width:120px">사용자</th>
-            <th style="width:160px">동작</th><th>내용</th><th style="width:130px">IP</th>
+            <th style="width:11%">일시</th>
+            <th style="width:10%">사용자ID</th>
+            <th style="width:9%">사용자</th>
+            <th style="width:12%">동작</th>
+            <th style="width:12%">행위</th>
+            <th>내용</th><th style="width:11%">IP</th>
           </tr></thead>
           <tbody>
-            ${res.logs.length ? res.logs.map((l) => `
+            ${aRows.length ? aRows.map((l) => `
               <tr>
                 <td class="small">${fmtDateTime(l.created_at)}</td>
-                <td>${esc(l.username || '-')}</td>
+                <td>${esc(l.username || '(비로그인)')}</td>
+                <td>${esc(l.user_name || '(비로그인)')}</td>
                 <td class="small">${esc(l.action)}</td>
-                <td class="small">${esc(l.detail || '')}${l.target_id ? ` <span class="muted">#${l.target_id}</span>` : ''}</td>
+                <td class="small">${esc(ACTION_TEXT[l.action] || '-')}</td>
+                <td class="small">${esc(l.detail || '')}</td>
                 <td class="small muted">${esc(l.ip || '-')}</td>
-              </tr>`).join('') : '<tr><td colspan="5" class="empty">기록이 없습니다.</td></tr>'}
+              </tr>`).join('') : '<tr><td colspan="7" class="empty">기록이 없습니다.</td></tr>'}
           </tbody>
         </table>
-      </div>`;
+      </div>
+      <div class="pager" id="a-pager"></div>`;
+
+    $('#a-xlsx').onclick = () => {
+      const p = new URLSearchParams();
+      ['from', 'to', 'action', 'q'].forEach((k) => { if (auditFilter[k]) p.set(k, auditFilter[k]); });
+      window.WR.downloadFile(`/api/admin/export/audit?${p}`, '활동로그.xlsx');
+    };
+
+    window.WR.renderPager($('#a-pager'), {
+      page: res.page, pages: aPages,
+      onGo: (n) => { page.audit = n; renderAudit(); },
+    });
+
+    const runSearch = () => {
+      auditFilter.action = $('#al-action').value;
+      auditFilter.q = $('#al-q').value.trim();
+      page.audit = 1;
+      renderAudit();
+    };
+    $('#al-search').onclick = runSearch;
+    $('#al-action').onchange = runSearch;
+    $('#al-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+
+    // 빠른 선택 단추 : 오늘 / 1주일 / 1개월 / 3개월 / 전체
+    body().querySelectorAll('[data-q]').forEach((b) => {
+      b.onclick = () => {
+        const kind = b.dataset.q;
+        auditFilter.quick = kind;
+        const r = quickRange(kind);
+        auditFilter.from = r.from;
+        auditFilter.to = r.to;
+        runSearch();
+      };
+    });
+
+    // 달력에서 시작일·종료일을 집는다 (타자 없이 클릭만으로)
+    const openCal = (anchor) => {
+      openRangeCalendar(anchor, {
+        from: auditFilter.from,
+        to: auditFilter.to,
+        onApply: (from, to) => {
+          auditFilter.quick = 'custom';
+          auditFilter.from = from;
+          auditFilter.to = to;
+          runSearch();
+        },
+      });
+    };
+    $('#al-pick').onclick = () => {
+      // 누르는 즉시 표시를 옮긴다 (달력을 닫아도 이 상태가 유지된다)
+      body().querySelectorAll('.quick-range button').forEach((x) => x.classList.remove('on'));
+      $('#al-pick').classList.add('on');
+      openCal($('#al-pick'));
+    };
+    $('#al-range').onclick = () => openCal($('#al-range'));
+
+    $('#al-reset').onclick = () => {
+      Object.keys(auditFilter).forEach((k) => { auditFilter[k] = ''; });
+      page.audit = 1;
+      renderAudit();
+    };
   }
 
   init();

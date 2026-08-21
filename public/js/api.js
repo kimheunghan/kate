@@ -52,6 +52,7 @@
       const msg = (data && data.error) || (typeof data === 'string' && data) || `요청 실패 (${res.status})`;
       const err = new Error(msg);
       err.status = res.status;
+      err.body = (data && typeof data === 'object') ? data : null;  // 상세 정보(중복 목록 등)
       throw err;
     }
     return data;
@@ -117,9 +118,110 @@
     w.addEventListener('load', () => { try { w.focus(); w.print(); } catch (e) { /* 사용자가 직접 인쇄 */ } });
   }
 
+  /**
+   * 파일 내려받기.
+   * 주소로 바로 이동시키면(location.href) HTTP 사이트에서는 Chrome 이
+   * '안전하지 않은 다운로드'로 차단한다. 내용을 받아 브라우저가 직접
+   * 파일로 만들어 저장하면(blob:) 그 검사를 받지 않는다.
+   */
+  async function downloadFile(url, fallbackName) {
+    let res;
+    try {
+      // cache:'no-store' 를 빼면 크롬이 예전에 받은 문서를 그대로 다시 준다.
+      res = await fetch(url, { headers: { ...HEADERS }, credentials: 'same-origin', cache: 'no-store' });
+    } catch (e) {
+      toast('서버에 연결할 수 없습니다.', true);
+      return;
+    }
+    if (res.status === 401) { location.href = '/login'; return; }
+    if (!res.ok) {
+      let msg = `내려받지 못했습니다 (${res.status})`;
+      try {
+        const j = await res.json();
+        if (j && j.error) msg = j.error;
+      } catch (e) { /* 본문이 JSON 이 아니면 기본 메시지 */ }
+      toast(msg, true);
+      return;
+    }
+
+    // 서버가 지정한 파일명을 그대로 사용 (한글 파일명은 filename* 에 들어 있다)
+    const cd = res.headers.get('content-disposition') || '';
+    let name = fallbackName || 'download';
+    const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+    const plain = /filename="([^"]+)"/i.exec(cd);
+    if (utf8) { try { name = decodeURIComponent(utf8[1]); } catch (e) { /* 그대로 */ } }
+    else if (plain) name = plain[1];
+
+    const blob = await res.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 30000);
+  }
+
   /** 보고서를 Word 문서로 내려받는다 */
   function downloadReport(reportId) {
-    location.href = `/api/reports/${reportId}/export`;
+    downloadFile(`/api/reports/${reportId}/export`, '주간보고.doc');
+  }
+
+  /** 보고서를 아래한글 문서(HWPX)로 내려받는다 */
+  function downloadReportHwpx(reportId) {
+    downloadFile(`/api/reports/${reportId}/export-hwpx`, '주간보고.hwpx');
+  }
+
+  /**
+   * 주간보고를 한글 문서로 내려받는다 (보이는 범위만).
+   *   주차를 고르면  → 그 주차 한 파일(.hwpx)
+   *   고르지 않으면  → 주차마다 한 파일씩 묶은 ZIP
+   */
+  function downloadWeekHwpx(weekId, orgId) {
+    const q = new URLSearchParams();
+    if (weekId) q.set('week_id', String(weekId));
+    if (orgId)  q.set('org_id', String(orgId));
+    downloadFile(`/api/reports/export-hwpx-week?${q}`,
+      weekId ? '주간보고.hwpx' : '주간보고_전체.zip');
+  }
+
+  /**
+   * 권한 명칭 (화면 전체에서 이 표기를 쓴다)
+   *   ADMIN     총괄관리자 — 전체 기관
+   *   ORG_ADMIN 기관관리자 — 자기 기관만
+   *   USER      작성자     — 자기가 속한 기관
+   */
+  const ROLE_LABEL = { ADMIN: '총괄관리자', ORG_ADMIN: '기관관리자', USER: '작성자' };
+  function roleLabel(role) { return ROLE_LABEL[role] || '작성자'; }
+
+  /**
+   * 쪽 이동을 그린다. 한 쪽이면 아무것도 그리지 않는다.
+   * @param {HTMLElement} host  그릴 자리
+   * @param {{page:number, pages:number, onGo:(n:number)=>void}} opt
+   */
+  function renderPager(host, { page, pages, onGo }) {
+    if (!host) return;
+    if (!pages || pages <= 1) { host.innerHTML = ''; return; }
+
+    // 현재 쪽 둘레만 보여 준다 (앞뒤 두 개씩)
+    const from = Math.max(1, Math.min(page - 2, pages - 4));
+    const to = Math.min(pages, Math.max(page + 2, 5));
+    const nums = [];
+    for (let i = from; i <= to; i++) nums.push(i);
+
+    host.innerHTML =
+      `<button class="btn sm" data-go="1" ${page <= 1 ? 'disabled' : ''}>«</button>` +
+      `<button class="btn sm" data-go="${page - 1}" ${page <= 1 ? 'disabled' : ''}>이전</button>` +
+      (from > 1 ? '<span class="pg-gap">…</span>' : '') +
+      nums.map((n) => `<button class="btn sm pg-num${n === page ? ' on' : ''}" data-go="${n}">${n}</button>`).join('') +
+      (to < pages ? '<span class="pg-gap">…</span>' : '') +
+      `<button class="btn sm" data-go="${page + 1}" ${page >= pages ? 'disabled' : ''}>다음</button>` +
+      `<button class="btn sm" data-go="${pages}" ${page >= pages ? 'disabled' : ''}>»</button>`;
+
+    host.querySelectorAll('[data-go]').forEach((b) => {
+      b.onclick = () => { const n = Number(b.dataset.go); if (n !== page) onGo(n); };
+    });
   }
 
   function $(sel, root) { return (root || document).querySelector(sel); }
@@ -136,8 +238,8 @@
         `<a href="${n.href}" class="${n.key === active ? 'active' : ''}">${esc(n.label)}</a>`).join('')}</nav>
       <div class="spacer"></div>
       <button class="who" id="btn-profile" type="button" title="내 정보 수정">
-        ${esc(user.org_name || (user.role === 'ADMIN' ? '전체' : '소속없음'))} ·
-        <b>${esc(user.name)}</b>${user.role === 'ADMIN' ? ' (관리자)' : ''}
+        ${esc(user.org_name || '소속없음')} ·
+        <b>${esc(user.name)}</b> <span class="role-tag">${roleLabel(user.role)}</span>
         <span class="who-edit">수정</span>
       </button>
       <button class="btn sm" id="btn-pw">비밀번호</button>
@@ -175,7 +277,8 @@
         <div class="body">
           <div class="alert error hidden" id="pf-err"></div>
           <label class="field"><span>아이디</span>
-            <input type="text" value="${esc(u.username)}" disabled></label>
+            <input type="text" id="pf-username" name="username" autocomplete="username"
+                   value="${esc(u.username)}" disabled></label>
           <label class="field"><span>이름</span>
             <input type="text" id="pf-name" value="${esc(u.name)}"></label>
           <label class="field"><span>이메일</span>
@@ -183,7 +286,7 @@
                    placeholder="아이디·비밀번호 찾기에 사용됩니다"></label>
           <label class="field"><span>연락처</span>
             <input type="text" id="pf-phone" value="${esc(u.phone || '')}" placeholder="010-0000-0000"></label>
-          <label class="field" style="margin-bottom:6px"><span>소속 기관</span>
+          <label class="field" style="margin-bottom:6px"><span>기관</span>
             <select id="pf-org">
               ${u.role === 'ADMIN' ? '<option value="">(전체 / 소속 없음)</option>' : ''}
               ${orgs.orgs.map((o) =>
@@ -335,5 +438,5 @@
     $('#pw-cur', back).focus();
   }
 
-  global.WR = { api, toast, esc, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
+  global.WR = { api, toast, esc, roleLabel, renderPager, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
 })(window);

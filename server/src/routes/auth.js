@@ -59,11 +59,13 @@ function makeTempPassword(len = 10) {
 }
 
 /** 아이디 일부를 가린다: bimatrix01 → bi******01 */
+/** 아이디 가운데 두 글자만 가린다. (예: hung6789 → hu**6789) */
 function maskUsername(u) {
-  if (u.length <= 3) return u[0] + '*'.repeat(u.length - 1);
-  const head = u.slice(0, 2);
-  const tail = u.slice(-2);
-  return head + '*'.repeat(Math.max(u.length - 4, 1)) + tail;
+  if (u.length <= 2) return u[0] + '*';
+  if (u.length <= 4) return u[0] + '**' + u.slice(3);
+  // 가운데 자리에서 두 글자를 가린다
+  const at = Math.max(1, Math.round((u.length - 2) / 2));
+  return u.slice(0, at) + '**' + u.slice(at + 2);
 }
 
 // ---------------------------------------------------------------------
@@ -93,7 +95,7 @@ router.post('/login', async (req, res, next) => {
 
     if (!user || !auth.verifyPassword(password, user.password_hash)) {
       noteFailure(username);
-      await audit.log(req, 'LOGIN_FAIL', { detail: username });
+      await audit.log(req, 'LOGIN_FAIL', { detail: username, actorName: username });
       return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
     }
 
@@ -211,8 +213,9 @@ router.put('/profile', auth.requireAuth, async (req, res, next) => {
 
     if (!name) return res.status(400).json({ error: '이름을 입력하세요.' });
     if (name.length > 50) return res.status(400).json({ error: '이름이 너무 깁니다.' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: '올바른 이메일을 입력하세요. (아이디·비밀번호 찾기에 사용됩니다)' });
+    // 이메일은 선택 입력. 적었다면 형태만 확인한다.
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: '올바른 이메일을 입력하세요.' });
     }
     if (phone && phone.length > 30) return res.status(400).json({ error: '연락처가 너무 깁니다.' });
 
@@ -318,7 +321,9 @@ router.post('/signup', rateLimit(5, 10 * 60 * 1000), async (req, res, next) => {
     const name     = String(req.body?.name || '').trim();
     const email    = String(req.body?.email || '').trim();
     const phone    = String(req.body?.phone || '').trim();
-    const note     = String(req.body?.signup_note || '').trim().slice(0, 500);
+    // 담당 역할 (총괄책임자 / 실무책임자 / 참여연구원)
+    const DUTIES = ['LEAD', 'MANAGER', 'RESEARCHER'];
+    const duty = DUTIES.includes(req.body?.duty) ? req.body.duty : null;
     const orgId    = Number(req.body?.org_id) || null;
 
     if (!/^[A-Za-z0-9._-]{4,50}$/.test(username)) {
@@ -326,14 +331,16 @@ router.post('/signup', rateLimit(5, 10 * 60 * 1000), async (req, res, next) => {
     }
     if (password.length < 8) return res.status(400).json({ error: '비밀번호는 8자 이상이어야 합니다.' });
     if (!name) return res.status(400).json({ error: '이름을 입력하세요.' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: '올바른 이메일을 입력하세요. (아이디·비밀번호 찾기에 사용됩니다)' });
+    // 이메일은 선택 입력. 적었다면 형태만 확인한다.
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: '올바른 이메일을 입력하세요.' });
     }
-    if (!orgId) return res.status(400).json({ error: '소속 기관을 선택하세요.' });
+    if (!orgId) return res.status(400).json({ error: '기관을 선택하세요.' });
+    if (!duty)  return res.status(400).json({ error: '담당 역할을 선택하세요.' });
 
     // 허용 도메인이 지정되어 있으면 해당 메일 주소만 가입할 수 있다
     const domains = config.signup.allowedEmailDomains;
-    if (domains.length) {
+    if (email && domains.length) {
       const d = email.split('@')[1].toLowerCase();
       if (!domains.includes(d)) {
         return res.status(400).json({
@@ -351,18 +358,19 @@ router.post('/signup', rateLimit(5, 10 * 60 * 1000), async (req, res, next) => {
     const auto = config.signup.autoApprove;
     const { rows } = await db.query(
       `INSERT INTO wr.users
-         (username, password_hash, name, email, phone, org_id, role, approval_status, signup_note, approved_at)
+         (username, password_hash, name, email, phone, org_id, role, approval_status, duty, approved_at)
        VALUES ($1, $2, $3, $4, $5, $6, 'USER', $7::varchar, $8,
                CASE WHEN $7::varchar = 'APPROVED' THEN now() ELSE NULL END)
        ON CONFLICT (username) DO NOTHING
        RETURNING id, username`,
       [username, auth.hashPassword(password), name, email, phone || null, orgId,
-       auto ? 'APPROVED' : 'PENDING', note || null]
+       auto ? 'APPROVED' : 'PENDING', duty]
     );
     if (!rows[0]) return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
 
     await audit.log(req, 'SIGNUP', {
       targetType: 'user', targetId: rows[0].id,
+      actorId: rows[0].id, actorName: username,
       detail: `${username} (${auto ? '자동승인' : '승인대기'})`,
     });
     res.status(201).json({
@@ -376,32 +384,42 @@ router.post('/signup', rateLimit(5, 10 * 60 * 1000), async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------
-// POST /api/auth/find-id  — 이름 + 이메일로 아이디 찾기 (일부 마스킹)
+// POST /api/auth/find-id  — 이름 + 소속 기관으로 아이디 찾기 (일부 마스킹)
 // ---------------------------------------------------------------------
 router.post('/find-id', rateLimit(10, 10 * 60 * 1000), async (req, res, next) => {
   try {
     const name = String(req.body?.name || '').trim();
-    const email = String(req.body?.email || '').trim();
-    if (!name || !email) return res.status(400).json({ error: '이름과 이메일을 모두 입력하세요.' });
+    const orgId = Number(req.body?.org_id) || null;
+    if (!name || !orgId) return res.status(400).json({ error: '이름과 소속을 모두 선택하세요.' });
 
+    // 같은 기관에 동명이인이 있으면 이름 뒤에 -A, -B 를 붙여 등록한다.
+    // '홍길동' 으로 찾아도 '홍길동-A' 가 나오도록 함께 뒤진다.
+    const base = name.replace(/[.^$*+?()[\]{}|\\-]/g, '\\$&');
     const { rows } = await db.query(
-      `SELECT username, created_at, approval_status
+      `SELECT username, name, created_at, approval_status
          FROM wr.users
-        WHERE name = $1 AND lower(email) = lower($2)
-        ORDER BY id`,
-      [name, email]
+        WHERE (name = $1 OR name ~ ('^' || $3 || '-[A-Z]$')) AND org_id = $2
+        ORDER BY name, id`,
+      [name, orgId, base]
     );
-    await audit.log(req, 'FIND_ID', { detail: `${name} / ${email} → ${rows.length}건` });
+    // 아이디 찾기는 로그인하지 않은 사람이 하는 동작이라
+    // 누가 했는지 남기지 않는다. 화면에는 (비로그인) 으로 나온다.
+    await audit.log(req, 'FIND_ID', {
+      detail: `${name} / 기관 ${orgId} → ${rows.length}건`,
+    });
 
     if (!rows.length) {
       return res.status(404).json({ error: '일치하는 가입 정보가 없습니다. 관리자에게 문의하세요.' });
     }
     res.json({
       accounts: rows.map((r) => ({
+        name: r.name,
         username: maskUsername(r.username),
         created_at: r.created_at,
         pending: r.approval_status === 'PENDING',
       })),
+      // 동명이인이 있으면 화면에서 이름을 함께 보여준다
+      duplicated: rows.length > 1,
     });
   } catch (err) { next(err); }
 });
@@ -415,15 +433,15 @@ router.post('/reset-request', rateLimit(5, 10 * 60 * 1000), async (req, res, nex
   try {
     const username = String(req.body?.username || '').trim();
     const name = String(req.body?.name || '').trim();
-    const email = String(req.body?.email || '').trim();
-    if (!username || !name || !email) {
-      return res.status(400).json({ error: '아이디, 이름, 이메일을 모두 입력하세요.' });
+    if (!username || !name) {
+      return res.status(400).json({ error: '아이디와 이름을 모두 입력하세요.' });
     }
 
+    // 아이디 + 이름으로 본인을 확인한다 (이메일은 받지 않는다)
     const { rows } = await db.query(
       `SELECT id, username, name, email FROM wr.users
-        WHERE lower(username) = lower($1) AND name = $2 AND lower(email) = lower($3)`,
-      [username, name, email]
+        WHERE lower(username) = lower($1) AND name = $2`,
+      [username, name]
     );
     if (!rows[0]) {
       return res.status(404).json({ error: '일치하는 가입 정보가 없습니다. 관리자에게 문의하세요.' });
@@ -467,14 +485,16 @@ router.post('/reset-request', rateLimit(5, 10 * 60 * 1000), async (req, res, nex
               SET token_hash = NULL, expires_at = NULL, delivery = 'ADMIN' WHERE id = $1`,
           [created[0].id]
         );
-        await audit.log(req, 'RESET_MAIL_FAIL', { targetType: 'user', targetId: user.id, detail: err.message });
+        await audit.log(req, 'RESET_MAIL_FAIL', { targetType: 'user', targetId: user.id, detail: err.message,
+          actorId: user.id, actorName: user.username });
         return res.json({
           ok: true, delivery: 'ADMIN',
           message: '메일 발송에 실패하여 요청이 접수되었습니다.\n관리자가 확인 후 연락드립니다.',
         });
       }
 
-      await audit.log(req, 'RESET_MAIL_SENT', { targetType: 'user', targetId: user.id, detail: username });
+      await audit.log(req, 'RESET_MAIL_SENT', { targetType: 'user', targetId: user.id, detail: username,
+        actorId: user.id, actorName: user.username });
       // 메일 주소는 일부만 노출
       const masked = user.email.replace(/^(.{1,2})[^@]*(@.*)$/, (m, a, b) => `${a}****${b}`);
       return res.json({
@@ -500,7 +520,7 @@ router.post('/reset-request', rateLimit(5, 10 * 60 * 1000), async (req, res, nex
         );
         // 임시 비밀번호를 실제 계정에 적용 (다음 로그인 시 변경 안내)
         await client.query(
-          `UPDATE wr.users SET password_hash = $1, must_change_pw = TRUE WHERE id = $2`,
+          `UPDATE wr.users SET password_hash = $1, must_change_pw = FALSE WHERE id = $2`,
           [auth.hashPassword(tempPassword), user.id]
         );
         await client.query(
@@ -511,7 +531,8 @@ router.post('/reset-request', rateLimit(5, 10 * 60 * 1000), async (req, res, nex
         );
       });
 
-      await audit.log(req, 'RESET_DIRECT', { targetType: 'user', targetId: user.id, detail: username });
+      await audit.log(req, 'RESET_DIRECT', { targetType: 'user', targetId: user.id, detail: username,
+        actorId: user.id, actorName: user.username });
       return res.json({
         ok: true, delivery: 'DIRECT',
         temp_password: tempPassword,
@@ -532,7 +553,8 @@ router.post('/reset-request', rateLimit(5, 10 * 60 * 1000), async (req, res, nex
         [user.id, ip]
       );
     }
-    await audit.log(req, 'RESET_REQUEST', { targetType: 'user', targetId: user.id, detail: username });
+    await audit.log(req, 'RESET_REQUEST', { targetType: 'user', targetId: user.id, detail: username,
+      actorId: user.id, actorName: user.username });
     res.json({
       ok: true, delivery: 'ADMIN',
       message: '비밀번호 재설정 요청이 접수되었습니다.\n관리자가 확인 후 임시 비밀번호를 알려드립니다.',
@@ -615,7 +637,8 @@ router.post('/reset-complete', rateLimit(10, 10 * 60 * 1000), async (req, res, n
       );
     });
 
-    await audit.log(req, 'RESET_COMPLETE', { targetType: 'user', targetId: row.user_id, detail: row.username });
+    await audit.log(req, 'RESET_COMPLETE', { targetType: 'user', targetId: row.user_id, detail: row.username,
+      actorId: row.user_id, actorName: row.username });
     res.json({ ok: true, username: row.username, message: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인하세요.' });
   } catch (err) { next(err); }
 });

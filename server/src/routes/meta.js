@@ -15,11 +15,13 @@ const router = express.Router();
 // ---------------------------------------------------------------------
 router.get('/weeks', auth.requireAuth, async (req, res, next) => {
   try {
-    const limit = Math.min(Number(req.query.limit) || 60, 400);
+    const limit = Math.min(Number(req.query.limit) || 200, 400);
+    // 등록된 주차를 최신순으로 준다.
+    // 주차 자체가 사업 기간(~2027-03-31)까지만 만들어져 있으므로
+    // 여기서 따로 기간을 자르지 않는다.
     const { rows } = await db.query(
-      `SELECT id, year, week_no, start_date, end_date, label, is_open
+      `SELECT id, year, week_no, start_date, end_date, label
          FROM wr.report_weeks
-        WHERE start_date <= (CURRENT_DATE + INTERVAL '28 days')
         ORDER BY start_date DESC
         LIMIT $1`,
       [limit]
@@ -34,7 +36,7 @@ router.get('/weeks', auth.requireAuth, async (req, res, next) => {
 router.get('/weeks/current', auth.requireAuth, async (req, res, next) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, year, week_no, start_date, end_date, label, is_open
+      `SELECT id, year, week_no, start_date, end_date, label
          FROM wr.report_weeks
         WHERE start_date <= CURRENT_DATE
         ORDER BY start_date DESC

@@ -25,7 +25,9 @@ const ALLOWED_TAGS = new Set([
 ]);
 
 // 모든 허용 태그에 공통 허용되는 속성
-const GLOBAL_ATTRS = new Set(['style', 'align', 'dir', 'title']);
+// data-mk : 글머리표 기호를 따로 적어 둔다. 편집 중 스타일이 지워져도
+//           이 값으로 되돌린다. 값은 아래 safeMarker 로 걸러진다.
+const GLOBAL_ATTRS = new Set(['style', 'align', 'dir', 'title', 'data-mk']);
 
 // 태그별 추가 허용 속성
 const TAG_ATTRS = {
@@ -98,9 +100,51 @@ function safeUrl(raw, { allowDataImage = false } = {}) {
   return v;
 }
 
+/**
+ * style 값 안의 엔티티를 원래 글자로 되돌린다.
+ * 브라우저는 list-style-type 같은 따옴표 값을 큰따옴표로 적어 내보내는데,
+ * 속성 안에서는 &quot; 로 바뀐다. 그대로 두고 다시 escape 하면
+ * &amp;quot; 가 되고 그 안의 ; 때문에 선언이 잘려 값이 깨진다.
+ */
+function decodeEntities(s) {
+  return String(s)
+    .replace(/&#(\d{1,7});/g, (m, d) => String.fromCodePoint(Number(d)))
+    .replace(/&#[xX]([0-9a-fA-F]{1,6});/g, (m, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&nbsp;/gi, '\u00a0')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&');
+}
+
+/** 따옴표 안의 ; 는 구분자로 보지 않고 선언을 나눈다 */
+function splitDecls(text) {
+  const out = [];
+  let cur = '';
+  let quote = null;
+  for (const ch of String(text)) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      cur += ch;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch; cur += ch;
+    } else if (ch === ';') {
+      out.push(cur); cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
 function safeStyle(raw) {
   const out = [];
-  for (const decl of String(raw).split(';')) {
+  // 먼저 엔티티를 되돌린 뒤 검사한다. (되돌린 뒤에도 < > 가 있으면 아래에서 걸러진다)
+  // 따옴표 값은 작은따옴표로 통일해 속성에 다시 넣어도 깨지지 않게 한다.
+  const text = decodeEntities(raw).replace(/"([^"]*)"/g, (m, v) => `'${v.replace(/'/g, '')}'`);
+  for (const decl of splitDecls(text)) {
     const idx = decl.indexOf(':');
     if (idx < 1) continue;
     const prop = decl.slice(0, idx).trim().toLowerCase();
@@ -126,6 +170,14 @@ function sanitizeAttrs(tag, rawAttrs) {
     if (name.startsWith('on')) continue;                       // 모든 이벤트 핸들러 차단
     if (!GLOBAL_ATTRS.has(name) && !(allowed && allowed.has(name))) continue;
 
+    if (name === 'data-mk') {
+      // 글머리표 값만 허용 (따옴표 안 글자 몇 개 또는 disc/square/circle/decimal)
+      const v = decodeEntities(value).replace(/"/g, "'").trim();
+      if (/^'[^'<>]{1,4}'$/.test(v) || /^(disc|square|circle|decimal|none)$/.test(v)) {
+        out.push(`data-mk="${escapeAttr(v)}"`);
+      }
+      continue;
+    }
     if (name === 'style') {
       const s = safeStyle(value);
       if (s) out.push(`style="${escapeAttr(s)}"`);

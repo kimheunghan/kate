@@ -3,13 +3,36 @@
 const db = require('./db');
 
 /** 감사 로그 기록. 실패해도 본 요청은 막지 않는다. */
-async function log(req, action, { targetType = null, targetId = null, detail = null } = {}) {
+/**
+ * @param {object} opts
+ *   actorId / actorName : 로그인 전 동작(로그인 실패·비밀번호 재설정 등)에서
+ *     req.user 가 없을 때 '누가' 를 직접 넘긴다. 안 넘기면 로그인한 사람으로 남는다.
+ */
+async function log(req, action, {
+  targetType = null, targetId = null, detail = null, actorId, actorName,
+} = {}) {
   try {
     const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || null;
+
+    const uid = req.user?.id ?? actorId ?? null;
+    const uname = req.user?.username ?? actorName ?? null;
+
+    // 이름도 함께 남긴다. 계정이 지워져도 누구였는지 알 수 있다.
+    let display = req.user?.name ?? null;
+    if (!display && (uid || uname)) {
+      const { rows } = await db.query(
+        `SELECT name FROM wr.users WHERE ($1::int IS NOT NULL AND id = $1)
+                                     OR ($1::int IS NULL AND lower(username) = lower($2))
+          LIMIT 1`,
+        [uid, uname]
+      );
+      display = rows[0]?.name ?? null;
+    }
+
     await db.query(
-      `INSERT INTO wr.audit_logs (user_id, username, action, target_type, target_id, detail, ip)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [req.user?.id || null, req.user?.username || null, action, targetType, targetId, detail, ip]
+      `INSERT INTO wr.audit_logs (user_id, username, user_name, action, target_type, target_id, detail, ip)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [uid, uname, display, action, targetType, targetId, detail, ip]
     );
   } catch (err) {
     console.error('[audit] 기록 실패:', err.message);
