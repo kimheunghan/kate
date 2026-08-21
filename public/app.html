@@ -43,7 +43,10 @@
         <div class="spacer"></div>
         <!-- Excel 양식 내려받기 : 지금은 감춰 둔다. 기능은 그대로라 hidden 만 떼면 다시 보인다. -->
         <button class="btn sm hidden" id="btn-excel-template">Excel 양식</button>
+        <button class="btn sm" id="btn-export-hwpx"
+                title="아래한글 문서(HWPX)로 내려받기">한글 다운로드</button>
         <button class="btn sm primary" id="btn-excel-import">엑셀 업로드</button>
+        <button class="btn sm primary" id="btn-save">저장</button>
         <input type="file" id="excel-file-input" accept=".xlsx" class="hidden">
       </header>
 
@@ -104,17 +107,14 @@
       </div>
     </div>
 
-    <!-- ==================================================== 저장 버튼 -->
-    <div class="panel no-print" id="save-panel">
+    <!-- 저장·내려받기 버튼은 작성 영역 제목줄로 올렸다.
+         인쇄/Word 는 지금 쓰지 않으므로 이 칸째로 감춰 둔다. -->
+    <div class="panel no-print hidden" id="save-panel">
       <div class="body">
-        <!-- 오른쪽 정렬, 주 동작(저장)을 맨 오른쪽에 둔다 -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end">
           <button class="btn" id="btn-print">인쇄 / PDF</button>
           <button class="btn" id="btn-export"
                   title="Word 문서로 내려받기">Word 다운로드</button>
-          <button class="btn" id="btn-export-hwpx"
-                  title="아래한글 문서(HWPX)로 내려받기">한글 다운로드</button>
-          <button class="btn primary" id="btn-save">저장</button>
         </div>
       </div>
     </div>
