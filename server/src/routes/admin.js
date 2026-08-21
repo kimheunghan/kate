@@ -428,7 +428,8 @@ router.post('/users', userManager, async (req, res, next) => {
     if (!password) return res.status(400).json({ error: '초기 비밀번호를 입력하세요.' });
     if (password.length < 8) return res.status(400).json({ error: '초기 비밀번호는 8자 이상이어야 합니다.' });
     if (role !== 'ADMIN' && !orgId) return res.status(400).json({ error: '기관을 선택하세요.' });
-    if (!['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty)) {
+    // 감독관리자는 참여 인력이 아니라 담당 역할이 없다
+    if (role !== 'SUPERVISOR' && !['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty)) {
       return res.status(400).json({ error: '담당 역할을 선택하세요.' });
     }
 
@@ -451,7 +452,8 @@ router.post('/users', userManager, async (req, res, next) => {
        ON CONFLICT (username) DO NOTHING
        RETURNING id, username, name, email, role, org_id, duty, is_active`,
       [username, auth.hashPassword(password), name, req.body?.email || null, role, orgId,
-       ['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty) ? req.body.duty : null]
+       (role !== 'SUPERVISOR' && ['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty))
+         ? req.body.duty : null]
     );
     if (!rows[0]) return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
 
@@ -507,10 +509,15 @@ router.put('/users/:id(\\d+)', userManager, async (req, res, next) => {
     const DUTIES = ['LEAD', 'MANAGER', 'RESEARCHER'];
     let duty;
     if (Object.prototype.hasOwnProperty.call(req.body || {}, 'duty')) {
-      if (!DUTIES.includes(req.body.duty)) {
-        return res.status(400).json({ error: '담당 역할을 선택하세요.' });
+      // 감독관리자는 참여 인력이 아니라 담당 역할이 없다
+      if (req.body.role === 'SUPERVISOR') {
+        duty = null;
+      } else {
+        if (!DUTIES.includes(req.body.duty)) {
+          return res.status(400).json({ error: '담당 역할을 선택하세요.' });
+        }
+        duty = req.body.duty;
       }
-      duty = req.body.duty;
     }
 
     const { rows } = await db.query(

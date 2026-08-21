@@ -210,6 +210,12 @@ router.get('/', async (req, res, next) => {
       params.push(req.user.id); where.push(`r.author_id = $${params.length}`);
     }
 
+    // 감독관리자는 참여 인력이 아니다. 본인이 써 둔 보고서는
+    // 등록 내역에 올리지 않는다. (본인 화면에서 한글로만 내려받는다)
+    where.push(`NOT EXISTS (
+      SELECT 1 FROM wr.users su WHERE su.id = r.author_id AND su.role = 'SUPERVISOR'
+    )`);
+
     // 권한별 조회 범위 (작성자는 본인 것만)
     addViewScope(req.user, where, params);
     if (auth.seesAllOrgs(req.user) && req.query.org_id) {
@@ -1090,7 +1096,7 @@ router.get('/:id(\\d+)/export-hwpx', async (req, res, next) => {
 // 한 주차 분량을 한글 문서(HWPX) 버퍼로 만든다. 보고서가 없으면 null.
 // ---------------------------------------------------------------------
 async function renderWeekHwpx(user, week, orgId) {
-  const where = ['r.week_id = $1'];
+  const where = ['r.week_id = $1', "COALESCE(u.role, '') <> 'SUPERVISOR'"];
   const params = [week.id];
   addViewScope(user, where, params);
   if (auth.seesAllOrgs(user) && orgId) {
@@ -1153,7 +1159,10 @@ router.get('/export-hwpx-week', async (req, res, next) => {
     const weekId = Number(req.query.week_id);
 
     // 대상 주차 목록 (보고서가 있는 주차만, 최신 주차부터)
-    const where = [];
+    //  감독관리자가 써 둔 보고서는 참여 인력 실적이 아니므로 세지 않는다.
+    const where = [`NOT EXISTS (
+      SELECT 1 FROM wr.users su WHERE su.id = r.author_id AND su.role = 'SUPERVISOR'
+    )`];
     const params = [];
     addViewScope(req.user, where, params);
     if (orgId) { params.push(Number(orgId)); where.push(`r.org_id = $${params.length}`); }
@@ -1175,6 +1184,7 @@ router.get('/export-hwpx-week', async (req, res, next) => {
     // ── 주차 하나 : 한글 문서 그대로 ──────────────────────────────
     if (weekId) {
       const made = await renderWeekHwpx(req.user, weeks[0], orgId);
+      if (!made) return res.status(404).json({ error: '해당 주차에 등록된 보고서가 없습니다.' });
       const name = weekFileBase(weeks[0].label) + '.hwpx';
       await audit.log(req, 'REPORT_EXPORT_HWPX_WEEK', {
         targetType: 'week', targetId: weeks[0].id, detail: `${name} (${made.count}건)`,

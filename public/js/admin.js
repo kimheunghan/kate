@@ -22,6 +22,22 @@
 
   const DUTY_LABEL = { LEAD: '총괄책임자', MANAGER: '실무책임자', RESEARCHER: '참여연구원' };
   // 담당 역할은 반드시 선택해야 한다. 빈 항목은 고르라는 안내일 뿐 저장되지 않는다.
+  /**
+   * 권한에 맞춰 담당 역할 칸을 잠근다.
+   * 감독관리자는 참여 인력이 아니라 담당 역할이 없다.
+   */
+  function syncDutyByRole(roleSel, dutySel) {
+    if (!roleSel || !dutySel) return;
+    const apply = () => {
+      const off = roleSel.value === 'SUPERVISOR';
+      dutySel.disabled = off;
+      dutySel.title = off ? '감독관리자는 참여 인력이 아니라 담당 역할이 없습니다.' : '';
+      if (off) dutySel.value = '';
+    };
+    roleSel.addEventListener('change', apply);
+    apply();
+  }
+
   const dutyOptions = (sel) => ['', 'LEAD', 'MANAGER', 'RESEARCHER']
     .map((v) => `<option value="${v}" ${sel === v || (!sel && !v) ? 'selected' : ''}>${
       v ? DUTY_LABEL[v] : '선택하세요'}</option>`).join('');
@@ -146,7 +162,8 @@
 
       <div class="hint-row">
         <span class="small muted">
-          <span class="mark">※</span> 해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.</span>
+          <span class="mark">※</span> 해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.<br>
+          <span class="mark">※</span> 감독관리자는 참여 인력이 아니므로 대상 인원에서 제외됩니다. 감독관리자가 쓴 보고서는 등록 내역에 나오지 않고, 본인만 한글로 내려받을 수 있습니다.</span>
         <button class="btn sm dl-btn" id="st-xlsx">⤓ 엑셀 다운로드</button>
       </div>
 
@@ -413,6 +430,8 @@
     $('#u-forg').onchange = () => { page.users = 1; renderUsers(readUserFilters()); };
     $('#u-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { page.users = 1; renderUsers(readUserFilters()); } });
 
+    syncDutyByRole($('#u-role'), $('#u-duty'));
+
     $('#u-add').onclick = async () => {
       const payload = {
         username: $('#u-username').value.trim(),
@@ -543,6 +562,8 @@
         </footer>
       </div>`;
     document.body.appendChild(back);
+
+    syncDutyByRole($('#e-role', back), $('#e-duty', back));
 
     const close = () => back.remove();
     $('#e-cancel', back).onclick = close;

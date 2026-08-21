@@ -244,6 +244,11 @@
     } else {
       msgs.push('<div class="alert info">해당 주차에 등록된 보고서가 없습니다. 아래에서 새로 작성하세요.</div>');
     }
+    // 감독관리자는 참여 인력이 아니다. 본인 화면에서 미리 알려 준다.
+    if (state.me.role === 'SUPERVISOR') {
+      msgs.push('<div class="alert info">감독관리자는 참여 인력이 아니므로 등록 현황의 대상 인원에 포함되지 않습니다. '
+        + '작성한 보고서는 등록 내역에 나오지 않고, 본인만 한글로 내려받을 수 있습니다.</div>');
+    }
     $('#write-status').innerHTML = msgs.join('');
 
     renderItems(report ? report.items : [], readOnly);

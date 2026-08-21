@@ -19,6 +19,9 @@ async function log(req, action, {
   targetType = null, targetId = null, detail = null, actorId, actorName,
 } = {}) {
   try {
+    // 감독관리자는 참여 인력이 아니라 활동 기록을 남기지 않는다
+    if (req.user?.role === 'SUPERVISOR') return;
+
     const ip = clientIp(req);
 
     const uid = req.user?.id ?? actorId ?? null;
