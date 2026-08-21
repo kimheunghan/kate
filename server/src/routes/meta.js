@@ -16,12 +16,13 @@ const router = express.Router();
 router.get('/weeks', auth.requireAuth, async (req, res, next) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 200, 400);
-    // 등록된 주차를 최신순으로 준다.
-    // 주차 자체가 사업 기간(~2027-03-31)까지만 만들어져 있으므로
-    // 여기서 따로 기간을 자르지 않는다.
+    // 시작한 주차만 최신순으로 준다.
+    //  아직 오지 않은 주차는 쓸 일이 없는데 목록 위쪽을 채워서
+    //  현재 주차가 한참 아래에 묻혔다. 이제 맨 위가 현재 주차다.
     const { rows } = await db.query(
       `SELECT id, year, week_no, start_date, end_date, label
          FROM wr.report_weeks
+        WHERE start_date <= CURRENT_DATE
         ORDER BY start_date DESC
         LIMIT $1`,
       [limit]

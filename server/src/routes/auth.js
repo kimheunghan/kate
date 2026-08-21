@@ -112,7 +112,11 @@ router.post('/login', async (req, res, next) => {
 
     failures.delete(username);
     auth.setSessionCookie(res, user);
-    await db.query(`UPDATE wr.users SET last_login_at = now() WHERE id = $1`, [user.id]);
+    // 접속 IP 는 활동 로그가 지워져도 남아 있어야 하므로 사용자 정보에 직접 둔다
+    await db.query(
+      `UPDATE wr.users SET last_login_at = now(), last_login_ip = $2 WHERE id = $1`,
+      [user.id, audit.clientIp(req)]
+    );
 
     req.user = user;
     await audit.log(req, 'LOGIN', { targetType: 'user', targetId: user.id });

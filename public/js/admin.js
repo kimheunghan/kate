@@ -172,8 +172,9 @@
               <th style="width:13%">아이디</th>
               <th class="center" style="width:10%">상태</th>
               <th class="center" style="width:6%">첨부</th>
-              <th style="width:15%">제출시각</th>
-              <th style="width:15%">최종수정</th>
+              <th style="width:14%">제출시각</th>
+              <th style="width:14%">최종수정</th>
+              <th style="width:12%">접속IP</th>
             </tr>
           </thead>
           <tbody>
@@ -186,7 +187,8 @@
                 <td class="center">${r.file_count}</td>
                 <td class="small">${r.submitted_at ? fmtDateTime(r.submitted_at) : '-'}</td>
                 <td class="small">${r.report_id ? fmtDateTime(r.updated_at) : '-'}</td>
-              </tr>`).join('') : '<tr><td colspan="7" class="empty">조건에 맞는 작성자가 없습니다.</td></tr>'}
+                <td class="small muted">${esc(r.last_ip || '-')}</td>
+              </tr>`).join('') : '<tr><td colspan="8" class="empty">조건에 맞는 작성자가 없습니다.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -615,7 +617,7 @@
     REPORT_EXPORT_HWPX_WEEK: '주차 한글 다운로드',
     REPORT_EXPORT_HWPX_ALL: '전체 주차 ZIP 다운로드',
     REPORT_MOVE_ORG: '보고서 기관 이관', REPORT_ORG_CHANGE: '보고서 기관 변경',
-    EXCEL_IMPORT: '엑셀 일괄등록', EXCEL_PREVIEW: '엑셀 미리보기',
+    EXCEL_IMPORT: '엑셀 업로드', EXCEL_PREVIEW: '엑셀 미리보기',
     FILE_UPLOAD: '증적자료 첨부', FILE_DELETE: '증적자료 삭제',
     USER_CREATE: '사용자 추가', USER_UPDATE: '사용자 수정',
     USER_DELETE: '사용자 삭제', USER_PASSWORD_RESET: '비밀번호 초기화',
