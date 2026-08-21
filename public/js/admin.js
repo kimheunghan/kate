@@ -449,7 +449,9 @@
             ${uRows.map((u) => `
               <tr>
                 <td>${esc(u.org_name || '-')}</td>
-                <td><b>${esc(u.name)}</b></td>
+                <td><b>${esc(u.name)}</b>${u.can_view_all
+                  ? ' <span class="dual-mark" title="중복권한 · 등록 내역 및 주차별 현황판 조회 가능">★</span>'
+                  : ''}</td>
                 <td class="small muted">${esc(u.username)}</td>
                 <td class="center small">${u.duty ? DUTY_LABEL[u.duty] : '-'}</td>
                 <td class="center">${
