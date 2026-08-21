@@ -115,42 +115,46 @@
    */
   function applyListScopeUi() {
     const role = state.me.role;
-    // 전체 기관을 보는 사람 : 총괄·감독 관리자, 그리고 전체 조회 겸직자
-    const seesAll = role === 'ADMIN' || role === 'SUPERVISOR' || state.me.can_view_all === true;
-    const onlyMine = !seesAll && role !== 'ORG_ADMIN';
+    const dual = state.me.can_view_all === true;      // 중복권한
 
-    // 내려받기 단추 정리 (지우지 않고 감추기만 한다)
-    //   작성자   : 저장만
-    //   관리자   : 저장 + 한글 다운로드
-    //   인쇄/PDF, Word 다운로드는 아무에게도 보이지 않는다
+    // 등록 내역에서 3사 전체를 보는 사람.
+    //  중복권한은 원래 권한을 그대로 두고 조회 범위만 넓힌다.
+    const seesAll = role === 'ADMIN' || role === 'SUPERVISOR' || dual;
+    // 등록 내역 조회 탭을 쓰는 사람 (작성자만 못 쓴다)
+    const hasList = seesAll || role === 'ORG_ADMIN';
+    // 작성 탭의 한글 다운로드는 '원래 권한' 을 따른다.
+    //  작성자는 중복권한이 있어도 작성 탭에서는 내려받지 않는다.
+    //  (등록 내역 목록의 [한글] 단추는 그대로 쓴다)
+    const writeHwpx = role === 'ADMIN' || role === 'SUPERVISOR' || role === 'ORG_ADMIN';
+
+    // 인쇄/PDF, Word 다운로드는 아무에게도 보이지 않는다
     ['#btn-print', '#btn-export'].forEach((sel) => {
       const b = $(sel);
       if (b) b.classList.add('hidden');
     });
     const hwpxBtn = $('#btn-export-hwpx');
-    if (hwpxBtn) hwpxBtn.classList.toggle('hidden', onlyMine);
+    if (hwpxBtn) hwpxBtn.classList.toggle('hidden', !writeHwpx);
 
-    // 등록 내역 조회는 관리자만 본다. 작성자에게는 탭을 감춘다.
-    // (지우지 않고 감추기만 하므로 필요하면 이 줄만 빼면 다시 보인다)
+    // 등록 내역 조회 탭 (지우지 않고 감추기만 한다)
     const listTab = $$('.tabs button').find((b) => b.dataset.tab === 'list');
     if (listTab) {
-      listTab.classList.toggle('hidden', onlyMine);
+      listTab.classList.toggle('hidden', !hasList);
       // 감춘 탭에 머물러 있으면 작성 화면으로 돌려보낸다
-      if (onlyMine && listTab.classList.contains('active')) {
+      if (!hasList && listTab.classList.contains('active')) {
         $$('.tabs button').find((b) => b.dataset.tab === 'write').click();
       }
     }
 
-    // 기관 필터는 전체 관리자만 (기관 관리자는 자기 기관으로 고정되므로 불필요)
+    // 기관 필터는 3사를 다 보는 사람에게만 (기관관리자는 자기 기관 고정)
     const orgField = $('#f-org-field');
     if (orgField) orgField.classList.toggle('hidden', !seesAll);
     const note = $('#list-scope-note');
     if (note) {
-      note.textContent = onlyMine
+      note.textContent = !hasList
         ? '본인이 작성한 보고서만 표시됩니다.'
-        : (role === 'ORG_ADMIN'
-            ? `${state.me.org_name || '소속 기관'} 소속 전체 보고서가 표시됩니다.`
-            : '전체 기관의 보고서가 표시됩니다.');
+        : (seesAll
+            ? '전체 기관의 보고서가 표시됩니다.'
+            : `${state.me.org_name || '소속 기관'} 소속 전체 보고서가 표시됩니다.`);
     }
     // 소속·참여인력 열은 권한과 무관하게 항상 표시한다
     document.querySelectorAll('.col-org, .col-author').forEach((el) => {
