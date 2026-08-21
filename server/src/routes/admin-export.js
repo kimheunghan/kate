@@ -222,15 +222,29 @@ router.get('/export/status', async (req, res, next) => {
       params
     );
 
+    // 화면의 '작성자 제출 현황' 과 같은 사람별 목록 (접속IP 포함)
+    const { rows: people } = await db.query(
+      `SELECT s.org_name, s.user_name, s.username, s.status, s.file_count,
+              s.submitted_at, s.updated_at, s.report_id,
+              (SELECT a.ip FROM wr.audit_logs a
+                WHERE a.user_id = s.user_id AND a.ip IS NOT NULL
+                ORDER BY a.created_at DESC LIMIT 1) AS last_ip
+         FROM wr.v_submission_status s
+        WHERE ${where}
+        ORDER BY s.sort_order NULLS LAST, s.org_name,
+                 wr.duty_order(s.duty), s.user_name`,
+      params
+    );
+
     const tot = rows.reduce((a, r) => ({ t: a.t + r.total_users, s: a.s + r.submitted }), { t: 0, s: 0 });
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('등록 현황');
-    [28, 12, 12, 12, 12].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    [24, 12, 14, 11, 8, 20, 20, 16].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
     // '18주차 (2026/08/20목~08/26수)' → 제목은 '18주차', 부제는 괄호 안
     const m = /^(\S+)\s*(\(.*\))?$/.exec(week.label) || [];
-    let at = putTitle(ws, 5, `${m[1] || week.label} 주간보고 실적현황`, m[2] || '');
+    let at = putTitle(ws, 8, `${m[1] || week.label} 주간보고 실적현황`, m[2] || '');
 
     // ── 보고서 제출현황 ──────────────────────────────────────────
     at = putSectionTitle(ws, at, '보고서 제출현황');
@@ -293,7 +307,40 @@ router.get('/export/status', async (req, res, next) => {
       }
     }
     styleBody(ws, headAt);
-    putNote(ws, at, '해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.');
+    at = putNote(ws, at, '해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.');
+
+    // ── 작성자 제출 현황 (사람별) ────────────────────────────────
+    at += 1;                                        // 한 줄 띄운다
+    at = putSectionTitle(ws, at, `작성자 제출 현황 (${people.length}명)`);
+    const pHeadAt = at;
+    ws.getRow(at).values =
+      ['기관', '이름', '아이디', '상태', '첨부', '제출시각', '최종수정', '접속IP'];
+    styleHeader(ws, at);
+    at += 1;
+
+    const STATUS_TEXT = { SUBMITTED: '제출완료', DRAFT: '임시저장', NONE: '미등록' };
+    people.forEach((r) => {
+      ws.getRow(at).values = [
+        r.org_name || '(소속없음)',
+        r.user_name || '-',
+        r.username || '-',
+        STATUS_TEXT[r.status] || r.status || '-',
+        Number(r.file_count) || 0,
+        r.submitted_at ? stamp(r.submitted_at) : '-',
+        r.report_id ? stamp(r.updated_at) : '-',
+        r.last_ip || '-',
+      ];
+      at += 1;
+    });
+
+    // 상태·첨부·시각·IP 는 가운데로
+    for (let r = pHeadAt; r < at; r++) {
+      for (const c of [4, 5, 6, 7, 8]) {
+        ws.getRow(r).getCell(c).alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    }
+    styleBody(ws, pHeadAt);
+    putNote(ws, at - 1, '접속IP 는 활동 기록에 마지막으로 남은 접속 주소입니다.');
 
     const name = `${safeName(`등록현황_${week.label.replace(/\//g, '.')}`)}.xlsx`;
     await audit.log(req, 'EXPORT_STATUS', { detail: name });
