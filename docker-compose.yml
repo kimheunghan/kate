@@ -19,6 +19,7 @@ services:
       POSTGRES_DB: ${DB_NAME:-weekly_report}
       POSTGRES_USER: ${DB_USER:-wruser}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 를 .env 에 설정하세요}
+      AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-365}
       TZ: Asia/Seoul
       # 한글 정렬/대소문자 처리를 위한 초기화 옵션
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"

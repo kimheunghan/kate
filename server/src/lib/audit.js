@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('./db');
+const config = require('./config');
 
 /** 감사 로그 기록. 실패해도 본 요청은 막지 않는다. */
 /**
@@ -39,4 +40,37 @@ async function log(req, action, {
   }
 }
 
-module.exports = { log };
+/**
+ * 보관 기간이 지난 활동 로그를 지운다.
+ * @returns {Promise<number>} 지운 건수
+ */
+async function purgeOld() {
+  const days = config.auditRetentionDays;
+  if (!days || days <= 0) return 0;
+  try {
+    const { rowCount } = await db.query(
+      `DELETE FROM wr.audit_logs WHERE created_at < now() - ($1 || ' days')::interval`,
+      [String(days)]
+    );
+    if (rowCount) console.log(`[audit] ${days}일이 지난 기록 ${rowCount}건 삭제`);
+    return rowCount;
+  } catch (err) {
+    console.error('[audit] 오래된 기록 정리 실패:', err.message);
+    return 0;
+  }
+}
+
+/** 기동할 때 한 번, 그 뒤로는 하루에 한 번 정리한다 */
+function startPurgeSchedule() {
+  const days = config.auditRetentionDays;
+  if (!days || days <= 0) {
+    console.log('[audit] 활동 로그를 지우지 않습니다 (보관 기간 설정 없음)');
+    return;
+  }
+  console.log(`[audit] 활동 로그 보관 기간: ${days}일`);
+  purgeOld();
+  const timer = setInterval(purgeOld, 24 * 60 * 60 * 1000);
+  timer.unref();                       // 이 타이머 때문에 종료가 늦어지지 않게
+}
+
+module.exports = { log, purgeOld, startPurgeSchedule };

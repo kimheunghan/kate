@@ -153,6 +153,7 @@ async function start() {
 
   await db.waitForReady();
   await auth.ensureAdminAccount();
+  require('./lib/audit').startPurgeSchedule();
   await require('./lib/mailer').verify();
 
   // 인증서가 지정되어 있으면 HTTPS 로 기동한다
