@@ -660,6 +660,11 @@ body.brush-armed .editor-area { cursor: cell; }
 
 /* 버튼 옆 표식과 하단 안내 문구 */
 .mark { color: var(--danger); font-weight: 800; }
+
+/* 작성 화면 안내 칸 : 본문은 왼쪽, 꼬리말은 오른쪽 끝에 옅게.
+   좁아지면 꼬리말이 아래로 내려온다. (다른 화면의 안내는 건드리지 않는다) */
+#write-status .alert { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+#write-status .alert .alert-note { margin-left: auto; font-size: 12.5px; opacity: .82; }
 .danger-text { color: var(--danger); font-weight: 700; }
 .warn-text { color: var(--warn); font-weight: 700; }
 .compact-list { margin: 6px 0 0; padding-left: 20px; }

@@ -239,18 +239,18 @@
     updateTableHeads(week);
     $('#editor-badge').innerHTML = report ? statusBadge(report.status) : statusBadge('NONE');
 
-    const msgs = [];
-    if (report) {
-      msgs.push(`<div class="alert success">등록된 보고서입니다. (작성자 ${esc(report.author_name || '-')} · 최종수정 ${fmtDateTime(report.updated_at)})</div>`);
-    } else {
-      msgs.push('<div class="alert info">해당 주차에 등록된 보고서가 없습니다. 아래에서 새로 작성하세요.</div>');
-    }
-    // 감독관리자는 참여 인력이 아니다. 본인 화면에서 미리 알려 준다.
-    if (state.me.role === 'SUPERVISOR') {
-      msgs.push('<div class="alert info">감독관리자는 참여 인력이 아니므로 등록 현황의 대상 인원에 포함되지 않습니다. '
-        + '작성한 보고서는 등록 내역에 나오지 않고, 본인만 한글로 내려받을 수 있습니다.</div>');
-    }
-    $('#write-status').innerHTML = msgs.join('');
+    // 안내는 한 칸에 모은다. 줄이 여러 개면 화면이 답답해진다.
+    //  감독관리자에게만 붙는 꼬리말은 같은 줄 오른쪽에 옅게 둔다.
+    const supNote = state.me.role === 'SUPERVISOR'
+      ? '<span class="alert-note"><span class="mark">※</span> 감독관리자는 대상 인원에서 제외되며,'
+        + ' 작성한 보고서는 본인만 내려받을 수 있습니다.</span>'
+      : '';
+    const mainMsg = report
+      ? `등록된 보고서입니다. (작성자 ${esc(report.author_name || '-')} · 최종수정 ${fmtDateTime(report.updated_at)})`
+      : '해당 주차에 등록된 보고서가 없습니다. 아래에서 새로 작성하세요.';
+
+    $('#write-status').innerHTML =
+      `<div class="alert ${report ? 'success' : 'info'}"><span>${mainMsg}</span>${supNote}</div>`;
 
     renderItems(report ? report.items : [], readOnly);
     $('#note').value = report ? (report.note || '') : '';
