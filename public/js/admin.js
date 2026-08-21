@@ -496,6 +496,7 @@
     $('#u-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { page.users = 1; renderUsers(readUserFilters()); } });
 
     syncUserFields($('#u-org'), $('#u-role'), $('#u-duty'), $('#u-view-all'), orgsRes.orgs);
+    window.WR.stripBlanks($('#u-username'));
 
     $('#u-add').onclick = async () => {
       const payload = {

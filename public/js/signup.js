@@ -2,6 +2,9 @@
   'use strict';
   const { api, $ } = window.WR;
 
+  // 아이디 칸에 공백이 붙지 않게 한다
+  if (window.WR.stripBlanks) window.WR.stripBlanks(document.getElementById('username'));
+
   const err = $('#err');
   const done = $('#done');
   const btn = $('#submit');

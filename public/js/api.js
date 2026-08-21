@@ -228,6 +228,22 @@
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
 
+  /**
+   * 아이디 칸에 공백이 들어오지 않게 한다.
+   *   표에서 아이디를 드래그해 복사하면 칸 앞의 줄바꿈·들여쓰기가 함께 붙는다.
+   *   붙여넣는 순간 지워 준다.
+   */
+  function stripBlanks(el) {
+    if (!el) return;
+    const clean = () => {
+      const v = el.value.replace(/\s+/g, '');
+      if (v !== el.value) el.value = v;
+    };
+    el.addEventListener('input', clean);
+    el.addEventListener('paste', () => setTimeout(clean, 0));
+    el.addEventListener('blur', clean);
+  }
+
   /** 공통 상단바 렌더 */
   function renderTopbar(user, active) {
     const nav = [{ href: '/report', key: 'report', label: '주간보고' }];
@@ -443,5 +459,5 @@
     $('#pw-cur', back).focus();
   }
 
-  global.WR = { api, toast, esc, roleLabel, renderPager, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
+  global.WR = { api, toast, esc, roleLabel, renderPager, stripBlanks, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
 })(window);

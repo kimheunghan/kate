@@ -1,6 +1,9 @@
 (function () {
   'use strict';
-  const { api, esc, $ } = window.WR;
+  const { api, esc, $, stripBlanks } = window.WR;
+
+  // 표에서 아이디를 복사해 붙이면 앞뒤 공백이 따라온다. 들어오는 대로 지운다.
+  stripBlanks($('#username'));
 
   const form = $('#login-form');
   const err = $('#err');
