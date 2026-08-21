@@ -30,6 +30,20 @@ if [[ -z "${COMPOSE_FILE}" ]]; then
 fi
 [[ -f "${COMPOSE_FILE}" ]] || { echo "[!] compose 파일이 없습니다: ${COMPOSE_FILE}"; exit 1; }
 
+# compose 명령을 찾는다. 서버마다 다르다.
+#   podman-compose (별도 설치) / podman compose (내장) / docker-compose
+#  ※ 예전에는 podman-compose 만 불러, 그것이 없는 서버에서 기동에 실패했다.
+if command -v podman-compose >/dev/null 2>&1; then
+  COMPOSE="podman-compose"
+elif podman compose version >/dev/null 2>&1; then
+  COMPOSE="podman compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE="docker-compose"
+else
+  echo "[!] compose 명령을 찾지 못했습니다 (podman-compose / podman compose / docker-compose)"
+  exit 1
+fi
+
 # 소스/첨부파일 동기화 과정에서 달라질 수 있는 rootless UID를 먼저 보정한다.
 bash scripts/fix-runtime-permissions.sh
 
@@ -45,13 +59,13 @@ health_ok() {
 echo "[*] 이미지 빌드"
 podman build -q -t localhost/weekly-report:1.0 -f Containerfile . >/dev/null
 
-echo "[*] 앱 컨테이너 교체 (${COMPOSE_FILE})"
+echo "[*] 앱 컨테이너 교체 (${COMPOSE} · ${COMPOSE_FILE})"
 podman rm -f wr-app >/dev/null 2>&1 || true
 
 # 기동 실패를 감추지 않는다. 실패하면 그 자리에서 이유가 보여야 한다.
-if ! podman-compose -f "${COMPOSE_FILE}" up -d --no-deps app; then
+if ! ${COMPOSE} -f "${COMPOSE_FILE}" up -d --no-deps app; then
   echo "[!] app 만 띄우기 실패 — 전체 기동으로 다시 시도합니다"
-  podman-compose -f "${COMPOSE_FILE}" up -d
+  ${COMPOSE} -f "${COMPOSE_FILE}" up -d
 fi
 
 for i in $(seq 1 40); do
