@@ -507,7 +507,9 @@
         !payload.password ? ['#u-pw', '초기 비밀번호를 입력하세요.'] :
         payload.password.length < 8 ? ['#u-pw', '초기 비밀번호는 8자 이상이어야 합니다.'] :
         (payload.role !== 'ADMIN' && !payload.org_id) ? ['#u-org', '기관을 선택하세요.'] :
-        !payload.duty ? ['#u-duty', '담당 역할을 선택하세요.'] : null;
+        // 감독관리자는 참여 인력이 아니라 담당 역할이 없다
+        (payload.role !== 'SUPERVISOR' && !payload.duty)
+          ? ['#u-duty', '담당 역할을 선택하세요.'] : null;
 
       if (problem) {
         toast(problem[1], true);
@@ -657,7 +659,8 @@
         }
       }
 
-      if (!payload.duty) {
+      // 감독관리자는 참여 인력이 아니라 담당 역할이 없다
+      if (payload.role !== 'SUPERVISOR' && !payload.duty) {
         toast('담당 역할을 선택하세요.', true);
         $('#e-duty', back).focus();
         return;
