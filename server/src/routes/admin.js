@@ -15,6 +15,17 @@ const adminOnly = auth.requireAdmin;
 // 사용자·기관을 손대는 자리. 감독관리자는 조회만 하므로 여기서 막힌다.
 const userManager = auth.requireUserManager;
 
+const ROLES = ['ADMIN', 'SUPERVISOR', 'ORG_ADMIN', 'USER'];
+
+/** 감독 기관(회원가입에 안 나오는 기관)인가. 이 기관 소속은 감독관리자로 둔다. */
+async function isSupervisorOrg(orgId) {
+  if (!orgId) return false;
+  const { rows } = await db.query(
+    `SELECT is_signup_visible FROM wr.organizations WHERE id = $1`, [Number(orgId)]
+  );
+  return rows[0] ? rows[0].is_signup_visible === false : false;
+}
+
 // =====================================================================
 //  현황
 // =====================================================================
@@ -228,7 +239,8 @@ router.get('/users', userManager, async (req, res, next) => {
   try {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.name, u.email, u.phone, u.role, u.org_id, u.is_active,
-              u.must_change_pw, u.approval_status, u.duty, u.last_login_at, u.created_at, o.name AS org_name,
+              u.must_change_pw, u.approval_status, u.duty, u.can_view_all,
+              u.last_login_at, u.created_at, o.name AS org_name,
               (SELECT count(*)::int FROM wr.reports r
                 WHERE r.author_id = u.id AND r.org_id = u.org_id) AS report_count
          FROM wr.users u LEFT JOIN wr.organizations o ON o.id = u.org_id
@@ -410,8 +422,17 @@ router.post('/users', userManager, async (req, res, next) => {
     const username = String(req.body?.username || '').trim();
     const password = String(req.body?.password || '');
     const name = String(req.body?.name || '').trim();
-    let role = ['ADMIN', 'ORG_ADMIN', 'USER'].includes(req.body?.role) ? req.body.role : 'USER';
+    let role = ROLES.includes(req.body?.role) ? req.body.role : 'USER';
     let orgId = req.body?.org_id ? Number(req.body.org_id) : null;
+
+    // 감독 기관 소속은 언제나 감독관리자
+    if (await isSupervisorOrg(orgId)) role = 'SUPERVISOR';
+
+    // 전체 조회 겸직은 총괄관리자만 줄 수 있다.
+    // 이미 전체를 보는 권한(총괄·감독)에는 의미가 없으므로 끈다.
+    const canViewAll = req.user.role === 'ADMIN'
+      && req.body?.can_view_all === true
+      && role !== 'ADMIN' && role !== 'SUPERVISOR';
 
     // 기관 관리자는 자기 기관에만, 그리고 전체 관리자는 만들 수 없다
     if (req.user.role === 'ORG_ADMIN') {
@@ -447,13 +468,15 @@ router.post('/users', userManager, async (req, res, next) => {
     }
 
     const { rows } = await db.query(
-      `INSERT INTO wr.users (username, password_hash, name, email, role, org_id, duty, must_change_pw)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE)
+      `INSERT INTO wr.users (username, password_hash, name, email, role, org_id, duty,
+                             can_view_all, must_change_pw)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE)
        ON CONFLICT (username) DO NOTHING
-       RETURNING id, username, name, email, role, org_id, duty, is_active`,
+       RETURNING id, username, name, email, role, org_id, duty, can_view_all, is_active`,
       [username, auth.hashPassword(password), name, req.body?.email || null, role, orgId,
        (role !== 'SUPERVISOR' && ['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty))
-         ? req.body.duty : null]
+         ? req.body.duty : null,
+       canViewAll]
     );
     if (!rows[0]) return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
 
@@ -465,7 +488,13 @@ router.post('/users', userManager, async (req, res, next) => {
 router.put('/users/:id(\\d+)', userManager, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    const role = ['ADMIN', 'ORG_ADMIN', 'USER'].includes(req.body?.role) ? req.body.role : null;
+    let role = ROLES.includes(req.body?.role) ? req.body.role : null;
+
+    // 감독 기관으로 옮기면 감독관리자가 된다
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'org_id')
+        && await isSupervisorOrg(req.body?.org_id)) {
+      role = 'SUPERVISOR';
+    }
 
     if (req.user.role === 'ORG_ADMIN') {
       const { rows: t } = await db.query(`SELECT org_id, role FROM wr.users WHERE id = $1`, [id]);
@@ -520,16 +549,26 @@ router.put('/users/:id(\\d+)', userManager, async (req, res, next) => {
       }
     }
 
+    // 전체 조회 겸직은 총괄관리자만 바꿀 수 있다
+    let canViewAll;
+    if (req.user.role === 'ADMIN'
+        && Object.prototype.hasOwnProperty.call(req.body || {}, 'can_view_all')) {
+      canViewAll = req.body.can_view_all === true;
+    }
+    // 이미 전체를 보는 권한이면 겸직 표시는 꺼 둔다
+    if (role === 'ADMIN' || role === 'SUPERVISOR') canViewAll = false;
+
     const { rows } = await db.query(
       `UPDATE wr.users
-          SET name      = COALESCE($1, name),
-              email     = COALESCE($2, email),
-              role      = COALESCE($3, role),
-              org_id    = CASE WHEN $4::boolean THEN $5::int ELSE org_id END,
-              is_active = COALESCE($6, is_active),
-              duty      = CASE WHEN $8::boolean THEN $9::varchar ELSE duty END
+          SET name         = COALESCE($1, name),
+              email        = COALESCE($2, email),
+              role         = COALESCE($3, role),
+              org_id       = CASE WHEN $4::boolean THEN $5::int ELSE org_id END,
+              is_active    = COALESCE($6, is_active),
+              duty         = CASE WHEN $8::boolean THEN $9::varchar ELSE duty END,
+              can_view_all = COALESCE($10, can_view_all)
         WHERE id = $7
-        RETURNING id, username, name, email, role, org_id, is_active, duty`,
+        RETURNING id, username, name, email, role, org_id, is_active, duty, can_view_all`,
       [
         req.body?.name ? String(req.body.name).trim() : null,
         req.body?.email ?? null,
@@ -540,6 +579,7 @@ router.put('/users/:id(\\d+)', userManager, async (req, res, next) => {
         id,
         duty !== undefined,
         duty ?? null,
+        canViewAll ?? null,
       ]
     );
     if (!rows[0]) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });

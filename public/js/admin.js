@@ -38,6 +38,35 @@
     apply();
   }
 
+  /**
+   * 감독 기관(회원가입에 안 나오는 기관)을 고르면 권한을 감독관리자로 고정한다.
+   * 그리고 이미 전체를 보는 권한에는 '전체 조회' 겸직이 의미가 없으므로 잠근다.
+   */
+  function syncSupervisorOrg(orgSel, roleSel, viewAllChk, orgs) {
+    if (!orgSel || !roleSel) return;
+    const supOrgIds = new Set(
+      (orgs || []).filter((o) => o.is_signup_visible === false).map((o) => String(o.id))
+    );
+    const apply = () => {
+      const isSupOrg = supOrgIds.has(String(orgSel.value));
+      if (isSupOrg) roleSel.value = 'SUPERVISOR';
+      roleSel.disabled = isSupOrg;
+      roleSel.title = isSupOrg ? '감독 기관 소속은 감독관리자로 지정됩니다.' : '';
+
+      if (viewAllChk) {
+        const seesAll = roleSel.value === 'ADMIN' || roleSel.value === 'SUPERVISOR';
+        viewAllChk.disabled = seesAll;
+        if (seesAll) viewAllChk.checked = false;
+        viewAllChk.title = seesAll
+          ? '이미 전체를 볼 수 있는 권한입니다.'
+          : '등록 내역과 주차별 현황판을 전체 범위로 봅니다. 참여 인력 자격은 그대로입니다.';
+      }
+    };
+    orgSel.addEventListener('change', apply);
+    roleSel.addEventListener('change', apply);
+    apply();
+  }
+
   const dutyOptions = (sel) => ['', 'LEAD', 'MANAGER', 'RESEARCHER']
     .map((v) => `<option value="${v}" ${sel === v || (!sel && !v) ? 'selected' : ''}>${
       v ? DUTY_LABEL[v] : '선택하세요'}</option>`).join('');
@@ -54,12 +83,18 @@
     $('#topbar').innerHTML = window.WR.renderTopbar(state.me, 'admin');
     window.WR.bindTopbar();
 
-    // 감독관리자는 조회만 한다. 사용자 관리·활동 로그 탭은 감춘다.
-    if (state.me.role === 'SUPERVISOR') {
-      $$('#admin-tabs button').forEach((b) => {
-        if (b.dataset.tab === 'users' || b.dataset.tab === 'audit') b.classList.add('hidden');
-      });
-      if (state.tab === 'users' || state.tab === 'audit') state.tab = 'status';
+    // 탭은 실제로 쓸 수 있는 것만 보여준다.
+    //   사용자 관리 : 총괄관리자 · 기관관리자
+    //   활동 로그   : 총괄관리자
+    //   감독관리자와 '전체 조회' 겸직자는 조회 탭만 쓴다.
+    const canUsers = state.me.role === 'ADMIN' || state.me.role === 'ORG_ADMIN';
+    const canAudit = state.me.role === 'ADMIN';
+    $$('#admin-tabs button').forEach((b) => {
+      if (b.dataset.tab === 'users') b.classList.toggle('hidden', !canUsers);
+      if (b.dataset.tab === 'audit') b.classList.toggle('hidden', !canAudit);
+    });
+    if ((state.tab === 'users' && !canUsers) || (state.tab === 'audit' && !canAudit)) {
+      state.tab = 'status';
     }
 
     $$('#admin-tabs button').forEach((b) => {
@@ -361,6 +396,11 @@
             <option value="ADMIN">총괄관리자</option>
           </select>
         </label>
+        <label class="sb-field sb-check" style="flex:0 0 auto" id="u-view-all-field">
+          <span>전체 조회</span>
+          <input type="checkbox" id="u-view-all"
+                 title="등록 내역과 주차별 현황판을 전체 범위로 봅니다. 참여 인력 자격은 그대로입니다.">
+        </label>
         <button class="btn primary sb-btn" id="u-add">사용자 추가</button>
       </div>
 
@@ -399,10 +439,11 @@
                 <td class="small muted">${esc(u.username)}</td>
                 <td class="center small">${u.duty ? DUTY_LABEL[u.duty] : '-'}</td>
                 <td class="center">${
-                  u.role === 'ADMIN'      ? '<span class="badge role-admin">총괄관리자</span>' :
-                  u.role === 'SUPERVISOR' ? '<span class="badge role-super">감독관리자</span>' :
-                  u.role === 'ORG_ADMIN'  ? '<span class="badge role-org">기관관리자</span>' :
-                                            '<span class="badge role-user">작성자</span>'
+                  (u.role === 'ADMIN'      ? '<span class="badge role-admin">총괄관리자</span>' :
+                   u.role === 'SUPERVISOR' ? '<span class="badge role-super">감독관리자</span>' :
+                   u.role === 'ORG_ADMIN'  ? '<span class="badge role-org">기관관리자</span>' :
+                                             '<span class="badge role-user">작성자</span>')
+                  + (u.can_view_all ? ' <span class="badge role-super" title="등록 내역·주차별 현황판을 전체 범위로 봅니다">전체 조회</span>' : '')
                 }</td>
                 <td class="center">${
                   u.approval_status === 'PENDING'  ? '<span class="badge draft">승인대기</span>' :
@@ -431,6 +472,7 @@
     $('#u-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { page.users = 1; renderUsers(readUserFilters()); } });
 
     syncDutyByRole($('#u-role'), $('#u-duty'));
+    syncSupervisorOrg($('#u-org'), $('#u-role'), $('#u-view-all'), orgsRes.orgs);
 
     $('#u-add').onclick = async () => {
       const payload = {
@@ -439,6 +481,7 @@
         password: $('#u-pw').value,
         org_id: $('#u-role').value === 'ADMIN' ? ($('#u-org').value || null) : $('#u-org').value,
         role: $('#u-role').value,
+        can_view_all: $('#u-view-all').checked,
         duty: $('#u-duty').value || null,
       };
 
@@ -546,6 +589,10 @@
           <p class="small muted" style="margin:-6px 0 12px">
             <span class="mark">※</span> 비워 두면 기존 비밀번호가 유지됩니다.</p>
           <div class="field-hl">
+            <label class="field check-line">
+              <input type="checkbox" id="e-view-all" ${u.can_view_all ? 'checked' : ''}>
+              <span>전체 조회 (등록 내역·주차별 현황판을 전체 범위로)</span>
+            </label>
             <label class="field"><span>권한</span>
               <select id="e-role">
                 <option value="USER"       ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
@@ -564,6 +611,7 @@
     document.body.appendChild(back);
 
     syncDutyByRole($('#e-role', back), $('#e-duty', back));
+    syncSupervisorOrg($('#e-org', back), $('#e-role', back), $('#e-view-all', back), orgs);
 
     const close = () => back.remove();
     $('#e-cancel', back).onclick = close;
@@ -575,6 +623,7 @@
         email: $('#e-email', back).value.trim() || null,
         org_id: $('#e-org', back).value ? Number($('#e-org', back).value) : null,
         role: $('#e-role', back).value,
+        can_view_all: $('#e-view-all', back).checked,
         duty: $('#e-duty', back).value || null,
       };
 

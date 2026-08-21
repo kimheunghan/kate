@@ -309,7 +309,9 @@ router.get('/capabilities', (req, res) => {
 router.get('/signup-orgs', async (req, res, next) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, name FROM wr.organizations WHERE is_active = TRUE ORDER BY sort_order, name`
+      `SELECT id, name FROM wr.organizations
+        WHERE is_active = TRUE AND is_signup_visible = TRUE
+        ORDER BY sort_order, name`
     );
     res.json({ orgs: rows });
   } catch (err) { next(err); }

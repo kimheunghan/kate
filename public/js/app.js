@@ -115,7 +115,8 @@
    */
   function applyListScopeUi() {
     const role = state.me.role;
-    const seesAll = role === 'ADMIN' || role === 'SUPERVISOR';   // 전체 기관
+    // 전체 기관을 보는 사람 : 총괄·감독 관리자, 그리고 전체 조회 겸직자
+    const seesAll = role === 'ADMIN' || role === 'SUPERVISOR' || state.me.can_view_all === true;
     const onlyMine = !seesAll && role !== 'ORG_ADMIN';
 
     // 내려받기 단추 정리 (지우지 않고 감추기만 한다)

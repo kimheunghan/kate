@@ -62,7 +62,7 @@ router.get('/weeks/current', auth.requireAuth, async (req, res, next) => {
 router.get('/orgs', auth.requireAuth, async (req, res, next) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, name, sort_order, is_active
+      `SELECT id, name, sort_order, is_active, is_signup_visible
          FROM wr.organizations
         WHERE is_active = TRUE
         ORDER BY sort_order, name`

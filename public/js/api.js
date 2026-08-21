@@ -231,7 +231,10 @@
   /** 공통 상단바 렌더 */
   function renderTopbar(user, active) {
     const nav = [{ href: '/report', key: 'report', label: '주간보고' }];
-    if (user.role === 'ADMIN') nav.push({ href: '/admin', key: 'admin', label: '관리자' });
+    // 관리자 화면은 총괄·기관·감독 관리자와 전체 조회 겸직자가 쓴다
+    const seesAdmin = ['ADMIN', 'ORG_ADMIN', 'SUPERVISOR'].includes(user.role)
+      || user.can_view_all === true;
+    if (seesAdmin) nav.push({ href: '/admin', key: 'admin', label: '관리자' });
 
     return `
       <h1>주간실적 보고 시스템</h1>

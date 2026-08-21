@@ -97,7 +97,7 @@ async function loadUser(req, res, next) {
     try {
       const { rows } = await db.query(
         `SELECT u.id, u.username, u.name, u.email, u.phone, u.role, u.org_id, u.is_active,
-                u.must_change_pw, u.approval_status, o.name AS org_name
+                u.must_change_pw, u.approval_status, u.can_view_all, o.name AS org_name
            FROM wr.users u
            LEFT JOIN wr.organizations o ON o.id = u.org_id
           WHERE u.id = $1`,
@@ -128,9 +128,9 @@ function requireAdmin(req, res, next) {
 /** 관리자 화면 접근 (총괄·기관·감독 관리자) */
 function requireManager(req, res, next) {
   if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  if (!['ADMIN', 'ORG_ADMIN', 'SUPERVISOR'].includes(req.user.role)) {
-    return res.status(403).json({ error: '관리자 권한이 필요합니다.' });
-  }
+  const ok = ['ADMIN', 'ORG_ADMIN', 'SUPERVISOR'].includes(req.user.role)
+          || req.user.can_view_all === true;
+  if (!ok) return res.status(403).json({ error: '관리자 권한이 필요합니다.' });
   next();
 }
 
@@ -146,9 +146,13 @@ function requireUserManager(req, res, next) {
   next();
 }
 
-/** 기관을 가리지 않고 전체를 볼 수 있는가 (총괄관리자·감독관리자) */
+/**
+ * 기관을 가리지 않고 전체를 볼 수 있는가.
+ *   총괄관리자 · 감독관리자, 그리고 '전체 조회' 겸직 권한을 받은 사람.
+ *   겸직은 권한과 소속이 그대로라 참여 인력 집계에는 한 명으로 남는다.
+ */
 function seesAllOrgs(user) {
-  return user.role === 'ADMIN' || user.role === 'SUPERVISOR';
+  return user.role === 'ADMIN' || user.role === 'SUPERVISOR' || user.can_view_all === true;
 }
 
 /** 기관 관리자는 자기 기관으로만 조회 범위를 제한한다. 전체를 보는 권한은 요청값 그대로. */
