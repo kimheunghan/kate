@@ -216,8 +216,7 @@
 
       <div class="hint-row">
         <span class="small muted">
-          <span class="mark">※</span> 해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.<br>
-          <span class="mark">※</span> 감독관리자는 참여 인력이 아니므로 대상 인원에서 제외됩니다. 감독관리자가 쓴 보고서는 등록 내역에 나오지 않고, 본인만 한글로 내려받을 수 있습니다.</span>
+          <span class="mark">※</span> 해당 주차 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.</span>
         <button class="btn sm dl-btn" id="st-xlsx">⤓ 엑셀 다운로드</button>
       </div>
 
