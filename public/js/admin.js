@@ -458,14 +458,15 @@
                 <td class="small muted">${esc(u.username)}</td>
                 <td class="center small">${u.duty ? DUTY_LABEL[u.duty] : '-'}</td>
                 <td class="center">${
-                  (u.role === 'ADMIN'      ? '<span class="badge role-admin">총괄관리자</span>' :
-                   u.role === 'SUPERVISOR' ? '<span class="badge role-super">감독관리자</span>' :
-                   u.role === 'ORG_ADMIN'  ? '<span class="badge role-org">기관관리자</span>' :
-                                             '<span class="badge role-user">작성자</span>')
-                  // 중복권한 표식은 권한 칸에 붙인다
-                  + (u.can_view_all
-                      ? ' <span class="dual-mark" title="중복권한 · 등록 내역 및 주차별 현황판 조회 가능">★</span>'
-                      : '')
+                  // 중복권한이면 배지를 감싸고 오른쪽 위 모서리에 표식을 얹는다
+                  `<span class="role-cell${u.can_view_all ? ' has-dual' : ''}"${
+                    u.can_view_all ? ' title="중복권한 · 등록 내역 및 주차별 현황판 조회 가능"' : ''}>`
+                  + (u.role === 'ADMIN'      ? '<span class="badge role-admin">총괄관리자</span>' :
+                     u.role === 'SUPERVISOR' ? '<span class="badge role-super">감독관리자</span>' :
+                     u.role === 'ORG_ADMIN'  ? '<span class="badge role-org">기관관리자</span>' :
+                                               '<span class="badge role-user">작성자</span>')
+                  + (u.can_view_all ? '<span class="dual-mark">★</span>' : '')
+                  + '</span>'
                 }</td>
                 <td class="center">${
                   u.approval_status === 'PENDING'  ? '<span class="badge draft">승인대기</span>' :
