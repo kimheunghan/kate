@@ -235,7 +235,7 @@
       const cls = rate >= 100 ? 'cell-s' : (rate > 0 ? 'cell-d' : 'cell-n');
       return `<td class="${cls}" title="제출 ${c.submitted} / 미등록 ${c.none_cnt}">
                 <b>${c.submitted}</b><span class="muted">/${c.total_users}</span>
-                <div class="rate">${rate}%</div></td>`;
+                <div class="rate">(${rate}%)</div></td>`;
     };
 
     body().innerHTML = `
@@ -246,6 +246,7 @@
             ${[4, 8, 12, 16, 26].map((k) => `<option value="${k}" ${k === weeks ? 'selected' : ''}>최근 ${k}주</option>`).join('')}
           </select>
         </label>
+        <button class="btn sm dl-btn sb-right" id="mx-xlsx">⤓ 엑셀 다운로드</button>
       </div>
 
       <div class="legend-row">
@@ -282,12 +283,9 @@
           </tbody>
         </table>
       </div>
-      <div class="hint-row">
-        <span class="small muted">
-          <span class="mark">※</span> 주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.
-          (칸의 숫자 = <b>제출 / 대상</b>, ( )은 <b>제출률</b> 현황)</span>
-        <button class="btn sm dl-btn" id="mx-xlsx">⤓ 엑셀 다운로드</button>
-      </div>`;
+      <p class="small muted" style="margin:10px 2px 0">
+        <span class="mark">※</span> 주차별 참여 인력(상주/비상주)에 대한 보고서 제출 현황입니다.
+        (칸의 숫자 = <b>제출 / 대상</b>, ( )은 <b>제출률</b> 현황)</p>`;
 
     $('#mx-n').onchange = () => renderMatrix(Number($('#mx-n').value));
     $('#mx-xlsx').onclick = () =>
