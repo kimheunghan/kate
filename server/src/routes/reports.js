@@ -327,8 +327,13 @@ router.post('/', async (req, res, next) => {
     const orgId = resolved.orgId;
     if (!orgId) return res.status(400).json({ error: '소속 기관이 없습니다. 내 정보에서 소속을 지정하세요.' });
 
-    const { rows: wrows } = await db.query(`SELECT id FROM wr.report_weeks WHERE id = $1`, [weekId]);
+    const { rows: wrows } = await db.query(
+      `SELECT id, start_date <= CURRENT_DATE AS started FROM wr.report_weeks WHERE id = $1`,
+      [weekId]
+    );
     if (!wrows[0]) return res.status(400).json({ error: '존재하지 않는 주차입니다.' });
+    // 아직 시작하지 않은 주차에는 쓸 수 없다 (목록에도 나오지 않는다)
+    if (!wrows[0].started) return res.status(400).json({ error: '아직 시작하지 않은 주차입니다.' });
 
     const items = normalizeItems(req.body?.items);
     const missing = findEmptyCell(items);
