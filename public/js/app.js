@@ -528,14 +528,21 @@
     const input = $('#file-input');
 
     dz.onclick = () => input.click();
-    input.onchange = () => { if (input.files.length) uploadFiles(input.files); input.value = ''; };
+    // input.value = '' 는 FileList 를 비운다. uploadFiles 가 기다리는 동안
+    // 목록이 사라지지 않도록 미리 배열로 옮겨서 넘긴다.
+    input.onchange = () => {
+      const picked = Array.from(input.files);
+      input.value = '';
+      if (picked.length) uploadFiles(picked);
+    };
 
     ['dragenter', 'dragover'].forEach((ev) =>
       dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('over'); }));
     ['dragleave', 'drop'].forEach((ev) =>
       dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('over'); }));
     dz.addEventListener('drop', (e) => {
-      if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
+      const dropped = Array.from(e.dataTransfer.files);   // 이벤트가 끝나면 못 읽는다
+      if (dropped.length) uploadFiles(dropped);
     });
   }
 
@@ -556,10 +563,13 @@
     }
     if (!state.report.can_edit) { toast('첨부 권한이 없습니다.', true); return; }
 
-    const fd = new FormData();
-    for (const f of fileList) fd.append('files', f);
+    const files = Array.from(fileList);
+    if (!files.length) { toast('올릴 파일이 없습니다.', true); return; }
 
-    $('#dz-hint').textContent = `업로드 중... (${fileList.length}개)`;
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+
+    $('#dz-hint').textContent = `업로드 중... (${files.length}개)`;
     try {
       const res = await api.post(`/api/reports/${state.report.id}/attachments`, fd);
       state.report.attachments = (state.report.attachments || []).concat(res.attachments);
