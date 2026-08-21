@@ -832,6 +832,11 @@ async function fixHwpxLayout(buf, ratios) {
     .replace(/landscape="[A-Z]*"/, 'landscape="WIDELY"')
     .replace(/width="\d+"/, `width="${PAGE_W}"`)
     .replace(/height="\d+"/, `height="${PAGE_H}"`));
+  // 표가 한 쪽을 넘으면 쪽마다 나눠 찍히게 한다.
+  //  '글자처럼 취급'(treatAsChar="1") 이면 한글은 표를 나누지 못하고 통째로
+  //  다음 쪽으로 넘긴다. 기관이 여럿이라 표가 길어지면 첫 쪽이 비어 보였다.
+  xml = xml.replace(/(<hp:tbl\b[\s\S]{0,400}?<hp:pos )treatAsChar="1"/g, '$1treatAsChar="0"');
+
   xml = xml.replace(/<hp:margin[^>]*\/>/,
     `<hp:margin header="${HEAD_FOOT}" footer="${HEAD_FOOT}" gutter="0" ` +
     `left="${MARGIN}" right="${MARGIN}" top="${MARGIN}" bottom="${MARGIN}"/>`);
