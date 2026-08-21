@@ -217,10 +217,10 @@
   /** 표 제목에 대상 기간을 표시. 향후 계획은 다음 주차 기간을 쓴다. */
   function updateTableHeads(week) {
     const cur = week ? fmtRange(week.start_date, week.end_date) : '';
-    // weeks 는 최신순 정렬이므로 바로 앞 항목이 다음 주차
-    const idx = week ? state.weeks.findIndex((w) => w.id === week.id) : -1;
-    const nextWeek = idx > 0 ? state.weeks[idx - 1] : null;
-    const nxt = nextWeek ? fmtRange(nextWeek.start_date, nextWeek.end_date) : '';
+    // 다음 주차 기간은 서버가 주차마다 붙여 준다.
+    //  (목록에는 시작한 주차만 있어 가장 최근 주차는 여기서 찾을 수 없다)
+    const nxt = week && week.next_start_date
+      ? fmtRange(week.next_start_date, week.next_end_date) : '';
 
     $('#th-plan').innerHTML = `① 당초 계획${cur ? `<span class="th-date">(${cur})</span>` : ''}`;
     $('#th-result').innerHTML = `② 추진 실적${cur ? `<span class="th-date">(${cur})</span>` : ''}`;
