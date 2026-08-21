@@ -34,7 +34,7 @@ async function isSupervisorOrg(orgId) {
 // GET /api/admin/status?week_id=&org_id=&status=&q=
 //   선택 주차의 "사람별" 제출 현황. 미제출자까지 모두 나온다.
 // ---------------------------------------------------------------------
-router.get('/status', async (req, res, next) => {
+router.get('/status', auth.requireStatusView, async (req, res, next) => {
   try {
     let weekId = Number(req.query.week_id);
     if (!weekId) {

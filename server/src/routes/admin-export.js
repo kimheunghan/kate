@@ -192,7 +192,7 @@ const safeName = (v) => String(v || '').replace(/[\\/:*?"<>|]/g, '').replace(/\s
 // ---------------------------------------------------------------------
 // 등록 현황 — 기관별 소계
 // ---------------------------------------------------------------------
-router.get('/export/status', async (req, res, next) => {
+router.get('/export/status', auth.requireStatusView, async (req, res, next) => {
   try {
     const q = new URLSearchParams();
     if (req.query.week_id) q.set('week_id', String(req.query.week_id));

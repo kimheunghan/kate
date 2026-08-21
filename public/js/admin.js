@@ -103,17 +103,18 @@
     window.WR.bindTopbar();
 
     // 탭은 실제로 쓸 수 있는 것만 보여준다.
-    //   사용자 관리 · 활동 로그 : 총괄관리자
-    //   감독관리자와 중복권한자 : 등록 현황 · 주차별 현황판만
-    const canUsers = state.me.role === 'ADMIN';
-    const canAudit = state.me.role === 'ADMIN';
+    //   등록 현황 · 사용자 관리 · 활동 로그 : 총괄관리자
+    //   감독관리자와 중복권한자 : 주차별 현황판만
+    const isAdmin = state.me.role === 'ADMIN';
+    const allowed = { status: isAdmin, matrix: true, users: isAdmin, audit: isAdmin };
     $$('#admin-tabs button').forEach((b) => {
-      if (b.dataset.tab === 'users') b.classList.toggle('hidden', !canUsers);
-      if (b.dataset.tab === 'audit') b.classList.toggle('hidden', !canAudit);
+      b.classList.toggle('hidden', !allowed[b.dataset.tab]);
     });
-    if ((state.tab === 'users' && !canUsers) || (state.tab === 'audit' && !canAudit)) {
-      state.tab = 'status';
-    }
+    if (!allowed[state.tab]) state.tab = 'matrix';
+    // 첫 화면 탭에 '선택됨' 표시를 맞춘다
+    $$('#admin-tabs button').forEach((b) => {
+      b.classList.toggle('active', b.dataset.tab === state.tab);
+    });
 
     $$('#admin-tabs button').forEach((b) => {
       b.onclick = () => {

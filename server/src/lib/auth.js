@@ -147,6 +147,18 @@ function requireUserManager(req, res, next) {
 }
 
 /**
+ * 등록 현황(대상 인원·제출률)을 볼 수 있는가.
+ *   조회 전용 권한(감독관리자·중복권한)은 주차별 현황판만 본다.
+ */
+function requireStatusView(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'ORG_ADMIN') {
+    return res.status(403).json({ error: '등록 현황을 볼 권한이 없습니다.' });
+  }
+  next();
+}
+
+/**
  * 기관을 가리지 않고 전체를 볼 수 있는가.
  *   총괄관리자 · 감독관리자, 그리고 '전체 조회' 겸직 권한을 받은 사람.
  *   겸직은 권한과 소속이 그대로라 참여 인력 집계에는 한 명으로 남는다.
@@ -192,6 +204,7 @@ module.exports = {
   requireAdmin,
   requireManager,
   requireUserManager,
+  requireStatusView,
   seesAllOrgs,
   scopeOrg,
   ensureAdminAccount,
