@@ -98,7 +98,9 @@ EOF
   up)
     need_compose
     [[ -f .env ]] || { echo "[!] .env 가 없습니다. cp .env.example .env 후 값을 채우세요."; exit 1; }
-    mkdir -p "$(grep -E '^UPLOAD_HOST_DIR=' .env | cut -d= -f2 || echo ./data/uploads)"
+    # GCP에서 scp/tar로 가져온 파일은 호스트 소유자로 바뀔 수 있으므로
+    # 컨테이너 node 사용자가 증적자료를 생성/삭제할 수 있게 항상 보정한다.
+    bash scripts/fix-runtime-permissions.sh
     # 폐쇄망에서는 package로 가져와 podman load 한 이미지를 그대로 사용한다.
     # 소스로 새 이미지를 만들려면 먼저: bash scripts/deploy.sh build
     ${COMPOSE} -f "${COMPOSE_FILE}" up -d
@@ -117,7 +119,11 @@ EOF
     ;;
 
   down)    need_compose; ${COMPOSE} -f "${COMPOSE_FILE}" down ;;
-  restart) need_compose; ${COMPOSE} -f "${COMPOSE_FILE}" restart ;;
+  restart)
+    need_compose
+    bash scripts/fix-runtime-permissions.sh
+    ${COMPOSE} -f "${COMPOSE_FILE}" restart
+    ;;
   logs)    podman logs -f --tail 200 wr-app ;;
   status)
     podman ps --filter name=wr- --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
