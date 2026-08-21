@@ -672,7 +672,6 @@
               ? `<div class="sum-more">… 외 ${(r.summary_lines || []).length - MAX_SUMMARY_LINES}건</div>` : '')
         }</td>
         <td class="center">${statusBadge(r.status)}</td>
-        <td class="center">${r.item_count}</td>
         <td class="center">${r.file_count}</td>
         <td class="small">${fmtDateTime(r.updated_at)}</td>
         <td class="center nowrap">
