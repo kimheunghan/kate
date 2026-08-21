@@ -36,18 +36,24 @@
     );
     // 감독 기관을 골랐다가 되돌릴 때 원래 권한으로 돌아오게 기억해 둔다
     let lastRole = roleSel.value;
+    let lockedBySupOrg = false;
 
     const apply = () => {
       const isSupOrg = orgSel ? supOrgIds.has(String(orgSel.value)) : false;
       if (isSupOrg) {
         roleSel.value = 'SUPERVISOR';
-      } else if (roleSel.disabled) {
+      } else if (lockedBySupOrg) {
         // 방금 감독 기관에서 빠져나온 참이면 원래 권한으로 되돌린다
         roleSel.value = lastRole === 'SUPERVISOR' ? 'USER' : lastRole;
       }
-      roleSel.disabled = isSupOrg;
-      roleSel.title = isSupOrg ? '감독 기관 소속은 감독관리자로 지정됩니다.' : '';
+      lockedBySupOrg = isSupOrg;
       if (!isSupOrg) lastRole = roleSel.value;
+
+      // 중복권한을 주면 지금 권한을 그대로 둔다. 작성자면 작성자, 기관관리자면 기관관리자.
+      const dual = !isSupOrg && !!(viewAllChk && viewAllChk.checked);
+      roleSel.disabled = isSupOrg || dual;
+      roleSel.title = isSupOrg ? '감독 기관 소속은 감독관리자로 지정됩니다.'
+        : dual ? '중복권한을 주면 지금 권한을 그대로 둡니다.' : '';
 
       const isSupervisor = roleSel.value === 'SUPERVISOR';
       if (dutySel) {
@@ -71,6 +77,7 @@
 
     if (orgSel) orgSel.addEventListener('change', apply);
     roleSel.addEventListener('change', apply);
+    if (viewAllChk) viewAllChk.addEventListener('change', apply);
     apply();
   }
 
