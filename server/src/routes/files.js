@@ -68,7 +68,7 @@ async function loadReportForFiles(reportId) {
 
 /** 열람: USER=본인 보고서, ORG_ADMIN=자기 기관, ADMIN=전부 */
 function canView(user, report) {
-  if (user.role === 'ADMIN') return true;
+  if (auth.seesAllOrgs(user)) return true;      // 총괄관리자·감독관리자
   if (user.role === 'ORG_ADMIN') return Number(report.org_id) === Number(user.org_id);
   return report.author_id != null && Number(report.author_id) === Number(user.id);
 }
@@ -146,6 +146,10 @@ router.get('/attachments/:id(\\d+)/download', auth.requireAuth, async (req, res,
       return res.status(400).json({ error: '잘못된 파일 경로입니다.' });
     }
     if (!fs.existsSync(abs)) return res.status(404).json({ error: '파일이 서버에 존재하지 않습니다.' });
+
+    await audit.log(req, 'FILE_DOWNLOAD', {
+      targetType: 'report', targetId: att.report_id, detail: att.original_name,
+    });
 
     // 브라우저에서 실행되지 않도록 항상 다운로드로 강제
     res.setHeader('Content-Type', 'application/octet-stream');

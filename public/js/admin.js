@@ -650,7 +650,7 @@
     REPORT_EXPORT_HWPX_ALL: '전체 주차 ZIP 다운로드',
     REPORT_MOVE_ORG: '보고서 기관 이관', REPORT_ORG_CHANGE: '보고서 기관 변경',
     EXCEL_IMPORT: '엑셀 업로드', EXCEL_PREVIEW: '엑셀 미리보기',
-    FILE_UPLOAD: '증적자료 첨부', FILE_DELETE: '증적자료 삭제',
+    FILE_UPLOAD: '증적자료 첨부', FILE_DOWNLOAD: '증적자료 다운로드', FILE_DELETE: '증적자료 삭제',
     USER_CREATE: '사용자 추가', USER_UPDATE: '사용자 수정',
     USER_DELETE: '사용자 삭제', USER_PASSWORD_RESET: '비밀번호 초기화',
     EXPORT_STATUS: '등록 현황 엑셀', EXPORT_MATRIX: '주차별 현황 엑셀',
