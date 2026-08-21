@@ -36,6 +36,10 @@ const config = {
     maxFiles: num(process.env.MAX_UPLOAD_FILES, 20),
   },
 
+  // 활동 로그 보관 기간(일). 이보다 오래된 기록은 하루에 한 번 지운다.
+  // 0 이나 음수로 두면 지우지 않는다.
+  auditRetentionDays: num(process.env.AUDIT_RETENTION_DAYS, 365),
+
   bootstrap: {
     adminUsername: process.env.ADMIN_USERNAME || 'admin',
     adminPassword: process.env.ADMIN_PASSWORD || '',
