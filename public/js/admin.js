@@ -29,7 +29,7 @@
    *   - 이미 전체를 보는 권한(총괄·감독)에는 '전체 조회' 겸직이 의미가 없다
    * 한 함수로 묶어 둔다. 나눠 두면 값을 코드로 바꿀 때 다른 쪽이 따라오지 않는다.
    */
-  function syncUserFields(orgSel, roleSel, dutySel, viewAllChk, orgs) {
+  function syncUserFields(orgSel, roleSel, dutySel, viewAllChk, orgs, roleLocked) {
     if (!roleSel) return;
     const supOrgIds = new Set(
       (orgs || []).filter((o) => o.is_signup_visible === false).map((o) => String(o.id))
@@ -51,8 +51,9 @@
 
       // 중복권한을 주면 지금 권한을 그대로 둔다. 작성자면 작성자, 기관관리자면 기관관리자.
       const dual = !isSupOrg && !!(viewAllChk && viewAllChk.checked);
-      roleSel.disabled = isSupOrg || dual;
-      roleSel.title = isSupOrg ? '감독 기관 소속은 감독관리자로 지정됩니다.'
+      roleSel.disabled = roleLocked || isSupOrg || dual;
+      roleSel.title = roleLocked ? '이 계정의 권한은 총괄관리자만 바꿀 수 있습니다.'
+        : isSupOrg ? '감독 기관 소속은 감독관리자로 지정됩니다.'
         : dual ? '중복권한을 주면 지금 권한을 그대로 둡니다.' : '';
 
       const isSupervisor = roleSel.value === 'SUPERVISOR';
@@ -633,6 +634,9 @@
     // 기관관리자는 자기 기관 사람만, 작성자·기관관리자 권한만 다룬다
     const orgFixed = state.me.role === 'ORG_ADMIN';
     if (orgFixed) orgs = orgs.filter((o) => Number(o.id) === Number(state.me.org_id));
+    // 총괄·감독 관리자 계정은 기관관리자가 손댈 수 없다.
+    //  그래도 지금 권한이 무엇인지는 제대로 보여야 하므로 목록에 남기고 잠근다.
+    const roleLocked = orgFixed && (u.role === 'ADMIN' || u.role === 'SUPERVISOR');
     const back = document.createElement('div');
     back.className = 'modal-back';
     back.innerHTML = `
@@ -661,9 +665,10 @@
               <select id="e-role">
                 <option value="USER"       ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
                 <option value="ORG_ADMIN"  ${u.role === 'ORG_ADMIN' ? 'selected' : ''}>기관관리자</option>
-                ${orgFixed ? '' : `
-                <option value="SUPERVISOR" ${u.role === 'SUPERVISOR' ? 'selected' : ''}>감독관리자</option>
-                <option value="ADMIN"      ${u.role === 'ADMIN' ? 'selected' : ''}>총괄관리자</option>`}
+                ${(!orgFixed || u.role === 'SUPERVISOR') ? `
+                <option value="SUPERVISOR" ${u.role === 'SUPERVISOR' ? 'selected' : ''}>감독관리자</option>` : ''}
+                ${(!orgFixed || u.role === 'ADMIN') ? `
+                <option value="ADMIN"      ${u.role === 'ADMIN' ? 'selected' : ''}>총괄관리자</option>` : ''}
               </select>
             </label>
             <label class="field check-line mt8${orgFixed ? ' hidden' : ''}">
@@ -681,7 +686,7 @@
     document.body.appendChild(back);
 
     syncUserFields($('#e-org', back), $('#e-role', back), $('#e-duty', back),
-                   $('#e-view-all', back), orgs);
+                   $('#e-view-all', back), orgs, roleLocked);
 
     const close = () => back.remove();
     $('#e-cancel', back).onclick = close;
