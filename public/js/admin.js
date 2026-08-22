@@ -71,7 +71,7 @@
         const holder = viewAllChk.closest('label') || viewAllChk;
         holder.classList.toggle('hidden', !canDual);
         viewAllChk.title =
-          '등록 내역 및 주차별 현황판 조회 가능. 참여 인력 자격은 그대로입니다.';
+          '3사 등록 내역 및 주차별 현황판 조회 가능. 참여 인력 자격은 그대로입니다.';
       }
     };
 
@@ -431,7 +431,7 @@
         <label class="sb-field sb-check" style="flex:0 0 auto" id="u-view-all-field">
           <span>중복권한</span>
           <input type="checkbox" id="u-view-all"
-                 title="등록 내역 및 주차별 현황판 조회 가능. 참여 인력 자격은 그대로입니다.">
+                 title="3사 등록 내역 및 주차별 현황판 조회 가능. 참여 인력 자격은 그대로입니다.">
         </label>
         <button class="btn primary sb-btn" id="u-add">사용자 추가</button>
       </div>
@@ -473,7 +473,7 @@
                 <td class="center">${
                   // 중복권한이면 배지를 감싸고 오른쪽 위 모서리에 표식을 얹는다
                   `<span class="role-cell${u.can_view_all ? ' has-dual' : ''}"${
-                    u.can_view_all ? ' title="중복권한 · 등록 내역 및 주차별 현황판 조회 가능"' : ''}>`
+                    u.can_view_all ? ' title="중복권한 · 3사 등록 내역 및 주차별 현황판 조회 가능"' : ''}>`
                   + (u.role === 'ADMIN'      ? '<span class="badge role-admin">총괄관리자</span>' :
                      u.role === 'SUPERVISOR' ? '<span class="badge role-super">감독관리자</span>' :
                      u.role === 'ORG_ADMIN'  ? '<span class="badge role-org">기관관리자</span>' :
@@ -638,7 +638,7 @@
             <label class="field check-line mt8">
               <input type="checkbox" id="e-view-all" ${u.can_view_all ? 'checked' : ''}>
               <span><span class="mark">※</span> 중복권한<span class="dual-mark inline">★</span>
-                (등록 내역 및 주차별 현황판 조회 가능)</span>
+                (3사 등록 내역 및 주차별 현황판 조회 가능)</span>
             </label>
           </div>
         </div>
