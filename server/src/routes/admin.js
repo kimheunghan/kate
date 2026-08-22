@@ -455,6 +455,10 @@ router.post('/users', userManager, async (req, res, next) => {
     if (role !== 'SUPERVISOR' && !['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty)) {
       return res.status(400).json({ error: '담당 역할을 선택하세요.' });
     }
+    // 총괄책임자는 기관에 한 명뿐이라 기관관리자가 새로 지정하지 못한다
+    if (req.user.role === 'ORG_ADMIN' && req.body?.duty === 'LEAD') {
+      return res.status(403).json({ error: '총괄책임자는 총괄관리자가 지정합니다.' });
+    }
 
     // 같은 기관 동명이인 확인 (allow_duplicate_name 이 true 면 그대로 진행)
     if (orgId && req.body?.allow_duplicate_name !== true) {
@@ -548,6 +552,13 @@ router.put('/users/:id(\\d+)', userManager, async (req, res, next) => {
       } else {
         if (!DUTIES.includes(req.body.duty)) {
           return res.status(400).json({ error: '담당 역할을 선택하세요.' });
+        }
+        // 총괄책임자는 기관에 한 명뿐이라 기관관리자가 새로 지정하지 못한다
+        if (req.user.role === 'ORG_ADMIN' && req.body.duty === 'LEAD') {
+          const { rows: cur } = await db.query(`SELECT duty FROM wr.users WHERE id = $1`, [id]);
+          if (cur[0]?.duty !== 'LEAD') {
+            return res.status(403).json({ error: '총괄책임자는 총괄관리자가 지정합니다.' });
+          }
         }
         duty = req.body.duty;
       }

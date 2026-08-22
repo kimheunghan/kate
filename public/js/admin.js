@@ -81,9 +81,18 @@
     apply();
   }
 
-  const dutyOptions = (sel) => ['', 'LEAD', 'MANAGER', 'RESEARCHER']
-    .map((v) => `<option value="${v}" ${sel === v || (!sel && !v) ? 'selected' : ''}>${
+  /**
+   * 담당 역할 선택지.
+   *   총괄책임자는 기관에 한 명뿐이라 기관관리자는 고를 수 없다.
+   *   (이미 총괄책임자인 사람을 고칠 때는 그 값이 사라지지 않도록 남겨 둔다)
+   */
+  const dutyOptions = (sel) => {
+    const orgFixed = state.me && state.me.role === 'ORG_ADMIN';
+    const list = ['', 'LEAD', 'MANAGER', 'RESEARCHER']
+      .filter((v) => !(orgFixed && v === 'LEAD' && sel !== 'LEAD'));
+    return list.map((v) => `<option value="${v}" ${sel === v || (!sel && !v) ? 'selected' : ''}>${
       v ? DUTY_LABEL[v] : '선택하세요'}</option>`).join('');
+  };
   const body = () => $('#tab-body');
 
   async function init() {
