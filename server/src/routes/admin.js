@@ -51,7 +51,7 @@ router.get('/status', auth.requireStatusView, async (req, res, next) => {
       `SELECT id, label, start_date, end_date FROM wr.report_weeks WHERE id = $1`, [weekId]
     );
 
-    const orgId = auth.scopeOrg(req.user, req.query.org_id);
+    const orgId = auth.scopeOrgForView(req.user, req.query.org_id);
     const where = ['week_id = $1'];
     const params = [weekId];
     if (orgId) { params.push(orgId); where.push(`org_id = $${params.length}`); }
@@ -130,7 +130,7 @@ router.get('/overview', auth.requireMatrixView, async (req, res, next) => {
     if (!weeks.length) return res.json({ weeks: [], orgs: [], cells: {}, totals: {} });
 
     const weekIds = weeks.map((w) => w.id);
-    const orgId = auth.scopeOrg(req.user, req.query.org_id);
+    const orgId = auth.scopeOrgForView(req.user, req.query.org_id);
 
     const params = [weekIds];
     let where = 'week_id = ANY($1::int[])';

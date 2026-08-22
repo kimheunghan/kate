@@ -183,8 +183,21 @@ function seesAllOrgs(user) {
   return user.role === 'ADMIN' || user.role === 'SUPERVISOR' || user.can_view_all === true;
 }
 
-/** 기관 관리자는 자기 기관으로만 조회 범위를 제한한다. 전체를 보는 권한은 요청값 그대로. */
+/**
+ * 사용자 관리 범위.
+ *   기관관리자는 중복권한이 있어도 자기 기관 사람만 다룬다.
+ */
 function scopeOrg(user, requestedOrgId) {
+  if (user.role === 'ORG_ADMIN') return user.org_id || -1;
+  return requestedOrgId ? Number(requestedOrgId) : null;
+}
+
+/**
+ * 현황 조회 범위 (등록 현황·주차별 현황판).
+ *   중복권한을 받은 기관관리자는 3사 전체를 본다.
+ */
+function scopeOrgForView(user, requestedOrgId) {
+  if (seesAllOrgs(user)) return requestedOrgId ? Number(requestedOrgId) : null;
   if (user.role === 'ORG_ADMIN') return user.org_id || -1;
   return requestedOrgId ? Number(requestedOrgId) : null;
 }
@@ -224,5 +237,6 @@ module.exports = {
   requireMatrixView,
   seesAllOrgs,
   scopeOrg,
+  scopeOrgForView,
   ensureAdminAccount,
 };
