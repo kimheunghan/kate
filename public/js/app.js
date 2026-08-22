@@ -683,7 +683,14 @@
 
   function bindListTab() {
     $('#btn-search').onclick = () => searchList(1);
-    ['#f-status', '#f-week', '#f-org'].forEach((s) => { $(s).onchange = () => searchList(1); });
+    ['#f-status', '#f-org'].forEach((s) => { $(s).onchange = () => searchList(1); });
+
+    // 주차를 고르면 그 주차의 제출·미등록을 함께 보도록 상태를 '전체' 로 바꾼다.
+    //  다시 '전체 주차' 로 돌아오면 줄이 크게 늘어나므로 '제출완료' 로 되돌린다.
+    $('#f-week').onchange = () => {
+      $('#f-status').value = $('#f-week').value ? '' : 'SUBMITTED';
+      searchList(1);
+    };
     $('#f-week').addEventListener('change', updateWeekDownloadButton);
     updateWeekDownloadButton();
 
