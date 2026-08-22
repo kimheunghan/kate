@@ -22,6 +22,10 @@ async function log(req, action, {
     // 감독관리자는 참여 인력이 아니라 활동 기록을 남기지 않는다
     if (req.user?.role === 'SUPERVISOR') return;
 
+    // 소속 기관이 없는 계정(최초 관리자 같은 운영용)도 남기지 않는다.
+    //  대상 인원에도 들어가지 않는 자리라 기록에서도 뺀다.
+    if (req.user && !req.user.org_id) return;
+
     const ip = clientIp(req);
 
     const uid = req.user?.id ?? actorId ?? null;
