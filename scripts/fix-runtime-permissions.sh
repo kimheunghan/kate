@@ -25,3 +25,10 @@ else
 fi
 
 echo "[✔] 업로드 권한 보정 완료: ${UPLOAD_HOST_DIR} -> container 1000:1000"
+
+# HTTPS 인증서도 컨테이너의 node(1000) 가 읽을 수 있어야 한다.
+# 호스트 소유 그대로 두면 컨테이너 안에서 root:root 600 으로 보여 앱이 기동에 실패한다.
+if [[ -f certs/server.key ]]; then
+  podman unshare chown 1000:1000 certs/server.crt certs/server.key
+  echo "[✔] 인증서 권한 보정 완료: certs/ -> container 1000:1000"
+fi

@@ -19,6 +19,10 @@ fi
 OUT=certs
 mkdir -p "${OUT}"
 
+# 이전 인증서는 컨테이너용으로 소유자가 바뀌어 있을 수 있어(fix-runtime-permissions.sh)
+# 덮어쓰기가 막힌다. 먼저 지우고 새로 만든다.
+rm -f "${OUT}/server.crt" "${OUT}/server.key"
+
 # 접속에 쓰이는 모든 주소를 SAN 에 넣어야 브라우저가 인정한다
 SAN="DNS:localhost,IP:127.0.0.1"
 for h in "$@"; do
