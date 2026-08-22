@@ -725,17 +725,19 @@
         <td class="col-author">${esc(r.author_name || '-')}</td>
         <td class="col-week">${esc(r.week_label)}</td>
         <td class="small summary col-summary">${
+          !r.id ? '<span class="muted">미등록</span>' :
           (r.summary_lines || []).slice(0, MAX_SUMMARY_LINES)
             .map((line) => `<div class="sum-line">${esc(line)}</div>`).join('')
           + ((r.summary_lines || []).length > MAX_SUMMARY_LINES
               ? `<div class="sum-more">… 외 ${(r.summary_lines || []).length - MAX_SUMMARY_LINES}건</div>` : '')
         }</td>
         <td class="center col-state">${statusBadge(r.status)}</td>
-        <td class="center col-files">${r.file_count}</td>
-        <td class="small col-updated">${fmtDateTime(r.updated_at)}</td>
-        <td class="center nowrap col-actions">
+        <td class="center col-files">${r.id ? r.file_count : '-'}</td>
+        <td class="small col-updated">${r.id ? fmtDateTime(r.updated_at) : '-'}</td>
+        <td class="center nowrap col-actions">${r.id ? `
           <button class="btn sm" data-open="${r.id}">열기</button>
-          <button class="btn sm" data-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받기">한글</button>
+          <button class="btn sm" data-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받기">한글</button>`
+          : '<span class="muted small">-</span>'}
         </td>
       </tr>`).join('');
 

@@ -213,49 +213,53 @@ router.get('/', async (req, res, next) => {
   try {
     const page = Math.max(Number(req.query.page) || 1, 1);
     const size = Math.min(Math.max(Number(req.query.size) || 20, 1), 100);
-    const where = [];
+
+    // 제출 현황 뷰(참여 인력 × 주차)를 바탕으로 만든다.
+    //  그래야 아직 내지 않은 사람도 '미등록' 으로 함께 나온다.
+    //  뷰는 감독관리자와 소속 없는 계정을 이미 빼 놓았다.
+    const where = ['s.start_date <= CURRENT_DATE'];   // 아직 오지 않은 주차는 뺀다
     const params = [];
 
-    if (req.query.week_id) { params.push(Number(req.query.week_id)); where.push(`r.week_id = $${params.length}`); }
-    if (req.query.status)  { params.push(String(req.query.status));  where.push(`r.status  = $${params.length}`); }
-    if (req.query.author_id) { params.push(Number(req.query.author_id)); where.push(`r.author_id = $${params.length}`); }
+    if (req.query.week_id) { params.push(Number(req.query.week_id)); where.push(`s.week_id = $${params.length}`); }
+    if (req.query.status)  { params.push(String(req.query.status));  where.push(`s.status  = $${params.length}`); }
+    if (req.query.author_id) { params.push(Number(req.query.author_id)); where.push(`s.user_id = $${params.length}`); }
     if (String(req.query.mine) === '1') {
-      params.push(req.user.id); where.push(`r.author_id = $${params.length}`);
+      params.push(req.user.id); where.push(`s.user_id = $${params.length}`);
     }
 
-    // 감독관리자는 참여 인력이 아니다. 본인이 써 둔 보고서는
-    // 등록 내역에 올리지 않는다. (본인 화면에서 한글로만 내려받는다)
-    where.push(`NOT EXISTS (
-      SELECT 1 FROM wr.users su WHERE su.id = r.author_id AND su.role = 'SUPERVISOR'
-    )`);
-
-    // 권한별 조회 범위 (작성자는 본인 것만)
-    addViewScope(req.user, where, params);
-    if (auth.seesAllOrgs(req.user) && req.query.org_id) {
-      params.push(Number(req.query.org_id)); where.push(`r.org_id = $${params.length}`);
+    // 권한별 조회 범위
+    if (!auth.seesAllOrgs(req.user)) {
+      if (req.user.role === 'ORG_ADMIN') {
+        params.push(req.user.org_id || -1); where.push(`s.org_id = $${params.length}`);
+      } else {
+        params.push(req.user.id); where.push(`s.user_id = $${params.length}`);
+      }
+    } else if (req.query.org_id) {
+      params.push(Number(req.query.org_id)); where.push(`s.org_id = $${params.length}`);
     }
+
     if (req.query.q) {
       params.push(`%${String(req.query.q).trim()}%`);
       const i = params.length;
       where.push(`EXISTS (
         SELECT 1 FROM wr.report_items ri
-         WHERE ri.report_id = r.id
+         WHERE ri.report_id = s.report_id
            AND (ri.plan_html ILIKE $${i} OR ri.result_html ILIKE $${i} OR ri.next_plan_html ILIKE $${i})
       )`);
     }
 
-    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const whereSql = `WHERE ${where.join(' AND ')}`;
 
-    const countSql = `SELECT count(*)::int AS total FROM wr.reports r ${whereSql}`;
-    const { rows: cnt } = await db.query(countSql, params);
+    const { rows: cnt } = await db.query(
+      `SELECT count(*)::int AS total FROM wr.v_submission_status s ${whereSql}`, params);
 
     params.push(size, (page - 1) * size);
     const listSql = `
-      SELECT r.id, r.week_id, r.org_id, r.status, r.submitted_at, r.updated_at, r.note,
-             w.label AS week_label, w.start_date, w.end_date,
-             o.name  AS org_name,
-             u.name  AS author_name,
-             (SELECT count(*)::int FROM wr.report_items ri WHERE ri.report_id = r.id) AS item_count,
+      SELECT s.report_id AS id, s.week_id, s.org_id, s.status,
+             s.submitted_at, s.updated_at, r.note,
+             s.week_label, s.start_date, s.end_date,
+             s.org_name, s.user_id, s.user_name AS author_name,
+             s.item_count::int AS item_count,
              -- 항목별로 한 줄씩 보여주도록 배열로 넘긴다. (화면에서 줄바꿈 + 말줄임 처리)
              -- 실적 보고이므로 ② 추진 실적을 우선 쓰고, 비어 있으면 ① 당초 계획으로 대체.
              -- 본문에 사용자가 붙인 번호가 이미 있으므로 따로 번호를 붙이지 않는다.
@@ -269,18 +273,16 @@ router.get('/', async (req, res, next) => {
                                '&nbsp;', ' '), '&amp;', '&'),
                              '<[^>]*>', ' ', 'g'),
                            '\s+', ' ', 'g')) AS txt
-                    FROM wr.report_items x WHERE x.report_id = r.id
+                    FROM wr.report_items x WHERE x.report_id = s.report_id
                 ) t
                WHERE t.txt <> '') AS summary_lines,
-             (SELECT count(*)::int FROM wr.attachments  a WHERE a.report_id  = r.id) AS file_count
-        FROM wr.reports r
-        JOIN wr.report_weeks  w ON w.id = r.week_id
-        JOIN wr.organizations o ON o.id = r.org_id
-        LEFT JOIN wr.users    u ON u.id = r.author_id
+             s.file_count::int AS file_count
+        FROM wr.v_submission_status s
+        LEFT JOIN wr.reports r ON r.id = s.report_id
         ${whereSql}
        -- 최신 주차 → 기관 순서 → 담당 역할(총괄책임자·실무책임자·참여연구원) → 이름 가나다
-       ORDER BY w.start_date DESC, o.sort_order, o.name,
-                wr.duty_order(u.duty), u.name, u.username
+       ORDER BY s.start_date DESC, s.sort_order NULLS LAST, s.org_name,
+                wr.duty_order(s.duty), s.user_name, s.username
        LIMIT $${params.length - 1} OFFSET $${params.length}`;
     const { rows } = await db.query(listSql, params);
 
