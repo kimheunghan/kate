@@ -16,6 +16,17 @@ cd "$(dirname "$0")/.."
 IMAGE="localhost/weekly-report:1.0"
 COMPOSE_FILE="docker-compose.prod.yml"
 
+# 앱이 HTTP/HTTPS 중 무엇으로 떴는지 확인하고 그 스킴을 출력한다.
+# (.env 에 SSL_CERT_FILE 이 있으면 HTTPS. 자체 서명이므로 -k 로 검증을 건너뛴다)
+health_scheme() {
+  local port="$1" host_ip="${2:-}" h
+  for h in 127.0.0.1 ${host_ip}; do
+    curl -fsSk "https://${h}:${port}/api/health" >/dev/null 2>&1 && { echo https; return 0; }
+    curl -fsS  "http://${h}:${port}/api/health"  >/dev/null 2>&1 && { echo http;  return 0; }
+  done
+  return 1
+}
+
 # podman-compose / docker-compose 중 있는 것을 사용
 if command -v podman-compose >/dev/null 2>&1; then
   COMPOSE="podman-compose"
@@ -110,9 +121,8 @@ EOF
     # 운영에서는 특정 IP 에만 포트를 열어 두어 127.0.0.1 로는 닿지 않는다
     HOST_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
     for i in $(seq 1 30); do
-      if curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1 \
-         || { [[ -n "${HOST_IP}" ]] && curl -fsS "http://${HOST_IP}:${PORT}/api/health" >/dev/null 2>&1; }; then
-        echo "[✔] 정상 기동 → http://${HOST_IP:-127.0.0.1}:${PORT}"
+      if SCHEME="$(health_scheme "${PORT}" "${HOST_IP}")"; then
+        echo "[✔] 정상 기동 → ${SCHEME}://${HOST_IP:-127.0.0.1}:${PORT}"
         exit 0
       fi
       sleep 2
@@ -131,7 +141,11 @@ EOF
   status)
     podman ps --filter name=wr- --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
     PORT="$(grep -E '^APP_PORT=' .env 2>/dev/null | cut -d= -f2 || echo 16000)"
-    echo; curl -fsS "http://127.0.0.1:${PORT}/api/health" && echo || echo "[!] health 응답 없음"
+    echo
+    if   curl -fsSk "https://127.0.0.1:${PORT}/api/health"; then echo
+    elif curl -fsS  "http://127.0.0.1:${PORT}/api/health";  then echo
+    else echo "[!] health 응답 없음"
+    fi
     ;;
 
   *)

@@ -10,7 +10,17 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-[[ -f .env ]] && set -a && . ./.env && set +a
+
+# .env 를 셸로 실행(. ./.env)하면 "SMTP_FROM_NAME=주간실적 보고 시스템" 처럼
+# 따옴표 없이 띄어쓰기가 들어간 줄에서 "보고: command not found" 가 뜬다.
+# 필요한 값만 그대로 읽어 온다. (값에 무엇이 들어 있든 실행되지 않는다)
+env_get() {
+  [[ -f .env ]] || return 0
+  sed -n "s/^$1=//p" .env | tail -n 1 | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"
+}
+for k in DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD DB_EXPOSE_PORT; do
+  [[ -n "${!k:-}" ]] || printf -v "$k" '%s' "$(env_get "$k")"
+done
 
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-16432}"

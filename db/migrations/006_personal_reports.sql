@@ -21,9 +21,12 @@ SET search_path TO wr, public;
 --    ORG_ADMIN : 자기 기관만 관리
 --    USER      : 작성자
 -- ---------------------------------------------------------------------
+-- SUPERVISOR 는 017 에서 추가된 권한이지만 여기에도 넣어 둔다.
+-- 이 파일은 여러 번 돌 수 있는데, 감독관리자가 이미 있는 DB 에서 다시 돌면
+-- DROP 은 되고 ADD 는 제약 위반으로 실패해 제약이 사라진 채 남는다.
 ALTER TABLE wr.users DROP CONSTRAINT IF EXISTS users_role_chk;
 ALTER TABLE wr.users
-    ADD CONSTRAINT users_role_chk CHECK (role IN ('USER', 'ORG_ADMIN', 'ADMIN'));
+    ADD CONSTRAINT users_role_chk CHECK (role IN ('USER', 'ORG_ADMIN', 'SUPERVISOR', 'ADMIN'));
 
 COMMENT ON COLUMN wr.users.role IS 'USER=작성자, ORG_ADMIN=기관 관리자, ADMIN=전체 관리자';
 

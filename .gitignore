@@ -1,4 +1,7 @@
 .env
+# .env 사본(백업)도 비밀값을 담고 있으므로 함께 제외한다
+.env.*
+!.env.example
 node_modules/
 data/
 dist/
