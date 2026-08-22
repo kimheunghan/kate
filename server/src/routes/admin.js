@@ -116,7 +116,7 @@ router.get('/status', auth.requireStatusView, async (req, res, next) => {
 // ---------------------------------------------------------------------
 // GET /api/admin/overview?weeks=8  — 최근 N주 × 기관별 제출 인원
 // ---------------------------------------------------------------------
-router.get('/overview', async (req, res, next) => {
+router.get('/overview', auth.requireMatrixView, async (req, res, next) => {
   try {
     const n = Math.min(Math.max(Number(req.query.weeks) || 8, 1), 26);
     const { rows: weeks } = await db.query(
@@ -434,10 +434,12 @@ router.post('/users', userManager, async (req, res, next) => {
       && req.body?.can_view_all === true
       && role === 'ORG_ADMIN';
 
-    // 기관 관리자는 자기 기관에만, 그리고 전체 관리자는 만들 수 없다
+    // 기관관리자는 자기 기관에만, 그리고 작성자·기관관리자만 만들 수 있다
     if (req.user.role === 'ORG_ADMIN') {
       orgId = req.user.org_id;
-      if (role === 'ADMIN') return res.status(403).json({ error: '총괄관리자 계정은 만들 수 없습니다.' });
+      if (role !== 'USER' && role !== 'ORG_ADMIN') {
+        return res.status(403).json({ error: '작성자 또는 기관관리자만 등록할 수 있습니다.' });
+      }
     }
 
     // 비어 있는 것과 형식이 틀린 것을 구분해 안내한다 (회원가입과 같은 기준)
@@ -501,8 +503,10 @@ router.put('/users/:id(\\d+)', userManager, async (req, res, next) => {
       if (!t[0] || Number(t[0].org_id) !== Number(req.user.org_id)) {
         return res.status(403).json({ error: '다른 기관 사용자는 수정할 수 없습니다.' });
       }
-      if (t[0].role === 'ADMIN' || role === 'ADMIN') {
-        return res.status(403).json({ error: '총괄관리자 권한은 변경할 수 없습니다.' });
+      // 총괄·감독 관리자는 손대지도, 만들지도 못한다
+      const heavy = (r) => r === 'ADMIN' || r === 'SUPERVISOR';
+      if (heavy(t[0].role) || heavy(role)) {
+        return res.status(403).json({ error: '총괄·감독 관리자 권한은 변경할 수 없습니다.' });
       }
     }
 

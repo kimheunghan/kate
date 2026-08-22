@@ -132,17 +132,20 @@ function requireAdmin(req, res, next) {
  */
 function requireManager(req, res, next) {
   if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  const ok = req.user.role === 'ADMIN' || req.user.role === 'SUPERVISOR'
+  const ok = ['ADMIN', 'SUPERVISOR', 'ORG_ADMIN'].includes(req.user.role)
           || req.user.can_view_all === true;
   if (!ok) return res.status(403).json({ error: '관리자 권한이 필요합니다.' });
   next();
 }
 
-/** 사용자·기관을 손대는 자리. 총괄관리자만. */
+/**
+ * 사용자를 손대는 자리.
+ *   총괄관리자는 전체, 기관관리자는 자기 기관 사람만 (각 라우트에서 다시 확인한다).
+ */
 function requireUserManager(req, res, next) {
   if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ error: '사용자·기관을 관리할 권한이 없습니다.' });
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'ORG_ADMIN') {
+    return res.status(403).json({ error: '사용자를 관리할 권한이 없습니다.' });
   }
   next();
 }
@@ -155,6 +158,18 @@ function requireStatusView(req, res, next) {
   if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
   if (req.user.role !== 'ADMIN') {
     return res.status(403).json({ error: '등록 현황을 볼 권한이 없습니다.' });
+  }
+  next();
+}
+
+/**
+ * 주차별 현황판을 볼 수 있는가.
+ *   3사 전체를 보는 사람만 쓴다. 기관관리자는 사용자 관리만 한다.
+ */
+function requireMatrixView(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  if (!seesAllOrgs(req.user)) {
+    return res.status(403).json({ error: '주차별 현황판을 볼 권한이 없습니다.' });
   }
   next();
 }
@@ -206,6 +221,7 @@ module.exports = {
   requireManager,
   requireUserManager,
   requireStatusView,
+  requireMatrixView,
   seesAllOrgs,
   scopeOrg,
   ensureAdminAccount,

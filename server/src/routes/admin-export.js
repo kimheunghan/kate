@@ -357,7 +357,7 @@ router.get('/export/status', auth.requireStatusView, async (req, res, next) => {
 // ---------------------------------------------------------------------
 // 주차별 현황판
 // ---------------------------------------------------------------------
-router.get('/export/matrix', async (req, res, next) => {
+router.get('/export/matrix', auth.requireMatrixView, async (req, res, next) => {
   try {
     const n = Math.min(Math.max(Number(req.query.weeks) || 8, 1), 26);
     const { rows: weeks } = await db.query(

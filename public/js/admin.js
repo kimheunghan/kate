@@ -98,10 +98,11 @@
       window.WR.rememberMe(state.me);
     } catch (e) { return; }
 
-    // 관리자 화면을 쓰는 사람 : 총괄관리자 · 감독관리자 · 중복권한자
-    //  기관관리자는 여기 들어오지 않는다. 자기 기관 보고서는
-    //  주간보고 화면의 [등록 내역 조회] 탭에서 본다.
-    const canEnter = state.me.role === 'ADMIN' || state.me.role === 'SUPERVISOR'
+    // 관리자 화면을 쓰는 사람
+    //   총괄관리자   : 전부
+    //   감독관리자·중복권한자 : 주차별 현황판
+    //   기관관리자   : 사용자 관리 (자기 기관 사람만)
+    const canEnter = ['ADMIN', 'SUPERVISOR', 'ORG_ADMIN'].includes(state.me.role)
       || state.me.can_view_all === true;
     if (!canEnter) { location.href = '/report'; return; }
 
@@ -129,11 +130,17 @@
     window.WR.bindTopbar();
 
     const isAdmin = state.me.role === 'ADMIN';
-    const allowed = { status: isAdmin, matrix: true, users: isAdmin, audit: isAdmin };
+    const isOrgAdmin = state.me.role === 'ORG_ADMIN';
+    const allowed = {
+      status: isAdmin,
+      matrix: isAdmin || !isOrgAdmin,          // 기관관리자는 현황판을 쓰지 않는다
+      users: isAdmin || isOrgAdmin,
+      audit: isAdmin,
+    };
     $$('#admin-tabs button').forEach((b) => {
       b.classList.toggle('hidden', !allowed[b.dataset.tab]);
     });
-    if (!allowed[state.tab]) state.tab = 'matrix';
+    if (!allowed[state.tab]) state.tab = isOrgAdmin ? 'users' : 'matrix';
     $$('#admin-tabs button').forEach((b) => {
       b.classList.toggle('active', b.dataset.tab === state.tab);
     });
@@ -396,7 +403,12 @@
       api.get('/api/admin/users' + (q.toString() ? `?${q}` : '')),
       api.get('/api/orgs'),
     ]);
-    const orgOpts = orgsRes.orgs.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+    // 기관관리자는 자기 기관 사람만 다룬다. 기관은 고정, 권한은 두 가지만.
+    const orgFixed = state.me.role === 'ORG_ADMIN';
+    const orgList = orgFixed
+      ? orgsRes.orgs.filter((o) => Number(o.id) === Number(state.me.org_id))
+      : orgsRes.orgs;
+    const orgOpts = orgList.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
 
     const { part: uRows, pages: uPages } = slicePage(usersRes.users, 'users');
 
@@ -413,7 +425,7 @@
           <span>초기 비밀번호</span><input type="text" id="u-pw" placeholder="8자 이상">
         </label>
         <label class="sb-field" style="flex:1 1 160px">
-          <span>기관</span><select id="u-org">${orgOpts}</select>
+          <span>기관</span><select id="u-org" ${orgFixed ? 'disabled' : ''}>${orgOpts}</select>
         </label>
         <label class="sb-field" style="flex:0 0 140px">
           <span>담당 역할</span>
@@ -424,11 +436,12 @@
           <select id="u-role">
             <option value="USER">작성자</option>
             <option value="ORG_ADMIN">기관관리자</option>
+            ${orgFixed ? '' : `
             <option value="SUPERVISOR">감독관리자</option>
-            <option value="ADMIN">총괄관리자</option>
+            <option value="ADMIN">총괄관리자</option>`}
           </select>
         </label>
-        <label class="sb-field sb-check" style="flex:0 0 auto" id="u-view-all-field">
+        <label class="sb-field sb-check${orgFixed ? ' hidden' : ''}" style="flex:0 0 auto" id="u-view-all-field">
           <span>중복권한</span>
           <input type="checkbox" id="u-view-all"
                  title="3사 등록 내역 및 주차별 현황판 조회 가능. 참여 인력 자격은 그대로입니다.">
@@ -489,7 +502,7 @@
                 <td class="small">${fmtDateTime(u.last_login_at)}</td>
                 <td class="center nowrap">
                   <button class="btn sm" data-uedit="${u.id}">권한</button>
-                  <button class="btn sm danger" data-udel="${u.id}">삭제</button>
+                  ${orgFixed ? '' : `<button class="btn sm danger" data-udel="${u.id}">삭제</button>`}
                 </td>
               </tr>`).join('')}
           </tbody>
@@ -603,6 +616,9 @@
   }
 
   function openUserEdit(u, orgs) {
+    // 기관관리자는 자기 기관 사람만, 작성자·기관관리자 권한만 다룬다
+    const orgFixed = state.me.role === 'ORG_ADMIN';
+    if (orgFixed) orgs = orgs.filter((o) => Number(o.id) === Number(state.me.org_id));
     const back = document.createElement('div');
     back.className = 'modal-back';
     back.innerHTML = `
@@ -631,11 +647,12 @@
               <select id="e-role">
                 <option value="USER"       ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
                 <option value="ORG_ADMIN"  ${u.role === 'ORG_ADMIN' ? 'selected' : ''}>기관관리자</option>
+                ${orgFixed ? '' : `
                 <option value="SUPERVISOR" ${u.role === 'SUPERVISOR' ? 'selected' : ''}>감독관리자</option>
-                <option value="ADMIN"      ${u.role === 'ADMIN' ? 'selected' : ''}>총괄관리자</option>
+                <option value="ADMIN"      ${u.role === 'ADMIN' ? 'selected' : ''}>총괄관리자</option>`}
               </select>
             </label>
-            <label class="field check-line mt8">
+            <label class="field check-line mt8${orgFixed ? ' hidden' : ''}">
               <input type="checkbox" id="e-view-all" ${u.can_view_all ? 'checked' : ''}>
               <span><span class="mark">※</span> 중복권한<span class="dual-mark inline">★</span>
                 (3사 등록 내역 및 주차별 현황판 조회 가능)</span>
