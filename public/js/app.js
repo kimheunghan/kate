@@ -683,7 +683,7 @@
 
   function bindListTab() {
     $('#btn-search').onclick = () => searchList(1);
-    ['#f-week', '#f-org'].forEach((s) => { $(s).onchange = () => searchList(1); });
+    ['#f-status', '#f-week', '#f-org'].forEach((s) => { $(s).onchange = () => searchList(1); });
     $('#f-week').addEventListener('change', updateWeekDownloadButton);
     updateWeekDownloadButton();
 
@@ -697,6 +697,7 @@
   async function searchList(page) {
     state.listPage = page || 1;
     const p = new URLSearchParams({ page: state.listPage, size: PAGE_SIZE });
+    if ($('#f-status').value) p.set('status', $('#f-status').value);
     if ($('#f-week').value)   p.set('week_id', $('#f-week').value);
     if ($('#f-org').value)    p.set('org_id', $('#f-org').value);
 

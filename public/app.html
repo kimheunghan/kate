@@ -127,7 +127,15 @@
       </header>
       <div class="body">
         <div class="search-bar">
-          <label class="sb-field" style="flex:2 1 340px">
+          <label class="sb-field" style="flex:0 0 150px">
+            <span>상태</span>
+            <select id="f-status">
+              <option value="">전체</option>
+              <option value="SUBMITTED" selected>제출완료</option>
+              <option value="NONE">미등록</option>
+            </select>
+          </label>
+          <label class="sb-field" style="flex:2 1 320px">
             <span>주차</span>
             <select id="f-week"><option value="">전체</option></select>
           </label>
