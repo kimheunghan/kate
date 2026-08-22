@@ -677,8 +677,16 @@
       ? '선택한 주차의 보고서를 한글 문서 한 개로 내려받습니다.'
       : '주차마다 한글 문서를 만들어 ZIP 한 개로 묶어 내려받습니다.';
     $('#dl-note').innerHTML = one
-      ? '<span class="mark">※</span> 선택한 주차만 한글 문서로 내려받습니다.'
+      ? '<span class="mark">※</span> 선택한 주차만 내려받습니다. 증적자료는 따로 받습니다.'
       : '<span class="mark">※</span> 한 주차만 받으시려면 위에서 주차를 먼저 선택하세요.';
+
+    const fbtn = $('#btn-week-files');
+    if (fbtn) {
+      $('#dl-files-label').textContent = one ? '해당 주차 증적자료 ZIP' : '전체 증적자료 ZIP 다운로드';
+      fbtn.title = one
+        ? '선택한 주차에 첨부된 증적자료를 ZIP 으로 묶어 내려받습니다.'
+        : '모든 주차의 증적자료를 주차별 폴더로 묶어 내려받습니다. 용량이 크면 주차를 나눠 받으세요.';
+    }
   }
 
   function bindListTab() {
@@ -693,6 +701,15 @@
     };
     $('#f-week').addEventListener('change', updateWeekDownloadButton);
     updateWeekDownloadButton();
+
+    $('#btn-week-files').onclick = () => {
+      const weekId = $('#f-week').value;
+      if (!weekId) toast('모든 주차의 증적자료를 주차별 폴더로 묶습니다. 용량이 클 수 있습니다.');
+      const p = new URLSearchParams();
+      if (weekId) p.set('week_id', weekId);
+      if ($('#f-org') && $('#f-org').value) p.set('org_id', $('#f-org').value);
+      window.WR.downloadFile(`/api/reports/export-files-week?${p}`, '증적자료.zip');
+    };
 
     $('#btn-week-hwpx').onclick = () => {
       const weekId = $('#f-week').value;

@@ -34,6 +34,9 @@ const config = {
     dir: process.env.UPLOAD_DIR || path.resolve(__dirname, '../../../uploads'),
     maxBytes: num(process.env.MAX_UPLOAD_MB, 50) * 1024 * 1024,
     maxFiles: num(process.env.MAX_UPLOAD_FILES, 20),
+    // 증적자료를 ZIP 으로 묶어 내려줄 때의 합계 상한(MB).
+    // 넘으면 만들지 않고 주차를 나눠 받으라고 안내한다.
+    exportMaxBytes: num(process.env.EXPORT_FILES_MAX_MB, 300) * 1024 * 1024,
   },
 
   // 활동 로그 보관 기간(일). 이보다 오래된 기록은 하루에 한 번 지운다.

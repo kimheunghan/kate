@@ -1,7 +1,10 @@
 'use strict';
 
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const db = require('../lib/db');
+const config = require('../lib/config');
 const auth = require('../lib/auth');
 const audit = require('../lib/audit');
 const { sanitizeHtml, htmlToText } = require('../lib/sanitize');
@@ -1237,6 +1240,114 @@ router.get('/export-hwpx-week', requireExport, async (req, res, next) => {
     console.error('[hwpx] 주차 내보내기 실패:', err.message);
     res.status(500).json({ error: '한글 문서로 변환하지 못했습니다. 잠시 후 다시 시도해 주세요.' });
   }
+});
+
+// ---------------------------------------------------------------------
+// GET /api/reports/export-files-week?week_id=&org_id=
+//   증적자료(첨부)를 ZIP 으로 묶어 내려준다.
+//     week_id 가 있으면 그 주차만, 없으면 보이는 범위의 모든 주차.
+//   폴더 구조 :  주차 / 기관 / 참여인력 / 파일
+//   문서(한글)는 따로 받는다. 첨부는 원본이라 커질 수 있어 여기서만 다룬다.
+// ---------------------------------------------------------------------
+router.get('/export-files-week', requireExport, async (req, res, next) => {
+  try {
+    const orgId = auth.seesAllOrgs(req.user) ? req.query.org_id : null;
+    const weekId = Number(req.query.week_id);
+
+    const where = ["COALESCE(u.role, '') <> 'SUPERVISOR'"];
+    const params = [];
+    addViewScope(req.user, where, params);
+    if (orgId) { params.push(Number(orgId)); where.push(`r.org_id = $${params.length}`); }
+    if (weekId) { params.push(weekId); where.push(`r.week_id = $${params.length}`); }
+
+    const { rows: files } = await db.query(
+      `SELECT a.id, a.original_name, a.stored_path, a.byte_size,
+              w.label AS week_label, w.start_date,
+              o.name  AS org_name, o.sort_order,
+              u.name  AS author_name, u.duty, u.username
+         FROM wr.attachments a
+         JOIN wr.reports r ON r.id = a.report_id
+         JOIN wr.report_weeks  w ON w.id = r.week_id
+         JOIN wr.organizations o ON o.id = r.org_id
+         LEFT JOIN wr.users    u ON u.id = r.author_id
+        WHERE ${where.join(' AND ')}
+        ORDER BY w.start_date DESC, o.sort_order, o.name,
+                 wr.duty_order(u.duty), u.name, a.id`,
+      params
+    );
+
+    if (!files.length) {
+      return res.status(404).json({
+        error: weekId ? '해당 주차에 첨부된 증적자료가 없습니다.' : '내려받을 증적자료가 없습니다.',
+      });
+    }
+
+    // 합계가 상한을 넘으면 만들지 않는다. 만드는 도중에 끊기면 되돌릴 수 없다.
+    const total = files.reduce((sum, f) => sum + Number(f.byte_size || 0), 0);
+    if (total > config.upload.exportMaxBytes) {
+      const mb = (n) => Math.round(n / 1024 / 1024);
+      return res.status(413).json({
+        error: `증적자료 합계가 ${mb(total)}MB 로 한 번에 받을 수 있는 크기(${mb(config.upload.exportMaxBytes)}MB)를 넘습니다.`
+             + ' 위에서 주차를 골라 나눠 받아 주세요.',
+      });
+    }
+
+    const archiver = require('archiver');
+    // 이미 압축된 파일(hwp·xlsx·이미지)이 대부분이라 다시 압축해도 줄지 않는다.
+    // 담기만 하면 서버도 가볍고 받는 쪽도 빠르다.
+    const zip = archiver('zip', { store: true });
+    zip.on('warning', (e) => console.warn('[첨부ZIP] 경고:', e.message));
+    zip.on('error', (e) => { console.error('[첨부ZIP] 실패:', e.message); res.destroy(); });
+
+    const base = weekId
+      ? `${weekFileBase(files[0].week_label)}_증적자료`
+      : `주간보고_증적자료_전체(${new Set(files.map((f) => f.week_label)).size}개 주차)`;
+    const name = safeFileName(base) + '.zip';
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    res.setHeader('Content-Disposition',
+      `attachment; filename="attachments.zip"; filename*=UTF-8''${encodeURIComponent(name)}`);
+    zip.pipe(res);
+
+    const used = new Set();
+    let added = 0;
+    for (const f of files) {
+      const abs = path.resolve(config.upload.dir, f.stored_path);
+      // uploads 밖을 가리키거나 사라진 파일은 건너뛴다
+      if (!abs.startsWith(path.resolve(config.upload.dir) + path.sep)) continue;
+      if (!fs.existsSync(abs)) continue;
+
+      // 주차 / 기관 폴더 아래에 '기관명_이름_원본파일명' 으로 담는다.
+      //  풀어 놓아도 어느 기관 누구 것인지 파일 이름만 보고 알 수 있다.
+      const folder = [
+        safeFileName(String(f.week_label).replace(/\//g, '.')),
+        safeFileName(f.org_name || '소속없음'),
+      ].join('/');
+      const who = safeFileName(f.author_name || f.username || '작성자없음');
+      const org = safeFileName(f.org_name || '소속없음');
+
+      // 같은 폴더에 같은 이름이 있으면 (2), (3) 을 붙인다
+      let entry = `${folder}/${org}_${who}_${safeFileName(f.original_name)}`;
+      if (used.has(entry)) {
+        const dot = entry.lastIndexOf('.');
+        const stem = dot > 0 ? entry.slice(0, dot) : entry;
+        const ext = dot > 0 ? entry.slice(dot) : '';
+        let n = 2;
+        while (used.has(`${stem} (${n})${ext}`)) n += 1;
+        entry = `${stem} (${n})${ext}`;
+      }
+      used.add(entry);
+      zip.file(abs, { name: entry });
+      added += 1;
+    }
+
+    await audit.log(req, 'FILE_EXPORT_ZIP', {
+      targetType: weekId ? 'week' : null, targetId: weekId || null,
+      detail: `${name} (${added}건)`,
+    });
+    await zip.finalize();
+  } catch (err) { next(err); }
 });
 
 module.exports = router;
