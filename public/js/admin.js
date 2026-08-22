@@ -142,16 +142,19 @@
 
     const isAdmin = state.me.role === 'ADMIN';
     const isOrgAdmin = state.me.role === 'ORG_ADMIN';
+    // 주차별 현황판은 3사 전체를 보는 사람이 쓴다 (총괄·감독 관리자, 중복권한자)
+    const seesAll = isAdmin || state.me.role === 'SUPERVISOR'
+      || state.me.can_view_all === true;
     const allowed = {
       status: isAdmin,
-      matrix: isAdmin || !isOrgAdmin,          // 기관관리자는 현황판을 쓰지 않는다
+      matrix: seesAll,
       users: isAdmin || isOrgAdmin,
       audit: isAdmin,
     };
     $$('#admin-tabs button').forEach((b) => {
       b.classList.toggle('hidden', !allowed[b.dataset.tab]);
     });
-    if (!allowed[state.tab]) state.tab = isOrgAdmin ? 'users' : 'matrix';
+    if (!allowed[state.tab]) state.tab = allowed.matrix ? 'matrix' : 'users';
     $$('#admin-tabs button').forEach((b) => {
       b.classList.toggle('active', b.dataset.tab === state.tab);
     });
