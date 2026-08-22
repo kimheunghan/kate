@@ -180,12 +180,27 @@ textarea { resize: vertical; min-height: 60px; }
 /* 권한을 확인하기 전의 탭 줄. 자리는 잡아 두고 글자만 감춘다. */
 .tabs.pending { visibility: hidden; }
 
+/* 이름표 옆에 칸을 나란히 두는 줄 (권한 등) */
+.field.inline-row {
+  display: flex; flex-direction: row; align-items: center; gap: 10px;
+  margin-bottom: 0;
+}
+.field.inline-row > span {
+  display: inline-block; margin: 0; flex: 0 0 auto;
+  font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.field.inline-row > select { flex: 1 1 auto; }
+
 .role-cell { position: relative; display: inline-block; }
 .role-cell.has-dual { cursor: default; }
 .dual-mark {
   position: absolute; right: -2px; top: -4px; z-index: 1;
   color: #2c8f66; font-size: 12px; line-height: 1;
   pointer-events: none;
+}
+/* 글 안에 그냥 붙여 쓰는 별표 (목록 배지 위가 아니라 문장 속) */
+.dual-mark.inline {
+  position: static; margin-left: 2px; font-size: 12px; vertical-align: 1px;
 }
 
 /* 검색줄 안의 체크박스 (전체 조회 겸직 등) */

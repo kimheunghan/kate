@@ -629,9 +629,10 @@
           <div class="field-hl">
             <label class="field check-line">
               <input type="checkbox" id="e-view-all" ${u.can_view_all ? 'checked' : ''}>
-              <span><span class="mark">※</span> 중복권한 (등록 내역 및 주차별 현황판 조회 가능)</span>
+              <span><span class="mark">※</span> 중복권한<span class="dual-mark inline">★</span>
+                (등록 내역 및 주차별 현황판 조회 가능)</span>
             </label>
-            <label class="field"><span>권한</span>
+            <label class="field inline-row"><span>권한</span>
               <select id="e-role">
                 <option value="USER"       ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
                 <option value="ORG_ADMIN"  ${u.role === 'ORG_ADMIN' ? 'selected' : ''}>기관관리자</option>
