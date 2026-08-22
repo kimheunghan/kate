@@ -281,11 +281,12 @@
     $('#btn-excel-import').disabled = readOnly;
     $('#btn-excel-import').title = readOnly
       ? '본인이 작성한 보고서에서만 사용할 수 있습니다.' : '';
-    // 아직 저장 전이라도 세 칸이 차 있으면 저장한 뒤 내려받게 하므로
-    // 버튼은 열어 둔다. 남이 쓴 보고서일 때만 막는다.
-    $('#btn-print').disabled = readOnly;
-    $('#btn-export').disabled = readOnly;
-    $('#btn-export-hwpx').disabled = readOnly;
+    // 내려받기는 남이 쓴 보고서라도 막지 않는다.
+    //  볼 수 있으면 받을 수도 있어야 한다. 고치는 것만 막힌다.
+    //  (아직 저장 전이면 세 칸이 차 있을 때 저장한 뒤 내려받는다)
+    $('#btn-print').disabled = false;
+    $('#btn-export').disabled = false;
+    $('#btn-export-hwpx').disabled = false;
 
     // 삭제는 이미 등록된 내 보고서에만 쓴다
     const delBtn = $('#btn-delete');
@@ -515,17 +516,19 @@
       }
     };
 
-    // 저장 전이면 세 칸이 다 찼을 때 저장한 뒤 내려받는다
+    // 이미 등록된 보고서면 그대로 내려받는다 (남이 쓴 것도 받을 수 있다).
+    // 아직 저장 전이면 세 칸이 다 찼을 때 저장한 뒤 내려받는다.
+    const forDownload = async () => (state.report ? state.report : ensureSavedReport());
     $('#btn-print').onclick = async () => {
-      const r = await ensureSavedReport();
+      const r = await forDownload();
       if (r) openPrint(r.id);
     };
     $('#btn-export').onclick = async () => {
-      const r = await ensureSavedReport();
+      const r = await forDownload();
       if (r) downloadReport(r.id);
     };
     $('#btn-export-hwpx').onclick = async () => {
-      const r = await ensureSavedReport();
+      const r = await forDownload();
       if (r) downloadReportHwpx(r.id);
     };
   }
