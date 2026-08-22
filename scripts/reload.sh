@@ -49,11 +49,17 @@ bash scripts/fix-runtime-permissions.sh
 
 # 헬스체크 주소. 운영에서는 특정 IP 에만 포트를 열어 두어
 # 127.0.0.1 로는 닿지 않는다. 두 곳을 모두 시도한다.
+# .env 의 SSL_CERT_FILE 유무에 따라 앱이 HTTP/HTTPS 중 하나로 뜨므로 둘 다 시도한다.
+# (-k : 자체 서명 인증서를 쓰므로 검증을 건너뛴다)
 health_ok() {
-  curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1 && return 0
   local ip
   ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
-  [[ -n "${ip}" ]] && curl -fsS "http://${ip}:${PORT}/api/health" >/dev/null 2>&1
+  local h
+  for h in 127.0.0.1 ${ip}; do
+    curl -fsSk "https://${h}:${PORT}/api/health" >/dev/null 2>&1 && return 0
+    curl -fsS  "http://${h}:${PORT}/api/health"  >/dev/null 2>&1 && return 0
+  done
+  return 1
 }
 
 echo "[*] 이미지 빌드"
