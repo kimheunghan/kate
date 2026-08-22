@@ -428,11 +428,11 @@ router.post('/users', userManager, async (req, res, next) => {
     // 감독 기관 소속은 언제나 감독관리자
     if (await isSupervisorOrg(orgId)) role = 'SUPERVISOR';
 
-    // 전체 조회 겸직은 총괄관리자만 줄 수 있다.
-    // 이미 전체를 보는 권한(총괄·감독)에는 의미가 없으므로 끈다.
+    // 중복권한은 총괄관리자가 기관관리자에게만 준다.
+    //  작성자는 본인 보고서만 다루고, 총괄·감독 관리자는 이미 전체를 본다.
     const canViewAll = req.user.role === 'ADMIN'
       && req.body?.can_view_all === true
-      && role !== 'ADMIN' && role !== 'SUPERVISOR';
+      && role === 'ORG_ADMIN';
 
     // 기관 관리자는 자기 기관에만, 그리고 전체 관리자는 만들 수 없다
     if (req.user.role === 'ORG_ADMIN') {
@@ -549,14 +549,21 @@ router.put('/users/:id(\\d+)', userManager, async (req, res, next) => {
       }
     }
 
-    // 전체 조회 겸직은 총괄관리자만 바꿀 수 있다
+    // 중복권한은 총괄관리자가 기관관리자에게만 준다
     let canViewAll;
     if (req.user.role === 'ADMIN'
         && Object.prototype.hasOwnProperty.call(req.body || {}, 'can_view_all')) {
       canViewAll = req.body.can_view_all === true;
     }
-    // 이미 전체를 보는 권한이면 겸직 표시는 꺼 둔다
-    if (role === 'ADMIN' || role === 'SUPERVISOR') canViewAll = false;
+    if (canViewAll) {
+      // 바꾸려는 권한이 없으면 지금 저장된 권한을 본다
+      let target = role;
+      if (!target) {
+        const { rows: cur } = await db.query(`SELECT role FROM wr.users WHERE id = $1`, [id]);
+        target = cur[0]?.role || null;
+      }
+      if (target !== 'ORG_ADMIN') canViewAll = false;
+    }
 
     const { rows } = await db.query(
       `UPDATE wr.users

@@ -63,13 +63,13 @@
         if (isSupervisor) dutySel.value = '';
       }
 
-      // 전체 조회 겸직은 3사 소속에게만 뜻이 있다.
-      // 총괄·감독 관리자는 이미 전체를 보므로 칸 자체를 감춘다.
+      // 중복권한은 기관관리자에게만 준다.
+      //  작성자는 본인 보고서만 다루고, 총괄·감독 관리자는 이미 전체를 본다.
       if (viewAllChk) {
-        const seesAll = roleSel.value === 'ADMIN' || isSupervisor;
-        if (seesAll) viewAllChk.checked = false;
+        const canDual = roleSel.value === 'ORG_ADMIN';
+        if (!canDual) viewAllChk.checked = false;
         const holder = viewAllChk.closest('label') || viewAllChk;
-        holder.classList.toggle('hidden', seesAll);
+        holder.classList.toggle('hidden', !canDual);
         viewAllChk.title =
           '등록 내역 및 주차별 현황판 조회 가능. 참여 인력 자격은 그대로입니다.';
       }
@@ -627,11 +627,6 @@
           <p class="small muted" style="margin:-6px 0 12px">
             <span class="mark">※</span> 비워 두면 기존 비밀번호가 유지됩니다.</p>
           <div class="field-hl">
-            <label class="field check-line">
-              <input type="checkbox" id="e-view-all" ${u.can_view_all ? 'checked' : ''}>
-              <span><span class="mark">※</span> 중복권한<span class="dual-mark inline">★</span>
-                (등록 내역 및 주차별 현황판 조회 가능)</span>
-            </label>
             <label class="field inline-row"><span>권한</span>
               <select id="e-role">
                 <option value="USER"       ${u.role === 'USER' ? 'selected' : ''}>작성자</option>
@@ -639,6 +634,11 @@
                 <option value="SUPERVISOR" ${u.role === 'SUPERVISOR' ? 'selected' : ''}>감독관리자</option>
                 <option value="ADMIN"      ${u.role === 'ADMIN' ? 'selected' : ''}>총괄관리자</option>
               </select>
+            </label>
+            <label class="field check-line mt8">
+              <input type="checkbox" id="e-view-all" ${u.can_view_all ? 'checked' : ''}>
+              <span><span class="mark">※</span> 중복권한<span class="dual-mark inline">★</span>
+                (등록 내역 및 주차별 현황판 조회 가능)</span>
             </label>
           </div>
         </div>
