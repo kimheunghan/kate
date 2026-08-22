@@ -63,10 +63,12 @@
         if (isSupervisor) dutySel.value = '';
       }
 
-      // 중복권한은 기관관리자에게만 준다.
+      // 중복권한은 총괄관리자가 기관관리자에게만 준다.
       //  작성자는 본인 보고서만 다루고, 총괄·감독 관리자는 이미 전체를 본다.
+      //  기관관리자는 이 칸을 다루지 못하므로 아예 보이지 않는다.
       if (viewAllChk) {
-        const canDual = roleSel.value === 'ORG_ADMIN';
+        const iAmAdmin = state.me && state.me.role === 'ADMIN';
+        const canDual = iAmAdmin && roleSel.value === 'ORG_ADMIN';
         if (!canDual) viewAllChk.checked = false;
         const holder = viewAllChk.closest('label') || viewAllChk;
         holder.classList.toggle('hidden', !canDual);
