@@ -285,17 +285,11 @@
       <button class="btn sm" id="btn-logout">로그아웃</button>`;
   }
 
-  /** 사업단 현판. 벽 없이 판만 그린다 (사진이 아니라 글자라 늘려도 또렷하다) */
+  /** 사업단 현판 (실제 현판 사진에서 벽을 잘라 내고 판만 남긴 것) */
   function openBrandPlate() {
     const back = document.createElement('div');
     back.className = 'plate-back';
-    back.innerHTML = `
-      <div class="plate" role="img" aria-label="AI 인허가 사업단 현판">
-        <div class="plate-in">
-          <div class="plate-title">AI 인허가 사업단</div>
-          <div class="plate-sub">국토교통부 · 과학기술정보통신부</div>
-        </div>
-      </div>`;
+    back.innerHTML = '<img class="plate" src="/img/plate.jpg" alt="AI 인허가 사업단 현판">';
     const close = () => back.remove();
     back.addEventListener('click', close);
     document.addEventListener('keydown', function esc(e) {
