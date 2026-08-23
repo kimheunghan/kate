@@ -289,7 +289,7 @@
   function openBrandPlate() {
     const back = document.createElement('div');
     back.className = 'plate-back';
-    back.innerHTML = '<img class="plate" src="/img/plate.jpg" alt="AI 인허가 사업단 현판">';
+    back.innerHTML = '<img class="plate" src="/img/plate.png" alt="AI 인허가 사업단 현판">';
     const close = () => back.remove();
     back.addEventListener('click', close);
     document.addEventListener('keydown', function esc(e) {
