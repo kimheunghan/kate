@@ -192,17 +192,26 @@ textarea { resize: vertical; min-height: 60px; }
 .plate-wrap {
   display: flex; flex-direction: column; align-items: center; gap: 22px;
 }
-.plate-nav { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.plate-nav { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
 /* 링크로 만든 단추라 밑줄이 남는다. 지우고 크게 키운다. */
 .plate-nav .btn {
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 168px; padding: 13px 26px;
-  font-size: 17px; font-weight: 700; letter-spacing: -.2px;
-  text-decoration: none; border-radius: 10px;
-  transition: transform .12s, box-shadow .12s, background .12s;
+  min-width: 200px; padding: 16px 32px;
+  font-size: 21px; font-weight: 800; letter-spacing: -.3px;
+  text-decoration: none; border-radius: 12px;
+  transition: transform .12s, box-shadow .12s, filter .12s;
 }
-.plate-nav .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0, 0, 0, .35); }
-.plate-nav .btn:active { transform: translateY(0); }
+/* 마우스를 올리면 도드라져 보이게 — 위로 뜨고 그늘이 깊어지고 테두리에 빛이 돈다 */
+.plate-nav .btn:hover {
+  transform: translateY(-3px);
+  filter: brightness(1.06);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, .5),
+              inset 0 1px 0 rgba(255, 255, 255, .55);
+}
+.plate-nav .btn:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .45), inset 0 2px 5px rgba(0, 0, 0, .25);
+}
 img.plate {
   display: block;
   max-width: min(860px, 92vw); max-height: 86vh;
