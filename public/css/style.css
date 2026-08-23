@@ -180,8 +180,10 @@ textarea { resize: vertical; min-height: 60px; }
 /* ------------------------------------------------ 사업단 현판
    사진이 아니라 글자와 색으로 그린다. 벽 없이 판만 나오고,
    화면이 커져도 흐려지지 않는다. */
-#btn-brand { cursor: pointer; }
-#btn-brand:hover { text-decoration: underline; text-underline-offset: 4px; }
+/* 제목은 로고 자리라 밑줄을 긋지 않는다. 밝기만 살짝 바꿔 누를 수 있음을 알린다. */
+#btn-brand { cursor: pointer; transition: opacity .12s; }
+#btn-brand:hover { opacity: .82; }
+#btn-brand:active { opacity: .7; }
 
 .plate-back {
   position: fixed; inset: 0; z-index: 1200;
