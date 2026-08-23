@@ -265,11 +265,7 @@
   /** 공통 상단바 렌더 */
   function renderTopbar(user, active) {
     const nav = [{ href: '/report', key: 'report', label: '주간보고' }];
-    // 관리자 화면 : 총괄관리자(전부) · 감독관리자와 중복권한자(주차별 현황판)
-    //               · 기관관리자(사용자 관리)
-    const seesAdmin = ['ADMIN', 'SUPERVISOR', 'ORG_ADMIN'].includes(user.role)
-      || user.can_view_all === true;
-    if (seesAdmin) nav.push({ href: '/admin', key: 'admin', label: '관리화면' });
+    if (canSeeAdmin(user)) nav.push({ href: '/admin', key: 'admin', label: '관리화면' });
 
     return `
       <h1 id="btn-brand" title="사업단 현판 보기">주간실적 보고 시스템</h1>
@@ -285,11 +281,31 @@
       <button class="btn sm" id="btn-logout">로그아웃</button>`;
   }
 
+  /**
+   * 관리화면을 쓸 수 있는 사람인가.
+   *   총괄관리자(전부) · 감독관리자와 중복권한자(주차별 현황판) · 기관관리자(사용자 관리)
+   *   작성자는 쓸 수 없다.
+   */
+  function canSeeAdmin(user) {
+    return !!user
+      && (['ADMIN', 'SUPERVISOR', 'ORG_ADMIN'].includes(user.role) || user.can_view_all === true);
+  }
+
   /** 사업단 현판 (실제 현판 사진에서 벽을 잘라 내고 판만 남긴 것) */
   function openBrandPlate() {
+    const me = cachedMe();
     const back = document.createElement('div');
     back.className = 'plate-back';
-    back.innerHTML = '<img class="plate" src="/img/plate.png" alt="AI 인허가 사업단 현판">';
+    back.innerHTML = `
+      <div class="plate-wrap">
+        <img class="plate" src="/img/plate.png" alt="AI 인허가 사업단 현판">
+        <nav class="plate-nav">
+          <a class="btn" href="/report">주간보고</a>
+          ${canSeeAdmin(me) ? '<a class="btn primary" href="/admin">관리화면</a>' : ''}
+        </nav>
+      </div>`;
+    // 단추를 누를 때는 닫기가 먼저 끼어들지 않게 한다
+    back.querySelector('.plate-nav').addEventListener('click', (e) => e.stopPropagation());
     const close = () => back.remove();
     back.addEventListener('click', close);
     document.addEventListener('keydown', function esc(e) {
