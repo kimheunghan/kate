@@ -114,11 +114,11 @@ router.get('/status', auth.requireStatusView, async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------
-// GET /api/admin/overview?weeks=8  — 최근 N주 × 기관별 제출 인원
+// GET /api/admin/overview?weeks=4  — 최근 N주 × 기관별 제출 인원
 // ---------------------------------------------------------------------
 router.get('/overview', auth.requireMatrixView, async (req, res, next) => {
   try {
-    const n = Math.min(Math.max(Number(req.query.weeks) || 8, 1), 26);
+    const n = Math.min(Math.max(Number(req.query.weeks) || 4, 1), 26);
     const { rows: weeks } = await db.query(
       `SELECT id, label, start_date
          FROM wr.report_weeks

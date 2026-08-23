@@ -338,7 +338,7 @@
   // 2. 주차별 현황판 (매트릭스)
   // ==================================================================
   async function renderMatrix(n) {
-    const weeks = n || 8;
+    const weeks = n || 4;          // 처음에는 최근 4주만 (칸이 많으면 한눈에 안 들어온다)
     const res = await api.get(`/api/admin/overview?weeks=${weeks}`);
     if (!res.weeks.length) { body().innerHTML = '<div class="empty">데이터가 없습니다.</div>'; return; }
 
