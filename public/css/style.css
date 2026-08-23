@@ -209,7 +209,13 @@ textarea { resize: vertical; min-height: 60px; }
   filter: brightness(1.12);
   box-shadow: 0 18px 34px rgba(0, 0, 0, .55),
               inset 0 -5px 0 #f0b429,
-              inset 0 2px 0 rgba(255, 255, 255, .6);
+              inset 0 4px 0 var(--primary);      /* 밝은 단추 : 파란 띠 */
+}
+/* 짙은 단추 위에서는 파란 띠가 묻히므로 흰 띠로 바꾼다 */
+.plate-nav .btn.primary:hover {
+  box-shadow: 0 18px 34px rgba(0, 0, 0, .55),
+              inset 0 -5px 0 #f0b429,
+              inset 0 4px 0 rgba(255, 255, 255, .85);
 }
 .plate-nav .btn:active {
   transform: translateY(0) scale(1);
