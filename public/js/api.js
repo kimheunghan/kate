@@ -272,7 +272,7 @@
     if (seesAdmin) nav.push({ href: '/admin', key: 'admin', label: '관리자' });
 
     return `
-      <h1>주간실적 보고 시스템</h1>
+      <h1 id="btn-brand" title="사업단 현판 보기">주간실적 보고 시스템</h1>
       <nav>${nav.map((n) =>
         `<a href="${n.href}" class="${n.key === active ? 'active' : ''}">${esc(n.label)}</a>`).join('')}</nav>
       <div class="spacer"></div>
@@ -285,7 +285,29 @@
       <button class="btn sm" id="btn-logout">로그아웃</button>`;
   }
 
+  /** 사업단 현판. 벽 없이 판만 그린다 (사진이 아니라 글자라 늘려도 또렷하다) */
+  function openBrandPlate() {
+    const back = document.createElement('div');
+    back.className = 'plate-back';
+    back.innerHTML = `
+      <div class="plate" role="img" aria-label="AI 인허가 사업단 현판">
+        <div class="plate-in">
+          <div class="plate-title">AI 인허가 사업단</div>
+          <div class="plate-sub">국토교통부 · 과학기술정보통신부</div>
+        </div>
+      </div>`;
+    const close = () => back.remove();
+    back.addEventListener('click', close);
+    document.addEventListener('keydown', function esc(e) {
+      if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
+    });
+    document.body.appendChild(back);
+  }
+
   function bindTopbar() {
+    const brand = $('#btn-brand');
+    if (brand) brand.onclick = openBrandPlate;
+
     const logout = $('#btn-logout');
     if (logout) {
       logout.onclick = async () => {

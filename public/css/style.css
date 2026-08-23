@@ -177,6 +177,44 @@ textarea { resize: vertical; min-height: 60px; }
 .badge.role-super { background: #dcefe6; color: #2c6b52; }
 /* 중복권한 표식. 권한 배지 오른쪽 위 모서리에 겹쳐 얹는다.
    배지를 감싼 칸을 기준으로 잡아야 테두리 위로 올라온다. */
+/* ------------------------------------------------ 사업단 현판
+   사진이 아니라 글자와 색으로 그린다. 벽 없이 판만 나오고,
+   화면이 커져도 흐려지지 않는다. */
+#btn-brand { cursor: pointer; }
+#btn-brand:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+.plate-back {
+  position: fixed; inset: 0; z-index: 1200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: rgba(16, 20, 26, .78);
+}
+.plate {
+  width: min(760px, 92vw);
+  aspect-ratio: 16 / 9;
+  display: flex; align-items: center; justify-content: center;
+  padding: clamp(10px, 1.6vw, 18px);
+  border-radius: 6px;
+  /* 놋쇠 판 : 위아래로 살짝 밝기 차를 줘 금속처럼 보이게 한다 */
+  background:
+    linear-gradient(160deg, #f3dc9a 0%, #d9b45e 26%, #c79a3c 52%, #e6c87e 74%, #b8862c 100%);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255, 255, 255, .35);
+}
+.plate-in {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: clamp(10px, 2vw, 22px);
+  border: 2px solid rgba(60, 40, 6, .55);
+  border-radius: 3px;
+}
+.plate-title {
+  font-size: clamp(30px, 6.4vw, 66px); font-weight: 800; letter-spacing: -.5px;
+  color: #241a04; text-shadow: 0 1px 0 rgba(255, 255, 255, .45);
+}
+.plate-sub {
+  font-size: clamp(13px, 2.3vw, 23px); font-weight: 700;
+  color: #3a2c08; text-shadow: 0 1px 0 rgba(255, 255, 255, .35);
+}
+
 /* 권한을 확인하기 전의 탭 줄. 자리는 잡아 두고 글자만 감춘다. */
 .tabs.pending { visibility: hidden; }
 
