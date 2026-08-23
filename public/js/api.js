@@ -269,7 +269,7 @@
     //               · 기관관리자(사용자 관리)
     const seesAdmin = ['ADMIN', 'SUPERVISOR', 'ORG_ADMIN'].includes(user.role)
       || user.can_view_all === true;
-    if (seesAdmin) nav.push({ href: '/admin', key: 'admin', label: '관리자' });
+    if (seesAdmin) nav.push({ href: '/admin', key: 'admin', label: '관리화면' });
 
     return `
       <h1 id="btn-brand" title="사업단 현판 보기">주간실적 보고 시스템</h1>
