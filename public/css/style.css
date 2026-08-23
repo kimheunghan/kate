@@ -204,12 +204,9 @@ textarea { resize: vertical; min-height: 60px; }
 }
 /* 마우스를 올리면 확 튀어나오게 — 커지고, 위로 뜨고,
    상단 메뉴에서 고른 항목과 같은 황색 띠가 아래에 깔린다 */
-/* 밝은 바탕의 짙은 글씨는 같은 굵기라도 얇아 보인다. 색을 진하게 하고
-   획을 아주 살짝 두껍게 해서 짙은 단추와 무게를 맞춘다. */
-.plate-nav .btn:not(.primary) {
-  color: var(--primary-dk);
-  -webkit-text-stroke: .5px currentColor;
-}
+/* 밝은 바탕의 짙은 글씨는 얇아 보인다. 색만 진하게 한다.
+   (획을 두껍게 하면 가장자리가 번져 그늘처럼 보인다) */
+.plate-nav .btn:not(.primary) { color: var(--primary-dk); }
 
 .plate-nav .btn:hover {
   transform: translateY(-5px) scale(1.06);
