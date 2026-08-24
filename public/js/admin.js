@@ -518,9 +518,14 @@
                 }</td>
                 <td class="small">${fmtDateTime(u.last_login_at)}</td>
                 <td class="center nowrap">
-                  <button class="btn sm" data-uedit="${u.id}">권한</button>
-                  ${(orgFixed && (u.role === 'ADMIN' || u.role === 'SUPERVISOR'))
-                    ? '' : `<button class="btn sm danger" data-udel="${u.id}">삭제</button>`}
+                  ${/* 기관관리자에게 총괄·감독 관리자는 상위 관리자라 손댈 수 없다.
+                        서버도 막는 자리이므로 버튼은 두되 비활성으로 보여 준다. */''}
+                  ${(() => {
+                    const locked = orgFixed && (u.role === 'ADMIN' || u.role === 'SUPERVISOR');
+                    const t = locked ? ' disabled title="상위 관리자는 변경할 수 없습니다."' : '';
+                    return `<button class="btn sm" data-uedit="${u.id}"${t}>권한</button>
+                            <button class="btn sm danger" data-udel="${u.id}"${t}>삭제</button>`;
+                  })()}
                 </td>
               </tr>`).join('')}
           </tbody>
