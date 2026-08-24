@@ -202,6 +202,13 @@
     const orgId = Number($('#sel-org').value);
     if (!weekId) return;
     if (!orgId) {
+      // 기관이 정해지지 않아 보고서는 못 읽지만, 고른 주차는 그대로 보여 준다.
+      //  머리글까지 비면 화면이 통째로 빈 것처럼 보인다.
+      const week = state.weeks.find((w) => w.id === weekId);
+      $('#editor-title').textContent = week ? week.label : '';
+      $('#editor-badge').innerHTML = statusBadge('NONE');
+      updateTableHeads(week);
+
       // 총괄관리자는 소속 없이 운영하는 자리라 배정을 요청할 상대가 없다.
       //  (소속이 없으면 등록 내역·활동 로그 집계에서 빠진다 — lib/audit.js 참고)
       $('#write-status').innerHTML = state.me.role === 'ADMIN'
