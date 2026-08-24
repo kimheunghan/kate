@@ -558,8 +558,8 @@
         !payload.password ? ['#u-pw', '초기 비밀번호를 입력하세요.'] :
         payload.password.length < 8 ? ['#u-pw', '초기 비밀번호는 8자 이상이어야 합니다.'] :
         (payload.role !== 'ADMIN' && !payload.org_id) ? ['#u-org', '기관을 선택하세요.'] :
-        // 감독관리자는 참여 인력이 아니라 담당 역할이 없다
-        (payload.role !== 'SUPERVISOR' && !payload.duty)
+        // 감독관리자와 소속 없는 계정은 참여 인력이 아니라 담당 역할이 없다
+        (payload.role !== 'SUPERVISOR' && payload.org_id && !payload.duty)
           ? ['#u-duty', '담당 역할을 선택하세요.'] : null;
 
       if (problem) {
@@ -584,10 +584,25 @@
     body().querySelectorAll('[data-udel]').forEach((b) => {
       b.onclick = async () => {
         const u = find(b.dataset.udel);
-        if (!confirm(`"${u.username}" 계정을 삭제할까요?`)) return;
+        // 소속이 없는 계정(admin 같은 운영용)은 활동 로그가 남지 않는다.
+        //  되돌릴 수 없는 작업이라 그 사실을 미리 알린다. (lib/audit.js 참고)
+        const logKept = !!(state.me && state.me.org_id);
+        const cnt = Number(u.report_count) || 0;
+        if (!confirm(
+          `"${u.username}" (${u.name}) 계정을 삭제합니다.\n\n` +
+          `· 이 사람이 작성한 보고서${cnt ? ` ${cnt}건` : ''}와 증적자료 파일이 함께 삭제됩니다.\n` +
+          `· 삭제된 보고서는 기관 실적 집계에서도 빠집니다.\n` +
+          `· 되돌릴 수 없습니다.\n\n` +
+          (logKept
+            ? `이 삭제는 활동 로그에 기록됩니다.`
+            : `[주의] 지금 로그인한 계정은 소속이 없어\n` +
+              `이 삭제가 활동 로그에 남지 않습니다.\n` +
+              `기록이 필요하면 소속이 있는 총괄관리자로 삭제하세요.`)
+        )) return;
         try {
-          await api.del(`/api/admin/users/${u.id}`);
-          toast('삭제되었습니다.'); renderUsers();
+          const r = await api.del(`/api/admin/users/${u.id}`);
+          toast(`삭제되었습니다. (보고서 ${r.reports}건 · 증적자료 ${r.files}건 함께 삭제)`);
+          renderUsers();
         } catch (e) { toast(e.message, true); }
       };
     });
@@ -719,8 +734,8 @@
         }
       }
 
-      // 감독관리자는 참여 인력이 아니라 담당 역할이 없다
-      if (payload.role !== 'SUPERVISOR' && !payload.duty) {
+      // 감독관리자와 소속 없는 계정은 참여 인력이 아니라 담당 역할이 없다
+      if (payload.role !== 'SUPERVISOR' && payload.org_id && !payload.duty) {
         toast('담당 역할을 선택하세요.', true);
         $('#e-duty', back).focus();
         return;

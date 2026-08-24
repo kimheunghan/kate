@@ -451,8 +451,10 @@ router.post('/users', userManager, async (req, res, next) => {
     if (!password) return res.status(400).json({ error: '초기 비밀번호를 입력하세요.' });
     if (password.length < 8) return res.status(400).json({ error: '초기 비밀번호는 8자 이상이어야 합니다.' });
     if (role !== 'ADMIN' && !orgId) return res.status(400).json({ error: '기관을 선택하세요.' });
-    // 감독관리자는 참여 인력이 아니라 담당 역할이 없다
-    if (role !== 'SUPERVISOR' && !['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty)) {
+    // 감독관리자와 소속 없는 계정(순수 시스템 관리자)은
+    // 참여 인력이 아니라 담당 역할이 없다
+    if (role !== 'SUPERVISOR' && orgId
+        && !['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty)) {
       return res.status(400).json({ error: '담당 역할을 선택하세요.' });
     }
     // 총괄책임자는 기관에 한 명뿐이라 기관관리자가 새로 지정하지 못한다
@@ -480,7 +482,8 @@ router.post('/users', userManager, async (req, res, next) => {
        ON CONFLICT (username) DO NOTHING
        RETURNING id, username, name, email, role, org_id, duty, can_view_all, is_active`,
       [username, auth.hashPassword(password), name, req.body?.email || null, role, orgId,
-       (role !== 'SUPERVISOR' && ['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty))
+       (role !== 'SUPERVISOR' && orgId
+        && ['LEAD', 'MANAGER', 'RESEARCHER'].includes(req.body?.duty))
          ? req.body.duty : null,
        canViewAll]
     );
@@ -546,8 +549,9 @@ router.put('/users/:id(\\d+)', userManager, async (req, res, next) => {
     const DUTIES = ['LEAD', 'MANAGER', 'RESEARCHER'];
     let duty;
     if (Object.prototype.hasOwnProperty.call(req.body || {}, 'duty')) {
-      // 감독관리자는 참여 인력이 아니라 담당 역할이 없다
-      if (req.body.role === 'SUPERVISOR') {
+      // 감독관리자와 소속 없는 계정(순수 시스템 관리자)은
+      // 참여 인력이 아니라 담당 역할이 없다
+      if (req.body.role === 'SUPERVISOR' || !newOrgId) {
         duty = null;
       } else {
         if (!DUTIES.includes(req.body.duty)) {
@@ -635,14 +639,41 @@ router.post('/users/:id(\\d+)/password', userManager, async (req, res, next) => 
   } catch (err) { next(err); }
 });
 
+// 사용자를 지우면 그 사람이 쓴 보고서와 증적자료도 함께 지운다.
+//  활동 로그만 남긴다 : audit_logs.user_id 는 SET NULL 이 되지만
+//  username·user_name 이 값으로 복사돼 있어 누구였는지는 그대로 남는다.
 router.delete('/users/:id(\\d+)', adminOnly, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     if (id === req.user.id) return res.status(400).json({ error: '본인 계정은 삭제할 수 없습니다.' });
-    const { rows } = await db.query(`DELETE FROM wr.users WHERE id = $1 RETURNING username`, [id]);
-    if (!rows[0]) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
-    await audit.log(req, 'USER_DELETE', { targetType: 'user', targetId: id, detail: rows[0].username });
-    res.json({ ok: true });
+
+    const { rows: urows } = await db.query(
+      `SELECT username, name FROM wr.users WHERE id = $1`, [id]
+    );
+    if (!urows[0]) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+
+    const { rows: reps } = await db.query(
+      `SELECT r.id,
+              (SELECT count(*)::int FROM wr.attachments a WHERE a.report_id = r.id) AS files
+         FROM wr.reports r WHERE r.author_id = $1`, [id]
+    );
+    const fileCount = reps.reduce((n, r) => n + r.files, 0);
+
+    // 물리 파일 정리는 files 라우터의 헬퍼를 재사용
+    const { removeFilesOfReport } = require('./files');
+    for (const r of reps) await removeFilesOfReport(r.id);
+
+    await db.tx(async (client) => {
+      // 항목(report_items)·첨부(attachments) 는 CASCADE 로 함께 지워진다
+      await client.query(`DELETE FROM wr.reports WHERE author_id = $1`, [id]);
+      await client.query(`DELETE FROM wr.users   WHERE id = $1`, [id]);
+    });
+
+    await audit.log(req, 'USER_DELETE', {
+      targetType: 'user', targetId: id,
+      detail: `${urows[0].username}(${urows[0].name}) · 보고서 ${reps.length}건 · 증적자료 ${fileCount}건 함께 삭제`,
+    });
+    res.json({ ok: true, reports: reps.length, files: fileCount });
   } catch (err) { next(err); }
 });
 
