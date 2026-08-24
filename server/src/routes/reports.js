@@ -787,12 +787,13 @@ async function fixHwpxLayout(buf, ratios) {
 
   // 세로(A4) 는 칸이 좁아 글이 자꾸 다음 줄로 넘어간다.
   // 본문 7pt / 표 제목 8.5pt / 문서 제목 15pt.
-  head = head.replace(/<hh:charPr id="0" height="\d+"/, '<hh:charPr id="0" height="700"');
-  head = head.replace(/<hh:charPr id="2" height="\d+"/, '<hh:charPr id="2" height="700"');
-  head = head.replace(/<hh:charPr id="4" height="\d+"/, '<hh:charPr id="4" height="700"');
-  head = head.replace(/<hh:charPr id="1" height="\d+"/, '<hh:charPr id="1" height="850"');
-  head = head.replace(/<hh:charPr id="3" height="\d+"/, '<hh:charPr id="3" height="850"');
-  head = head.replace(/<hh:charPr id="5" height="\d+"/, '<hh:charPr id="5" height="1500"');
+  //  id 를 하나씩 짚어 고치면, 다른 곳(엑셀·워드·한글·웹)에서 붙여넣어
+  //  색·배경색 같은 서식이 따라온 글은 변환기가 charPr 을 새로 만들어 쓰기
+  //  때문에 목록에서 빠져 한글 기본값(10pt)으로 남는다. 실제로 붙여넣은
+  //  칸만 커 보이는 일이 있었다. 아는 자리만 지정하고 나머지는 본문으로.
+  const CHAR_HEIGHT = { 1: 850, 3: 850, 5: 1500 };   // 표 제목 8.5pt · 문서 제목 15pt
+  head = head.replace(/<hh:charPr id="(\d+)" height="\d+"/g,
+    (_, id) => `<hh:charPr id="${id}" height="${CHAR_HEIGHT[id] || 700}"`);
 
   // 글꼴을 전부 휴먼명조로. (기본은 함초롬바탕/바탕/Times New Roman 이 섞여 나온다)
   head = head.replace(/(<hh:font\b[^>]*\bface=")[^"]*/g, '$1휴먼명조');
