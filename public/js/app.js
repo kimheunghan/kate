@@ -87,19 +87,11 @@
     $('#sel-org').innerHTML = opts;
     $('#f-org').innerHTML = '<option value="">전체</option>' + opts;
 
-    // 보고서는 언제나 "본인 소속 기관" 으로 저장된다. 그래서 평소에는 숨긴다.
-    // 다만 소속이 없는 총괄관리자는 어느 기관으로 쓸지 정할 방법이 있어야 한다.
-    //  (서버도 총괄관리자에 한해 화면에서 고른 기관을 받는다 — routes/reports.js resolveOrgId)
+    // 보고서는 언제나 "본인 소속 기관" 으로 저장된다.
+    // 총괄관리자도 마찬가지라 고를 일이 없어 화면에는 보이지 않는다.
     const orgSel = $('#sel-org');
-    const needsPick = state.me.role === 'ADMIN' && !state.me.org_id;
-    if (needsPick) {
-      orgSel.innerHTML = '<option value="">기관을 선택하세요</option>' + opts;
-      orgSel.value = '';
-      $('#sel-org-field').classList.remove('hidden');
-    } else {
-      orgSel.value = state.me.org_id || '';
-      $('#sel-org-field').classList.add('hidden');
-    }
+    orgSel.value = state.me.org_id || '';
+    orgSel.classList.add('hidden');
   }
 
   /** 표 위의 공용 툴바를 만든다 (칸마다 툴바를 붙이지 않기 위함) */
@@ -202,18 +194,11 @@
     const orgId = Number($('#sel-org').value);
     if (!weekId) return;
     if (!orgId) {
-      // 기관이 정해지지 않아 보고서는 못 읽지만, 고른 주차는 그대로 보여 준다.
-      //  머리글까지 비면 화면이 통째로 빈 것처럼 보인다.
-      const week = state.weeks.find((w) => w.id === weekId);
-      $('#editor-title').textContent = week ? week.label : '';
-      $('#editor-badge').innerHTML = statusBadge('NONE');
-      updateTableHeads(week);
-
-      // 총괄관리자는 소속 없이 운영하는 자리라 배정을 요청할 상대가 없다.
-      //  (소속이 없으면 등록 내역·활동 로그 집계에서 빠진다 — lib/audit.js 참고)
+      // 기관이 없으면 보고서를 읽어 올 수 없다. 그래도 주차·표·작성란은
+      //  빈 보고서와 똑같이 그려 준다. 안내만 다르게 붙인다.
+      applyReport(null, weekId, orgId);
       $('#write-status').innerHTML = state.me.role === 'ADMIN'
-        ? '<div class="alert">admin 관리자는 소속 기관이 없어 보고서 작성은 등록 내역에 표시되지 않습니다.'
-          + ' 위에서 기관을 고르면 그 기관 보고서로 작성할 수 있습니다.</div>'
+        ? '<div class="alert">admin 관리자는 소속 기관이 없어 보고서 작성은 등록 내역에 표시되지 않습니다.</div>'
         : '<div class="alert error">소속 기관이 지정되지 않았습니다. 관리자에게 기관 배정을 요청하세요.</div>';
       return;
     }
