@@ -472,9 +472,11 @@
         </label>
         <label class="sb-field" style="flex:0 0 200px">
           <span>기관</span>
-          <select id="u-forg">
-            <option value="">전체</option>
-            ${orgsRes.orgs.map((o) =>
+          <select id="u-forg" ${orgFixed ? 'disabled' : ''}>
+            ${orgFixed ? '' : '<option value="">전체</option>'}
+            ${orgsRes.orgs
+              .filter((o) => !orgFixed || Number(o.id) === Number(state.me.org_id))
+              .map((o) =>
               `<option value="${o.id}" ${String(f.org) === String(o.id) ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
           </select>
         </label>
@@ -517,7 +519,8 @@
                 <td class="small">${fmtDateTime(u.last_login_at)}</td>
                 <td class="center nowrap">
                   <button class="btn sm" data-uedit="${u.id}">권한</button>
-                  ${orgFixed ? '' : `<button class="btn sm danger" data-udel="${u.id}">삭제</button>`}
+                  ${(orgFixed && (u.role === 'ADMIN' || u.role === 'SUPERVISOR'))
+                    ? '' : `<button class="btn sm danger" data-udel="${u.id}">삭제</button>`}
                 </td>
               </tr>`).join('')}
           </tbody>

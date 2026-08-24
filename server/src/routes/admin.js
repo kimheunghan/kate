@@ -642,15 +642,26 @@ router.post('/users/:id(\\d+)/password', userManager, async (req, res, next) => 
 // 사용자를 지우면 그 사람이 쓴 보고서와 증적자료도 함께 지운다.
 //  활동 로그만 남긴다 : audit_logs.user_id 는 SET NULL 이 되지만
 //  username·user_name 이 값으로 복사돼 있어 누구였는지는 그대로 남는다.
-router.delete('/users/:id(\\d+)', adminOnly, async (req, res, next) => {
+router.delete('/users/:id(\\d+)', userManager, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     if (id === req.user.id) return res.status(400).json({ error: '본인 계정은 삭제할 수 없습니다.' });
 
     const { rows: urows } = await db.query(
-      `SELECT username, name FROM wr.users WHERE id = $1`, [id]
+      `SELECT username, name, role, org_id FROM wr.users WHERE id = $1`, [id]
     );
     if (!urows[0]) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+
+    // 기관관리자는 자기 기관 사람만, 그리고 총괄·감독 관리자는 손대지 못한다.
+    //  (사용자 수정 쪽과 같은 기준)
+    if (req.user.role === 'ORG_ADMIN') {
+      if (Number(urows[0].org_id) !== Number(req.user.org_id)) {
+        return res.status(403).json({ error: '다른 기관 사용자는 삭제할 수 없습니다.' });
+      }
+      if (urows[0].role === 'ADMIN' || urows[0].role === 'SUPERVISOR') {
+        return res.status(403).json({ error: '총괄·감독 관리자는 삭제할 수 없습니다.' });
+      }
+    }
 
     const { rows: reps } = await db.query(
       `SELECT r.id,
