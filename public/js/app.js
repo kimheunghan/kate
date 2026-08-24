@@ -194,8 +194,11 @@
     const orgId = Number($('#sel-org').value);
     if (!weekId) return;
     if (!orgId) {
-      $('#write-status').innerHTML =
-        '<div class="alert error">소속 기관이 지정되지 않았습니다. 관리자에게 기관 배정을 요청하세요.</div>';
+      // 총괄관리자는 소속 없이 운영하는 자리라 배정을 요청할 상대가 없다.
+      //  (소속이 없으면 등록 내역·활동 로그 집계에서 빠진다 — lib/audit.js 참고)
+      $('#write-status').innerHTML = state.me.role === 'ADMIN'
+        ? '<div class="alert">admin 관리자는 소속 기관이 없어 보고서 작성은 등록 내역에 표시되지 않습니다.</div>'
+        : '<div class="alert error">소속 기관이 지정되지 않았습니다. 관리자에게 기관 배정을 요청하세요.</div>';
       return;
     }
 
