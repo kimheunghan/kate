@@ -689,7 +689,7 @@ router.put('/reports/:id(\\d+)/org', userManager, async (req, res, next) => {
     const { rows: cur } = await db.query(
       `SELECT r.week_id, r.org_id, o.name AS org_name, w.label
          FROM wr.reports r
-         JOIN wr.organizations o ON o.id = r.org_id
+         LEFT JOIN wr.organizations o ON o.id = r.org_id
          JOIN wr.report_weeks w ON w.id = r.week_id
         WHERE r.id = $1`,
       [id]

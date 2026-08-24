@@ -85,7 +85,7 @@ async function loadReport(id) {
             o.name AS org_name, u.name AS author_name
        FROM wr.reports r
        JOIN wr.report_weeks  w ON w.id = r.week_id
-       JOIN wr.organizations o ON o.id = r.org_id
+       LEFT JOIN wr.organizations o ON o.id = r.org_id
        LEFT JOIN wr.users    u ON u.id = r.author_id
       WHERE r.id = $1`,
     [id]
@@ -349,7 +349,11 @@ router.post('/', async (req, res, next) => {
     const resolved = await resolveOrgId(req.user, req.body?.org_id);
     if (resolved.error) return res.status(400).json({ error: resolved.error });
     const orgId = resolved.orgId;
-    if (!orgId) return res.status(400).json({ error: '소속 기관이 없습니다. 내 정보에서 소속을 지정하세요.' });
+    // 소속 없는 총괄관리자(운영용 계정)는 기관 없이도 쓸 수 있다.
+    //  기관이 없으면 등록 내역·기관별 집계에서 빠진다 (마이그레이션 020 참고).
+    if (!orgId && req.user.role !== 'ADMIN') {
+      return res.status(400).json({ error: '소속 기관이 없습니다. 내 정보에서 소속을 지정하세요.' });
+    }
 
     const { rows: wrows } = await db.query(
       `SELECT id, start_date <= CURRENT_DATE AS started FROM wr.report_weeks WHERE id = $1`,
@@ -1127,7 +1131,7 @@ async function renderWeekHwpx(user, week, orgId) {
     `SELECT r.id, r.org_id, o.name AS org_name,
             u.name AS author_name, u.username
        FROM wr.reports r
-       JOIN wr.organizations o ON o.id = r.org_id
+       LEFT JOIN wr.organizations o ON o.id = r.org_id
        LEFT JOIN wr.users    u ON u.id = r.author_id
       WHERE ${where.join(' AND ')}
       ORDER BY o.sort_order, o.name, wr.duty_order(u.duty), u.name, u.username`,
@@ -1268,7 +1272,7 @@ router.get('/export-files-week', requireExport, async (req, res, next) => {
          FROM wr.attachments a
          JOIN wr.reports r ON r.id = a.report_id
          JOIN wr.report_weeks  w ON w.id = r.week_id
-         JOIN wr.organizations o ON o.id = r.org_id
+         LEFT JOIN wr.organizations o ON o.id = r.org_id
          LEFT JOIN wr.users    u ON u.id = r.author_id
         WHERE ${where.join(' AND ')}
         ORDER BY w.start_date DESC, o.sort_order, o.name,
