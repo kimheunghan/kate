@@ -28,8 +28,12 @@
             <select id="sel-week"></select>
           </label>
           <button class="btn primary sb-btn" id="btn-load">검색</button>
-          <!-- 보고서는 언제나 본인 소속으로 저장된다. 화면에 따로 보이지 않는다. -->
-          <select id="sel-org" class="hidden"></select>
+          <!-- 보고서는 언제나 본인 소속으로 저장된다. 그래서 평소에는 보이지 않는다.
+               소속이 없는 총괄관리자만 어느 기관으로 쓸지 골라야 해서 드러난다. -->
+          <label class="sb-field hidden" id="sel-org-field" style="flex:1 1 240px">
+            <span>기관</span>
+            <select id="sel-org"></select>
+          </label>
         </div>
         <div id="write-status"></div>
       </div>
