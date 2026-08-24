@@ -727,6 +727,21 @@ function listsToText(html) {
   return out;
 }
 
+/**
+ * 줄머리 기호로 들여쓰기 단계를 정한다.
+ *   0. 사업관리   → 0단계 (왼쪽 끝)
+ *   ■ 의사소통관리 → 1단계 (공백 2칸)
+ *   - 8월 …       → 2단계 (공백 4칸)
+ * 다른 곳에서 붙여넣은 글은 편집기 들여쓰기(padding-left) 없이 일반 공백만
+ * 들어 있는데, 그 공백은 변환하면서 합쳐져 사라진다. 그래서 기호로 판단한다.
+ */
+function markerLevel(html) {
+  const t = String(html).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+  if (/^[■□▪▫●○◆◇]/.test(t)) return 1;
+  if (/^[-\u2013\u2014\u2022]/.test(t)) return 2;
+  return 0;
+}
+
 function toHwpxCell(raw) {
   const html = listsToText(raw);
   if (!html) return '';
@@ -753,11 +768,31 @@ function toHwpxCell(raw) {
       .replace(/\n/g, '')
       .trim();
     if (!inner) return '';
-    // 예전에 저장된 19px, 28.5px 같은 값도 한 단계(8px) 배수로 맞춰서 센다.
-    // 그대로 나누면 4칸이어야 할 자리에 5칸이 찍힌다.
-    const level = Math.min(Math.round(pad / STEP_PX), 12);
+    // 편집기에서 들여쓴 글은 padding-left 가 있다. 그 값을 그대로 쓴다.
+    //  예전에 저장된 19px, 28.5px 같은 값도 한 단계(8px) 배수로 맞춰서 센다.
+    //  그대로 나누면 4칸이어야 할 자리에 5칸이 찍힌다.
+    // 붙여넣은 글은 그 값이 없어 전부 왼쪽에 붙으므로 줄머리 기호로 정한다.
+    //  이미 &nbsp; 로 들여쓴 줄은 손대지 않는다. (두 번 밀리는 것을 막는다)
+    const kept = /^(?:&nbsp;)+/.test(inner);
+    const level = pad
+      ? Math.min(Math.round(pad / STEP_PX), 12)
+      : (kept ? 0 : markerLevel(inner));
     const indent = '&nbsp;'.repeat(level * 2);
-    return indent + inner;
+    if (!indent) return inner;
+    // 일반 공백으로 들여쓴 흔적은 어차피 합쳐져 사라지므로 미리 걷어낸다.
+    // 공백은 여는 태그 안쪽(첫 글자 앞)에 넣는다. 태그 밖에 두면 변환기가
+    //  그 공백을 지워버려 붙여넣은 글이 전부 왼쪽에 붙는다.
+    // 여는 태그는 그대로 두고, 태그 사이에 끼어 있던 공백은 걷어낸다.
+    //  붙여넣은 글은 <span> 안쪽에도 공백이 들어 있어, 안 걷어내면 덧붙는다.
+    let head = '';
+    let rest = inner;
+    for (;;) {
+      const m = /^(<[a-z][^>]*>|[\s\u00a0]+|&nbsp;)/i.exec(rest);
+      if (!m) break;
+      if (m[0][0] === '<') head += m[0];
+      rest = rest.slice(m[0].length);
+    }
+    return head + indent + rest;
   }).filter(Boolean).join('<br>');
 }
 
