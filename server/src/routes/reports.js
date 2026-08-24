@@ -648,7 +648,7 @@ ${forWord ? `<!--[if gte mso 9]><xml>
 ${forWord ? '<div class="WordSection1">' : ''}
 <h1>주간 추진실적 보고</h1>
 <table>
-  <colgroup><col style="width:12%"><col style="width:8%"><col style="width:26%"><col style="width:27%"><col style="width:27%"></colgroup>
+  <colgroup><col style="width:12%"><col style="width:8%"><col style="width:25%"><col style="width:28%"><col style="width:27%"></colgroup>
   <thead><tr>
     <th>기관명</th>
     <th>참여인력</th>
@@ -1130,10 +1130,10 @@ router.get('/:id(\\d+)/export-hwpx', requireExport, async (req, res, next) => {
         margins: { left: 10, right: 10, top: 10, bottom: 10, header: 5, footer: 5, gutter: 0 },
       },
     });
-    // 기관명 12% / 참여인력 8% / 당초 26% / 실적 27% / 향후 27%
+    // 기관명 12% / 참여인력 8% / 당초 25% / 실적 28% / 향후 27%
     const buf = await fixHwpxLayout(
       Buffer.isBuffer(out) ? out : Buffer.from(out),
-      [0.12, 0.08, 0.26, 0.27, 0.27]
+      [0.12, 0.08, 0.25, 0.28, 0.27]
     );
 
     const name = safeFileName(`${report.org_name}_주간보고_${report.week_label}`) + '.hwpx';
@@ -1192,10 +1192,10 @@ async function renderWeekHwpx(user, week, orgId) {
       margins: { left: 10, right: 10, top: 10, bottom: 10, header: 5, footer: 5, gutter: 0 },
     },
   });
-  // 기관명 12% / 참여인력 8% / 당초 26% / 실적 27% / 향후 27%
+  // 기관명 12% / 참여인력 8% / 당초 25% / 실적 28% / 향후 27%
   const buf = await fixHwpxLayout(
     Buffer.isBuffer(out) ? out : Buffer.from(out),
-    [0.12, 0.08, 0.26, 0.27, 0.27]
+    [0.12, 0.08, 0.25, 0.28, 0.27]
   );
   return { buf, count: reports.length };
 }
