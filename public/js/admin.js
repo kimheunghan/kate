@@ -10,7 +10,7 @@
   /** 담당 역할 표기 */
   const PAGE_SIZE = 10;                  // 목록 한 쪽에 보여 줄 건수
   const AUDIT_MAX = 5000;                // 활동 로그 엑셀 최대 건수 (서버와 같은 값)
-  const page = { status: 1, users: 1, audit: 1 };   // 화면별 현재 쪽
+  const page = { status: 1, users: 1, audit: 1, reglist: 1 };   // 화면별 현재 쪽
 
   /** 배열에서 현재 쪽에 해당하는 부분만 잘라 낸다 */
   function slicePage(rows, which) {
@@ -150,6 +150,9 @@
       status: isAdmin,
       matrix: seesAll,
       users: isAdmin || isOrgAdmin,
+      // 등록 내역은 주간보고 화면의 조회 탭과 같은 기준 — 작성자만 못 쓴다.
+      //  범위는 서버가 권한대로 걸러 준다. (routes/reports.js addViewScope)
+      reglist: seesAll || isOrgAdmin,
       audit: isAdmin,
     };
     $$('#admin-tabs button').forEach((b) => {
@@ -167,6 +170,7 @@
       status: renderStatus,
       matrix: renderMatrix,
       users: renderUsers,
+      reglist: renderReglist,
       audit: renderAudit,
     }[state.tab];
 
@@ -981,6 +985,155 @@
   }
 
   // 활동 로그 검색 조건 (화면을 다시 그려도 유지된다)
+  // ===================================================================
+  //  등록 내역
+  //    주간보고 화면의 '등록 내역 조회' 와 같은 것을 관리화면에서도 본다.
+  //    "주간보고 > 등록 내역 조회" 로 옮겨 다니기 번거롭다는 요청.
+  //    조회 범위는 서버가 권한대로 걸러 주므로 여기서 따로 막지 않는다.
+  // ===================================================================
+  const REG_SUMMARY_LINES = 5;                 // 요약을 몇 줄까지 보여 줄까
+  const reglistFilter = { status: 'SUBMITTED', week: '', org: '' };
+
+  async function renderReglist() {
+    const q = new URLSearchParams({ page: page.reglist, size: PAGE_SIZE });
+    if (reglistFilter.status) q.set('status', reglistFilter.status);
+    if (reglistFilter.week) q.set('week_id', reglistFilter.week);
+    if (reglistFilter.org) q.set('org_id', reglistFilter.org);
+
+    const [weeksRes, orgsRes, res] = await Promise.all([
+      api.get('/api/weeks?limit=60'),
+      api.get('/api/orgs'),
+      api.get(`/api/reports?${q}`),
+    ]);
+
+    // 기관관리자는 자기 기관만 본다. 고를 것이 없으니 칸을 잠근다.
+    const orgLocked = state.me.role === 'ORG_ADMIN';
+    const orgs = orgLocked
+      ? orgsRes.orgs.filter((o) => Number(o.id) === Number(state.me.org_id))
+      : orgsRes.orgs;
+    const pages = Math.max(1, Math.ceil(res.total / res.size));
+    const weekPicked = !!reglistFilter.week;
+
+    body().innerHTML = `
+      <div class="search-bar">
+        <label class="sb-field" style="flex:0 0 150px">
+          <span>상태</span>
+          <select id="rg-status">
+            <option value="">전체</option>
+            <option value="SUBMITTED" ${reglistFilter.status === 'SUBMITTED' ? 'selected' : ''}>제출완료</option>
+            <option value="NONE" ${reglistFilter.status === 'NONE' ? 'selected' : ''}>미등록</option>
+          </select>
+        </label>
+        <label class="sb-field sb-week" style="flex:2 1 320px">
+          <span>주차</span>
+          <select id="rg-week">
+            <option value="">전체</option>
+            ${weeksRes.weeks.map((w) =>
+              `<option value="${w.id}" ${String(reglistFilter.week) === String(w.id) ? 'selected' : ''}>${esc(w.label)}</option>`).join('')}
+          </select>
+        </label>
+        <label class="sb-field" style="flex:1 1 220px">
+          <span>기관</span>
+          <select id="rg-org" ${orgLocked ? 'disabled' : ''}>
+            ${orgLocked ? '' : '<option value="">전체</option>'}
+            ${orgs.map((o) =>
+              `<option value="${o.id}" ${String(reglistFilter.org) === String(o.id) ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
+          </select>
+        </label>
+        <button class="btn primary sb-btn" id="rg-search">조회</button>
+      </div>
+
+      <div class="list-head">
+        <h3 class="sec-title">보고서 목록 (총 ${res.total}건)</h3>
+        <div class="list-tools">
+          <span class="dl-note">
+            <span class="mark">※</span> ${weekPicked ? '선택한 주차만 내려받습니다.' : '전체 주차를 묶어 내려받습니다.'}</span>
+          <button class="btn sm dl-btn" id="rg-hwpx">⤓ ${weekPicked ? '해당 주차' : '전체 주차'} 한글 다운로드</button>
+          <button class="btn sm dl-btn" id="rg-files">⤓ ${weekPicked ? '해당 주차' : '전체'} 증적자료 ZIP</button>
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table class="grid fixed">
+          <thead><tr>
+            <th style="width:10%">기관</th>
+            <th style="width:7%">참여인력</th>
+            <th style="width:18%">주차</th>
+            <th>내용 요약</th>
+            <th style="width:8%">상태</th>
+            <th style="width:6%">첨부</th>
+            <th style="width:11%">최종수정</th>
+            <th style="width:12%">상세보기 / 다운로드</th>
+          </tr></thead>
+          <tbody>
+            ${res.reports.length ? res.reports.map((r) => `
+              <tr>
+                <td>${esc(r.org_name)}</td>
+                <td>${esc(r.author_name || '-')}</td>
+                <td>${esc(r.week_label)}</td>
+                <td class="small summary">${
+                  !r.id ? '<span class="muted">미등록</span>' :
+                  (r.summary_lines || []).slice(0, REG_SUMMARY_LINES)
+                    .map((line) => `<div class="sum-line">${esc(line)}</div>`).join('')
+                  + ((r.summary_lines || []).length > REG_SUMMARY_LINES
+                      ? `<div class="sum-more">… 외 ${(r.summary_lines || []).length - REG_SUMMARY_LINES}건</div>` : '')
+                }</td>
+                <td class="center">${statusBadge(r.status)}</td>
+                <td class="center">${r.id ? r.file_count : '-'}</td>
+                <td class="small">${r.id ? fmtDateTime(r.updated_at) : '-'}</td>
+                <td class="center nowrap">${r.id ? `
+                  <button class="btn sm" data-rg-open="${r.id}">열기</button>
+                  <button class="btn sm" data-rg-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받기">한글</button>`
+                  : '<span class="muted small">-</span>'}</td>
+              </tr>`).join('')
+              : '<tr><td colspan="8" class="empty">조회된 보고서가 없습니다.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      <div id="rg-pager"></div>`;
+
+    const reload = (resetPage) => { if (resetPage) page.reglist = 1; renderReglist(); };
+    const read = () => {
+      reglistFilter.status = $('#rg-status').value;
+      reglistFilter.week = $('#rg-week').value;
+      reglistFilter.org = orgLocked ? '' : $('#rg-org').value;
+    };
+
+    $('#rg-search').onclick = () => { read(); reload(true); };
+    $('#rg-status').onchange = () => { read(); reload(true); };
+    if (!orgLocked) $('#rg-org').onchange = () => { read(); reload(true); };
+    // 주차를 고르면 그 주차의 미등록도 함께 보도록 상태를 '전체' 로 바꾼다.
+    //  전체 주차로 돌아오면 줄이 크게 늘어나므로 '제출완료' 로 되돌린다.
+    $('#rg-week').onchange = () => {
+      $('#rg-status').value = $('#rg-week').value ? '' : 'SUBMITTED';
+      read(); reload(true);
+    };
+
+    // 보고서 열기는 작성 화면이 맡는다. 관리화면에는 편집기가 없다.
+    body().querySelectorAll('[data-rg-open]').forEach((b) => {
+      b.onclick = () => { location.href = `/report?report=${b.dataset.rgOpen}`; };
+    });
+    body().querySelectorAll('[data-rg-hwpx]').forEach((b) => {
+      b.onclick = () => window.WR.downloadReportHwpx(b.dataset.rgHwpx);
+    });
+
+    $('#rg-hwpx').onclick = () => {
+      if (!reglistFilter.week) toast('전체 주차는 ZIP으로 묶어 다운로드됩니다.');
+      window.WR.downloadWeekHwpx(reglistFilter.week, reglistFilter.org);
+    };
+    $('#rg-files').onclick = () => {
+      if (!reglistFilter.week) toast('모든 주차의 증적자료를 주차별 폴더로 묶습니다. 용량이 클 수 있습니다.');
+      const p = new URLSearchParams();
+      if (reglistFilter.week) p.set('week_id', reglistFilter.week);
+      if (reglistFilter.org) p.set('org_id', reglistFilter.org);
+      window.WR.downloadFile(`/api/reports/export-files-week?${p}`, '증적자료.zip');
+    };
+
+    window.WR.renderPager($('#rg-pager'), {
+      page: res.page, pages, onGo: (n) => { page.reglist = n; renderReglist(); },
+    });
+  }
+
   const auditFilter = { quick: '', from: '', to: '', action: '', q: '' };
 
   async function renderAudit() {
