@@ -493,9 +493,9 @@
             <th style="width:14%">기관</th><th style="width:10%">이름</th>
             <th style="width:11%">아이디</th>
             <th class="center" style="width:10%">역할</th>
-            <th class="center" style="width:12%">권한</th>
-            <th class="center" style="width:8%">상태</th><th style="width:14%">최근 로그인</th>
-            <th class="center" style="width:21%">사용자 권한 및 삭제</th>
+            <th class="center" style="width:11%">권한</th>
+            <th class="center" style="width:8%">상태</th><th style="width:16%">최근 로그인</th>
+            <th class="center" style="width:20%">사용자 권한 및 삭제</th>
           </tr></thead>
           <tbody>
             ${uRows.map((u) => `
@@ -520,7 +520,7 @@
                   u.approval_status === 'REJECTED' ? '<span class="badge closed">반려</span>'   :
                   u.is_active ? '<span class="badge submitted">활성</span>' : '<span class="badge closed">중지</span>'
                 }</td>
-                <td class="small">${fmtDateTime(u.last_login_at)}</td>
+                <td class="small nowrap">${fmtDateTime(u.last_login_at)}</td>
                 <td class="center nowrap">
                   ${/* 기관관리자에게 총괄·감독 관리자는 상위 관리자라 손댈 수 없다.
                         서버도 막는 자리이므로 버튼은 두되 비활성으로 보여 준다. */''}
