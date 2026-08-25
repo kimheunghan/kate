@@ -1006,11 +1006,14 @@
       api.get(`/api/reports?${q}`),
     ]);
 
+    // 감독 기관(NIPA)은 참여 기관이 아니다. 그 소속은 감독관리자가 되어
+    //  등록 내역·집계에서 빠지므로, 골라도 늘 0건이라 목록에서 뺀다.
+    const pickable = orgsRes.orgs.filter((o) => o.is_signup_visible !== false);
     // 기관관리자는 자기 기관만 본다. 고를 것이 없으니 칸을 잠근다.
     const orgLocked = state.me.role === 'ORG_ADMIN';
     const orgs = orgLocked
-      ? orgsRes.orgs.filter((o) => Number(o.id) === Number(state.me.org_id))
-      : orgsRes.orgs;
+      ? pickable.filter((o) => Number(o.id) === Number(state.me.org_id))
+      : pickable;
     const pages = Math.max(1, Math.ceil(res.total / res.size));
     const weekPicked = !!reglistFilter.week;
 

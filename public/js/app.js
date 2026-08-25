@@ -85,7 +85,12 @@
   function fillOrgSelects() {
     const opts = state.orgs.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
     $('#sel-org').innerHTML = opts;
-    $('#f-org').innerHTML = '<option value="">전체</option>' + opts;
+    // 조회 칸에서는 감독 기관(NIPA)을 뺀다. 그 소속은 감독관리자가 되어
+    //  등록 내역에서 빠지므로 골라도 늘 0건이다.
+    //  저장용 칸(sel-org)에는 남겨 둔다. 감독관리자 본인이 쓸 때 필요하다.
+    $('#f-org').innerHTML = '<option value="">전체</option>'
+      + state.orgs.filter((o) => o.is_signup_visible !== false)
+          .map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
 
     // 보고서는 언제나 "본인 소속 기관" 으로 저장된다.
     // 총괄관리자도 마찬가지라 고를 일이 없어 화면에는 보이지 않는다.
