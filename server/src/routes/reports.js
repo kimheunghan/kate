@@ -1222,10 +1222,15 @@ router.get('/export-hwpx-week', requireExport, async (req, res, next) => {
     const orgId = auth.seesAllOrgs(req.user) ? req.query.org_id : null;
     const weekId = Number(req.query.week_id);
 
-    // 대상 주차 목록 (보고서가 있는 주차만, 최신 주차부터)
-    //  감독관리자가 써 둔 보고서는 참여 인력 실적이 아니므로 세지 않는다.
-    const where = [`NOT EXISTS (
-      SELECT 1 FROM wr.users su WHERE su.id = r.author_id AND su.role = 'SUPERVISOR'
+    // 대상 주차 목록 (담을 보고서가 있는 주차만, 최신 주차부터)
+    //  참여 인력의 보고서만 담으므로 목록도 같은 기준으로 뽑는다.
+    //  기준이 다르면 담을 것이 없어 건너뛰는 주차가 생겨 개수가 어긋난다.
+    //  (renderWeekHwpx · v_submission_status 와 같은 조건)
+    const where = [`EXISTS (
+      SELECT 1 FROM wr.users au
+       WHERE au.id = r.author_id AND au.role <> 'SUPERVISOR'
+         AND au.org_id IS NOT NULL AND au.is_active
+         AND au.approval_status = 'APPROVED'
     )`];
     const params = [];
     addViewScope(req.user, where, params);
@@ -1264,17 +1269,23 @@ router.get('/export-hwpx-week', requireExport, async (req, res, next) => {
     const JSZip = require('jszip');
     const zip = new JSZip();
     let total = 0;
+    // 주차 목록은 "보고서가 하나라도 있는 주차" 로 뽑지만, 문서는 참여 인력의
+    //  것만 담는다. 그래서 담을 것이 없어 건너뛰는 주차가 생긴다.
+    //  weeks.length 로 이름을 지으면 "2개 주차" 라 해놓고 한 개만 든 묶음이 나간다.
+    let madeWeeks = 0;
     for (const w of weeks) {
       const made = await renderWeekHwpx(req.user, w, orgId);
       if (!made) continue;
       zip.file(weekFileBase(w.label) + '.hwpx', made.buf);
       total += made.count;
+      madeWeeks += 1;
     }
+    if (!madeWeeks) return res.status(404).json({ error: '내려받을 보고서가 없습니다.' });
 
     const zipBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-    const name = safeFileName(`주간보고_전체(${weeks.length}개 주차)`) + '.zip';
+    const name = safeFileName(`주간보고_전체(${madeWeeks}개 주차)`) + '.zip';
     await audit.log(req, 'REPORT_EXPORT_HWPX_ALL', {
-      targetType: 'week', targetId: null, detail: `${name} (주차 ${weeks.length}개 / 보고서 ${total}건)`,
+      targetType: 'week', targetId: null, detail: `${name} (주차 ${madeWeeks}개 / 보고서 ${total}건)`,
     });
 
     res.setHeader('Content-Type', 'application/zip');
@@ -1325,14 +1336,26 @@ router.get('/export-files-week', requireExport, async (req, res, next) => {
       params
     );
 
-    if (!files.length) {
+    // 실제로 담을 수 있는 것만 남긴다. uploads 밖을 가리키거나 디스크에서
+    //  사라진 파일은 여기서 뺀다. 담는 자리에서 건너뛰면 이름은 DB 기준으로
+    //  이미 지어진 뒤라, "2개 주차" 라 해놓고 한 주차만 든 묶음이 나간다.
+    const uploadRoot = path.resolve(config.upload.dir) + path.sep;
+    const usable = files.filter((f) => {
+      const abs = path.resolve(config.upload.dir, f.stored_path);
+      return abs.startsWith(uploadRoot) && fs.existsSync(abs);
+    });
+    if (usable.length !== files.length) {
+      console.warn(`[첨부ZIP] 파일이 없어 뺀 항목 ${files.length - usable.length}건`);
+    }
+
+    if (!usable.length) {
       return res.status(404).json({
         error: weekId ? '해당 주차에 첨부된 증적자료가 없습니다.' : '내려받을 증적자료가 없습니다.',
       });
     }
 
     // 합계가 상한을 넘으면 만들지 않는다. 만드는 도중에 끊기면 되돌릴 수 없다.
-    const total = files.reduce((sum, f) => sum + Number(f.byte_size || 0), 0);
+    const total = usable.reduce((sum, f) => sum + Number(f.byte_size || 0), 0);
     if (total > config.upload.exportMaxBytes) {
       const mb = (n) => Math.round(n / 1024 / 1024);
       return res.status(413).json({
@@ -1348,9 +1371,10 @@ router.get('/export-files-week', requireExport, async (req, res, next) => {
     zip.on('warning', (e) => console.warn('[첨부ZIP] 경고:', e.message));
     zip.on('error', (e) => { console.error('[첨부ZIP] 실패:', e.message); res.destroy(); });
 
+    // 이름은 실제로 담을 목록을 기준으로 짓는다.
     const base = weekId
-      ? `${weekFileBase(files[0].week_label)}_증적자료`
-      : `주간보고_증적자료_전체(${new Set(files.map((f) => f.week_label)).size}개 주차)`;
+      ? `${weekFileBase(usable[0].week_label)}_증적자료`
+      : `주간보고_증적자료_전체(${new Set(usable.map((f) => f.week_label)).size}개 주차)`;
     const name = safeFileName(base) + '.zip';
 
     res.setHeader('Content-Type', 'application/zip');
@@ -1361,11 +1385,8 @@ router.get('/export-files-week', requireExport, async (req, res, next) => {
 
     const used = new Set();
     let added = 0;
-    for (const f of files) {
+    for (const f of usable) {
       const abs = path.resolve(config.upload.dir, f.stored_path);
-      // uploads 밖을 가리키거나 사라진 파일은 건너뛴다
-      if (!abs.startsWith(path.resolve(config.upload.dir) + path.sep)) continue;
-      if (!fs.existsSync(abs)) continue;
 
       // 주차 / 기관 폴더 아래에 '기관명_이름_원본파일명' 으로 담는다.
       //  풀어 놓아도 어느 기관 누구 것인지 파일 이름만 보고 알 수 있다.
