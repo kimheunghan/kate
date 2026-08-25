@@ -316,7 +316,12 @@
 
   function bindTopbar() {
     const brand = $('#btn-brand');
-    if (brand) brand.onclick = openBrandPlate;
+    if (brand) {
+      brand.onclick = openBrandPlate;
+      // 현판 사진을 미리 받아 둔다. 누른 다음에 받기 시작하면 늦게 뜬다.
+      const pre = new Image();
+      pre.src = '/img/plate.png';
+    }
 
     const logout = $('#btn-logout');
     if (logout) {

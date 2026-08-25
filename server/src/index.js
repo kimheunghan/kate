@@ -79,6 +79,17 @@ app.use((req, res, next) => {
   return sendPage(res, file);
 });
 
+// 그림은 좀처럼 바뀌지 않는다. css/js 와 달리 오래 캐시해 둔다.
+//  no-cache 로 두면 열 때마다 서버에 물어보느라 현판이 늦게 뜬다.
+//  바꿀 일이 생기면 파일 이름을 바꿔서 올린다.
+app.use('/img', express.static(path.join(publicDir, 'img'), {
+  index: false,
+  etag: true,
+  lastModified: true,
+  maxAge: '30d',
+  setHeaders(res) { res.setHeader('Cache-Control', 'public, max-age=2592000'); },
+}));
+
 app.use(express.static(publicDir, {
   index: false,
   etag: true,
