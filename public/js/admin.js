@@ -1061,32 +1061,32 @@
       <div class="table-scroll">
         <table class="grid fixed">
           <thead><tr>
-            <th style="width:10%">기관</th>
-            <th style="width:7%">참여인력</th>
-            <th style="width:18%">주차</th>
-            <th>내용 요약</th>
-            <th style="width:8%">상태</th>
-            <th style="width:6%">첨부</th>
-            <th style="width:11%">최종수정</th>
-            <th style="width:12%">상세보기 / 다운로드</th>
+            <th class="col-org" style="width:10%">기관</th>
+            <th class="col-author" style="width:7%">참여인력</th>
+            <th class="col-week" style="width:18%">주차</th>
+            <th class="col-summary">내용 요약</th>
+            <th class="center col-state" style="width:7%">상태</th>
+            <th class="center col-files" style="width:5%">첨부</th>
+            <th class="col-updated" style="width:10%">최종수정</th>
+            <th class="center col-actions" style="width:11%">상세보기 / 다운로드</th>
           </tr></thead>
           <tbody>
             ${res.reports.length ? res.reports.map((r) => `
               <tr>
-                <td>${esc(r.org_name)}</td>
-                <td>${esc(r.author_name || '-')}</td>
-                <td>${esc(r.week_label)}</td>
-                <td class="small summary">${
+                <td class="col-org">${esc(r.org_name)}</td>
+                <td class="col-author">${esc(r.author_name || '-')}</td>
+                <td class="col-week">${esc(r.week_label)}</td>
+                <td class="small summary col-summary">${
                   !r.id ? '<span class="muted">미등록</span>' :
                   (r.summary_lines || []).slice(0, REG_SUMMARY_LINES)
                     .map((line) => `<div class="sum-line">${esc(line)}</div>`).join('')
                   + ((r.summary_lines || []).length > REG_SUMMARY_LINES
                       ? `<div class="sum-more">… 외 ${(r.summary_lines || []).length - REG_SUMMARY_LINES}건</div>` : '')
                 }</td>
-                <td class="center">${statusBadge(r.status)}</td>
-                <td class="center">${r.id ? r.file_count : '-'}</td>
-                <td class="small">${r.id ? fmtDateTime(r.updated_at) : '-'}</td>
-                <td class="center nowrap">${r.id ? `
+                <td class="center col-state">${statusBadge(r.status)}</td>
+                <td class="center col-files">${r.id ? r.file_count : '-'}</td>
+                <td class="small col-updated">${r.id ? fmtDateTime(r.updated_at) : '-'}</td>
+                <td class="center nowrap col-actions">${r.id ? `
                   <button class="btn sm" data-rg-open="${r.id}">열기</button>
                   <button class="btn sm" data-rg-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받기">한글</button>`
                   : '<span class="muted small">-</span>'}</td>
@@ -1095,7 +1095,7 @@
           </tbody>
         </table>
       </div>
-      <div id="rg-pager"></div>`;
+      <div class="pager" id="rg-pager"></div>`;
 
     const reload = (resetPage) => { if (resetPage) page.reglist = 1; renderReglist(); };
     const read = () => {
