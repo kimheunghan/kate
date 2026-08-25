@@ -490,7 +490,7 @@
       <div class="table-scroll mt8">
         <table class="grid fixed">
           <thead><tr>
-            <th style="width:13%">기관</th><th style="width:12%">이름</th>
+            <th style="width:14%">기관</th><th style="width:11%">이름</th>
             <th style="width:11%">아이디</th>
             <th class="center" style="width:12%">담당 역할</th>
             <th class="center" style="width:12%">권한</th>
