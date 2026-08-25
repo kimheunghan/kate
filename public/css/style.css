@@ -922,7 +922,7 @@ table.grid.fixed td.col-org, table.grid.fixed td.col-author { word-break: keep-a
 /* 화면이 좁아지면 덜 중요한 칸부터 접는다.
    가로 스크롤이 생기면 오른쪽 끝의 [열기][한글] 단추가 화면 밖으로 밀려
    보이지 않는다. 단추와 누가·언제가 남도록 순서를 정했다. */
-@media (max-width: 1100px) {
+@media (max-width: 1450px) {
   /* 주간보고의 등록 내역 조회와 관리화면의 같은 목록에 함께 건다.
      한쪽만 걸면 같은 표가 화면마다 다르게 접힌다. */
   #tab-list .col-summary, #tab-body .col-summary { display: none; }
