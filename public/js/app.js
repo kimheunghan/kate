@@ -89,7 +89,7 @@
     //  등록 내역에서 빠지므로 골라도 늘 0건이다.
     //  저장용 칸(sel-org)에는 남겨 둔다. 감독관리자 본인이 쓸 때 필요하다.
     $('#f-org').innerHTML = '<option value="">전체</option>'
-      + state.orgs.filter((o) => o.is_signup_visible !== false)
+      + window.WR.reportOrgs(state.orgs)
           .map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
 
     // 보고서는 언제나 "본인 소속 기관" 으로 저장된다.

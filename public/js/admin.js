@@ -241,7 +241,7 @@
           <span>기관</span>
           <select id="st-org" ${orgLocked ? 'disabled' : ''}>
             <option value="">전체</option>
-            ${orgsRes.orgs.map((o) =>
+            ${window.WR.reportOrgs(orgsRes.orgs).map((o) =>
               `<option value="${o.id}" ${String(f.org) === String(o.id) || scopedOrgId === o.id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
           </select>
         </label>
@@ -1008,7 +1008,7 @@
 
     // 감독 기관(NIPA)은 참여 기관이 아니다. 그 소속은 감독관리자가 되어
     //  등록 내역·집계에서 빠지므로, 골라도 늘 0건이라 목록에서 뺀다.
-    const pickable = orgsRes.orgs.filter((o) => o.is_signup_visible !== false);
+    const pickable = window.WR.reportOrgs(orgsRes.orgs);
     // 기관관리자는 자기 기관만 본다. 고를 것이 없으니 칸을 잠근다.
     //  다만 '전체 조회' 겸직(can_view_all)을 받은 기관관리자는 3사를 다 본다.
     //  서버도 같은 기준으로 범위를 잡는다. (auth.seesAllOrgs)

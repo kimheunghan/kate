@@ -105,6 +105,19 @@
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
   }
 
+  /**
+   * 조회·집계 화면에서 고를 수 있는 기관.
+   *   감독 기관(가입 목록에서 숨긴 기관)은 참여 기관이 아니다. 그 소속은
+   *   감독관리자가 되어 등록 내역·기관별 집계에서 빠지므로, 골라도 늘 0건이다.
+   *   화면마다 따로 거르면 어긋나므로 규칙을 여기 하나만 둔다.
+   *
+   *   쓰지 않는 곳 : 사용자 관리(감독관리자를 지정·조회해야 한다),
+   *                 내 정보 수정, 주간보고 저장용 칸(본인 소속이 있어야 저장된다)
+   */
+  function reportOrgs(orgs) {
+    return (orgs || []).filter((o) => o.is_signup_visible !== false);
+  }
+
   function statusBadge(status) {
     if (status === 'SUBMITTED') return '<span class="badge submitted">제출완료</span>';
     return '<span class="badge none">미등록</span>';
@@ -515,5 +528,5 @@
     $('#pw-cur', back).focus();
   }
 
-  global.WR = { api, toast, esc, roleLabel, renderPager, stripBlanks, rememberMe, cachedMe, forgetMe, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
+  global.WR = { api, toast, esc, roleLabel, reportOrgs, renderPager, stripBlanks, rememberMe, cachedMe, forgetMe, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
 })(window);
