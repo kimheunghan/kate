@@ -1010,7 +1010,9 @@
     //  등록 내역·집계에서 빠지므로, 골라도 늘 0건이라 목록에서 뺀다.
     const pickable = orgsRes.orgs.filter((o) => o.is_signup_visible !== false);
     // 기관관리자는 자기 기관만 본다. 고를 것이 없으니 칸을 잠근다.
-    const orgLocked = state.me.role === 'ORG_ADMIN';
+    //  다만 '전체 조회' 겸직(can_view_all)을 받은 기관관리자는 3사를 다 본다.
+    //  서버도 같은 기준으로 범위를 잡는다. (auth.seesAllOrgs)
+    const orgLocked = state.me.role === 'ORG_ADMIN' && state.me.can_view_all !== true;
     const orgs = orgLocked
       ? pickable.filter((o) => Number(o.id) === Number(state.me.org_id))
       : pickable;
