@@ -490,12 +490,12 @@
       <div class="table-scroll mt8">
         <table class="grid fixed">
           <thead><tr>
-            <th style="width:20%">기관</th><th style="width:11%">이름</th>
-            <th style="width:14%">아이디</th>
+            <th style="width:16%">기관</th><th style="width:11%">이름</th>
+            <th style="width:11%">아이디</th>
             <th class="center" style="width:12%">담당 역할</th>
             <th class="center" style="width:10%">권한</th>
             <th class="center" style="width:8%">상태</th><th style="width:15%">최근 로그인</th>
-            <th class="center" style="width:10%">권한/삭제</th>
+            <th class="center" style="width:17%">권한 및 삭제</th>
           </tr></thead>
           <tbody>
             ${uRows.map((u) => `
