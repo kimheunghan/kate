@@ -1154,7 +1154,13 @@ router.get('/:id(\\d+)/export-hwpx', requireExport, async (req, res, next) => {
 // 한 주차 분량을 한글 문서(HWPX) 버퍼로 만든다. 보고서가 없으면 null.
 // ---------------------------------------------------------------------
 async function renderWeekHwpx(user, week, orgId) {
-  const where = ['r.week_id = $1', "COALESCE(u.role, '') <> 'SUPERVISOR'"];
+  // 취합 문서는 등록 내역·기관별 집계와 같은 대상이어야 한다.
+  //  기준은 보고서에 남은 기관 스냅샷이 아니라 "작성자가 지금 참여 인력인가" 다.
+  //  소속을 뗀 뒤에도 예전 보고서에는 기관이 남아 있어, 스냅샷으로 거르면
+  //  관리자가 쓴 것이 취합에 섞인다. (v_submission_status 와 같은 조건)
+  const where = ['r.week_id = $1', "COALESCE(u.role, '') <> 'SUPERVISOR'",
+                 'u.org_id IS NOT NULL', 'u.is_active',
+                 "u.approval_status = 'APPROVED'"];
   const params = [week.id];
   addViewScope(user, where, params);
   if (auth.seesAllOrgs(user) && orgId) {
@@ -1294,7 +1300,10 @@ router.get('/export-files-week', requireExport, async (req, res, next) => {
     const orgId = auth.seesAllOrgs(req.user) ? req.query.org_id : null;
     const weekId = Number(req.query.week_id);
 
-    const where = ["COALESCE(u.role, '') <> 'SUPERVISOR'"];
+    // 취합물이므로 한글 취합과 같은 기준으로 거른다. (renderWeekHwpx 참고)
+    const where = ["COALESCE(u.role, '') <> 'SUPERVISOR'",
+                   'u.org_id IS NOT NULL', 'u.is_active',
+                   "u.approval_status = 'APPROVED'"];
     const params = [];
     addViewScope(req.user, where, params);
     if (orgId) { params.push(Number(orgId)); where.push(`r.org_id = $${params.length}`); }
