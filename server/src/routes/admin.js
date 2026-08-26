@@ -693,6 +693,9 @@ router.delete('/users/:id(\\d+)', userManager, async (req, res, next) => {
     await db.tx(async (client) => {
       // 항목(report_items)·첨부(attachments) 는 CASCADE 로 함께 지워진다
       await client.query(`DELETE FROM wr.reports WHERE author_id = $1`, [id]);
+      // 활동 로그도 함께 지운다. 그냥 두면 user_id 만 비고 아이디·이름이
+      //  값으로 남아, 지운 사람이 계속 목록에 보인다.
+      await client.query(`DELETE FROM wr.audit_logs WHERE user_id = $1`, [id]);
       await client.query(`DELETE FROM wr.users   WHERE id = $1`, [id]);
     });
 
