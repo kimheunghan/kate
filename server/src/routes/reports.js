@@ -1231,7 +1231,9 @@ async function renderWeekHwpx(user, week, orgId) {
  *   18주차 (2026/08/20목~08/26수) → 18주차 (2026/08/20.목~08/26.수)
  */
 function labelDot(label) {
-  return String(label || '').replace(/(\d)([일월화수목금토])/g, '$1.$2');
+  return String(label || '')
+    .replace(/(\d)([일월화수목금토])/g, '$1.$2')
+    .replace(/\s+\(/, '(');            // 18주차 (…) → 18주차(…)
 }
 
 /**
@@ -1264,7 +1266,7 @@ function weekRangeBase(weeks) {
   if (first.id === last.id) return weekFileBase(first.label);
   // 양쪽 다 연·월·일·요일을 그대로 적는다
   return `주간보고_${first.week_no}주차~${last.week_no}주차`
-       + ` (${ymdDow(first.start_date, true)}~${ymdDow(last.end_date, true)})`;
+       + `(${ymdDow(first.start_date, true)}~${ymdDow(last.end_date, true)})`;
 }
 
 function weekFileBase(label) {
