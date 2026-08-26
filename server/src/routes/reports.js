@@ -1233,7 +1233,8 @@ async function renderWeekHwpx(user, week, orgId) {
 function labelDot(label) {
   return String(label || '')
     .replace(/(\d)([일월화수목금토])/g, '$1.$2')
-    .replace(/\s+\(/, '(');            // 18주차 (…) → 18주차(…)
+    .replace(/\s+\(/, '(')             // 18주차 (…) → 18주차(…)
+    .replace(/([~/])0(\d)/g, '$1$2');   // 2026/08/20~08/26 → 2026/8/20~8/26
 }
 
 /**
@@ -1255,8 +1256,7 @@ function ymdDow(iso, withYear) {
   const [y, m, d] = String(iso || '').split('-').map(Number);
   if (!y) return '';
   const dow = KOR_DOW_SHORT[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
-  const p = (n) => String(n).padStart(2, '0');
-  return (withYear ? `${y}/` : '') + `${p(m)}/${p(d)}.${dow}`;
+  return (withYear ? `${y}/` : '') + `${m}/${d}.${dow}`;
 }
 function weekRangeBase(weeks) {
   if (!weeks.length) return '주간보고';
