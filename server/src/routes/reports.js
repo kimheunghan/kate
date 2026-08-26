@@ -1150,7 +1150,7 @@ router.get('/:id(\\d+)/export-hwpx', requireExport, async (req, res, next) => {
     );
 
     const dl = dlNames(
-      `${report.org_name || '소속 없음'}_${report.author_name || '-'}_주간보고_${labelDot(report.week_label)}`,
+      `${report.org_name || '소속 없음'}_주간보고_${labelDot(report.week_label)}`,
       '.hwpx'
     );
     const name = dl.file;
