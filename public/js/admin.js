@@ -1018,6 +1018,8 @@
       : pickable;
     const pages = Math.max(1, Math.ceil(res.total / res.size));
     const weekPicked = !!reglistFilter.week;
+    // 내려받기는 총괄관리자와 기관관리자만. 서버도 같은 기준으로 막는다.
+    const canDl = window.WR.canExportDocs(state.me);
 
     body().innerHTML = `
       <div class="search-bar">
@@ -1051,10 +1053,11 @@
       <div class="list-head">
         <h3 class="sec-title">보고서 목록 (총 ${res.total}건)</h3>
         <div class="list-tools">
-          <span class="dl-note">
-            <span class="mark">※</span> ${weekPicked ? '선택한 주차만 내려받습니다.' : '전체 주차를 묶어 내려받습니다.'}</span>
-          <button class="btn sm dl-btn" id="rg-hwpx">⤓ ${weekPicked ? '해당 주차' : '전체 주차'} 한글 다운로드</button>
-          <button class="btn sm dl-btn" id="rg-files">⤓ ${weekPicked ? '해당 주차' : '전체'} 증적자료 ZIP</button>
+          ${canDl ? `
+            <span class="dl-note">
+              <span class="mark">※</span> ${weekPicked ? '선택한 주차만 내려받습니다.' : '전체 주차를 묶어 내려받습니다.'}</span>
+            <button class="btn sm dl-btn" id="rg-hwpx">⤓ ${weekPicked ? '해당 주차' : '전체 주차'} 한글 다운로드</button>
+            <button class="btn sm dl-btn" id="rg-files">⤓ ${weekPicked ? '해당 주차' : '전체'} 증적자료 ZIP</button>` : ''}
         </div>
       </div>
 
@@ -1088,7 +1091,7 @@
                 <td class="small col-updated">${r.id ? fmtDateTime(r.updated_at) : '-'}</td>
                 <td class="center nowrap col-actions">${r.id ? `
                   <button class="btn sm" data-rg-open="${r.id}">열기</button>
-                  <button class="btn sm" data-rg-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받기">한글</button>`
+                  ${canDl ? `<button class="btn sm" data-rg-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받기">한글</button>` : ''}`
                   : '<span class="muted small">-</span>'}</td>
               </tr>`).join('')
               : '<tr><td colspan="8" class="empty">조회된 보고서가 없습니다.</td></tr>'}
@@ -1122,11 +1125,11 @@
       b.onclick = () => window.WR.downloadReportHwpx(b.dataset.rgHwpx);
     });
 
-    $('#rg-hwpx').onclick = () => {
+    if (canDl) $('#rg-hwpx').onclick = () => {
       if (!reglistFilter.week) toast('전체 주차는 ZIP으로 묶어 다운로드됩니다.');
       window.WR.downloadWeekHwpx(reglistFilter.week, reglistFilter.org);
     };
-    $('#rg-files').onclick = () => {
+    if (canDl) $('#rg-files').onclick = () => {
       if (!reglistFilter.week) toast('모든 주차의 증적자료를 주차별 폴더로 묶습니다. 용량이 클 수 있습니다.');
       const p = new URLSearchParams();
       if (reglistFilter.week) p.set('week_id', reglistFilter.week);

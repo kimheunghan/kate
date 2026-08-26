@@ -137,10 +137,9 @@
     const seesAll = role === 'ADMIN' || role === 'SUPERVISOR' || dual;
     // 등록 내역 조회 탭을 쓰는 사람 (작성자만 못 쓴다)
     const hasList = seesAll || role === 'ORG_ADMIN';
-    // 작성 탭의 한글 다운로드는 '원래 권한' 을 따른다.
-    //  작성자는 중복권한이 있어도 작성 탭에서는 내려받지 않는다.
-    //  (등록 내역 목록의 [한글] 단추는 그대로 쓴다)
-    const writeHwpx = role === 'ADMIN' || role === 'SUPERVISOR' || role === 'ORG_ADMIN';
+    // 내려받기는 총괄관리자와 기관관리자만. 서버도 같은 기준으로 막는다.
+    //  중복권한은 조회 범위만 넓히는 것이라 내려받기에는 영향이 없다.
+    const canDl = window.WR.canExportDocs(state.me);
 
     // 인쇄/PDF, Word 다운로드는 아무에게도 보이지 않는다
     ['#btn-print', '#btn-export'].forEach((sel) => {
@@ -148,7 +147,12 @@
       if (b) b.classList.add('hidden');
     });
     const hwpxBtn = $('#btn-export-hwpx');
-    if (hwpxBtn) hwpxBtn.classList.toggle('hidden', !writeHwpx);
+    if (hwpxBtn) hwpxBtn.classList.toggle('hidden', !canDl);
+    // 등록 내역 위의 주차 묶음 내려받기도 같은 기준으로 감춘다
+    ['#btn-week-hwpx', '#btn-week-files', '#dl-note'].forEach((sel) => {
+      const el = $(sel);
+      if (el) el.classList.toggle('hidden', !canDl);
+    });
 
     // 등록 내역 조회 탭 (지우지 않고 감추기만 한다)
     const listTab = $$('.tabs button').find((b) => b.dataset.tab === 'list');
@@ -266,7 +270,7 @@
     //  감독관리자에게만 붙는 꼬리말은 같은 줄 오른쪽에 옅게 둔다.
     const supNote = state.me.role === 'SUPERVISOR'
       ? '<span class="alert-note"><span class="mark">※</span> 감독관리자는 대상 인원에서 제외되며,'
-        + ' 작성한 보고서는 본인만 내려받을 수 있습니다.</span>'
+        + ' 문서 내려받기는 하실 수 없습니다.</span>'
       : '';
     const mainMsg = report
       ? `등록된 보고서입니다. (작성자 ${esc(report.author_name || '-')} · 최종수정 ${fmtDateTime(report.updated_at)})`
@@ -773,7 +777,8 @@
         <td class="small col-updated">${r.id ? fmtDateTime(r.updated_at) : '-'}</td>
         <td class="center nowrap col-actions">${r.id ? `
           <button class="btn sm" data-open="${r.id}">열기</button>
-          <button class="btn sm" data-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받기">한글</button>`
+          ${window.WR.canExportDocs(state.me)
+            ? `<button class="btn sm" data-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받기">한글</button>` : ''}`
           : '<span class="muted small">-</span>'}
         </td>
       </tr>`).join('');

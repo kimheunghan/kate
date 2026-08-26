@@ -114,6 +114,15 @@
    *   쓰지 않는 곳 : 사용자 관리(감독관리자를 지정·조회해야 한다),
    *                 내 정보 수정, 주간보고 저장용 칸(본인 소속이 있어야 저장된다)
    */
+  /**
+   * 문서를 내려받을 수 있는 사람 — 총괄관리자와 기관관리자.
+   *   작성자는 작성만, 감독관리자는 보기만 한다.
+   *   서버의 canExport() 와 같은 기준이다. (routes/reports.js)
+   */
+  function canExportDocs(user) {
+    return !!user && (user.role === 'ADMIN' || user.role === 'ORG_ADMIN');
+  }
+
   function reportOrgs(orgs) {
     return (orgs || []).filter((o) => o.is_signup_visible !== false);
   }
@@ -528,5 +537,5 @@
     $('#pw-cur', back).focus();
   }
 
-  global.WR = { api, toast, esc, roleLabel, reportOrgs, renderPager, stripBlanks, rememberMe, cachedMe, forgetMe, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
+  global.WR = { api, toast, esc, roleLabel, reportOrgs, canExportDocs, renderPager, stripBlanks, rememberMe, cachedMe, forgetMe, fmtBytes, fmtDateTime, statusBadge, openPrint, downloadReport, downloadReportHwpx, downloadWeekHwpx, downloadFile, $, $$, renderTopbar, bindTopbar, openPasswordModal, openProfileModal };
 })(window);
