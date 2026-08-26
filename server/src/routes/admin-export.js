@@ -42,7 +42,6 @@ const ACTION_TEXT = {
   REPORT_SAVE: '보고서 저장', REPORT_UPDATE: '보고서 수정',
   REPORT_DELETE: '보고서 삭제', REPORT_STATUS: '보고서 상태 변경',
   REPORT_EXPORT: 'Word 다운로드', REPORT_EXPORT_HWPX: '한글 다운로드',
-  REPORT_EXPORT_HWPX_WEEK: '주차 한글 다운로드',
   REPORT_EXPORT_HWPX_ALL: '전체 주차 ZIP 다운로드',
     FILE_EXPORT_ZIP: '증적자료 ZIP 다운로드',
   REPORT_MOVE_ORG: '보고서 기관 이관', REPORT_ORG_CHANGE: '보고서 기관 변경',
