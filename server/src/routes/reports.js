@@ -1318,7 +1318,7 @@ router.get('/export-hwpx-week', requireExport, async (req, res, next) => {
       if (!made) return res.status(404).json({ error: '해당 주차에 등록된 보고서가 없습니다.' });
       const dl = dlNames(`주간보고_${labelDot(weeks[0].label)}`, '.hwpx');
       const name = dl.file;
-      await audit.log(req, 'REPORT_EXPORT_HWPX', {
+      await audit.log(req, 'REPORT_EXPORT_HWPX_WEEK', {
         targetType: 'week', targetId: weeks[0].id, detail: dl.shown,
       });
       res.setHeader('Content-Type', 'application/hwp+zip');
