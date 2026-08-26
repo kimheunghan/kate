@@ -115,12 +115,15 @@
    *                 내 정보 수정, 주간보고 저장용 칸(본인 소속이 있어야 저장된다)
    */
   /**
-   * 문서를 내려받을 수 있는 사람 — 총괄관리자와 기관관리자.
-   *   작성자는 작성만, 감독관리자는 보기만 한다.
+   * 문서를 내려받을 수 있는 사람 — 작성자만 못 한다.
+   *   총괄관리자·감독관리자·기관관리자·중복권한자가 쓴다.
    *   서버의 canExport() 와 같은 기준이다. (routes/reports.js)
    */
   function canExportDocs(user) {
-    return !!user && (user.role === 'ADMIN' || user.role === 'ORG_ADMIN');
+    if (!user) return false;
+    // 권한만 본다. 중복권한(can_view_all)은 조회 범위를 넓히는 것이고,
+    //  기관관리자에게만 줄 수 있어 여기서 따로 볼 필요가 없다.
+    return user.role === 'ADMIN' || user.role === 'SUPERVISOR' || user.role === 'ORG_ADMIN';
   }
 
   function reportOrgs(orgs) {

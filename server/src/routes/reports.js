@@ -61,12 +61,11 @@ function addViewScope(user, where, params) {
 
 /**
  * 문서로 내려받을 수 있는가 (인쇄·Word·한글·증적자료 ZIP).
- *   총괄관리자와 기관관리자만 쓴다.
- *   작성자는 화면에서 작성만 한다. 감독관리자는 보기만 하고 내려받지 않는다.
- *   중복권한(can_view_all)은 조회 범위만 넓히는 것이라 여기에 영향을 주지 않는다.
+ *   작성자만 못 쓴다. 화면에서 작성만 하고 문서로 가져가지 않는다.
+ *   총괄관리자·감독관리자·기관관리자·중복권한자가 쓴다.
  */
 function canExport(user) {
-  return user.role === 'ADMIN' || user.role === 'ORG_ADMIN';
+  return auth.seesAllOrgs(user) || user.role === 'ORG_ADMIN';
 }
 
 const requireExport = (req, res, next) =>

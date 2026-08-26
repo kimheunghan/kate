@@ -269,8 +269,8 @@
     // 안내는 한 칸에 모은다. 줄이 여러 개면 화면이 답답해진다.
     //  감독관리자에게만 붙는 꼬리말은 같은 줄 오른쪽에 옅게 둔다.
     const supNote = state.me.role === 'SUPERVISOR'
-      ? '<span class="alert-note"><span class="mark">※</span> 감독관리자는 대상 인원에서 제외되며,'
-        + ' 문서 내려받기는 하실 수 없습니다.</span>'
+      ? '<span class="alert-note"><span class="mark">※</span>'
+        + ' 감독관리자는 대상 인원에서 제외됩니다.</span>'
       : '';
     const mainMsg = report
       ? `등록된 보고서입니다. (작성자 ${esc(report.author_name || '-')} · 최종수정 ${fmtDateTime(report.updated_at)})`
