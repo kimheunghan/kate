@@ -1262,9 +1262,9 @@ function weekRangeBase(weeks) {
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
   if (first.id === last.id) return weekFileBase(first.label);
-  const sameYear = String(first.start_date).slice(0, 4) === String(last.end_date).slice(0, 4);
+  // 양쪽 다 연·월·일·요일을 그대로 적는다
   return `주간보고_${first.week_no}주차~${last.week_no}주차`
-       + ` (${ymdDow(first.start_date, true)}~${ymdDow(last.end_date, !sameYear)})`;
+       + ` (${ymdDow(first.start_date, true)}~${ymdDow(last.end_date, true)})`;
 }
 
 function weekFileBase(label) {
