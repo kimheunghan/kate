@@ -438,8 +438,14 @@ router.post('/find-id', rateLimit(10, 10 * 60 * 1000), async (req, res, next) =>
     );
     // 아이디 찾기는 로그인하지 않은 사람이 하는 동작이라
     // 누가 했는지 남기지 않는다. 화면에는 (비로그인) 으로 나온다.
+    const { rows: forg } = await db.query(
+      `SELECT name FROM wr.organizations WHERE id = $1`, [orgId]
+    );
+    const oname = forg[0]?.name || `기관 ${orgId}`;
     await audit.log(req, 'FIND_ID', {
-      detail: `${name} / 기관 ${orgId} → ${rows.length}건`,
+      detail: rows.length
+        ? rows.map((r) => `${oname} / ${r.username} / ${r.name}`).join(' · ')
+        : `${oname} / - / ${name} (찾지 못함)`,
     });
 
     if (!rows.length) {

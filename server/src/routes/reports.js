@@ -426,8 +426,12 @@ router.put('/:id(\\d+)', async (req, res, next) => {
       const resolved = await resolveOrgId(req.user, req.body.org_id);
       if (resolved.error) return res.status(400).json({ error: resolved.error });
       await db.query(`UPDATE wr.reports SET org_id = $1 WHERE id = $2`, [resolved.orgId, id]);
+      const { rows: onew } = await db.query(
+        `SELECT name FROM wr.organizations WHERE id = $1`, [resolved.orgId]
+      );
       await audit.log(req, 'REPORT_ORG_CHANGE', {
-        targetType: 'report', targetId: id, detail: `기관 변경 → ${resolved.orgId}`,
+        targetType: 'report', targetId: id,
+        detail: `기관 변경 ${existing.org_name || '소속 없음'} → ${onew[0]?.name || resolved.orgId}`,
       });
     }
 

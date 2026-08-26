@@ -12,6 +12,19 @@ const auth = require('../lib/auth');
 const audit = require('../lib/audit');
 const config = require('../lib/config');
 
+/** 활동 로그 표기 — 기관 주차 (뒤에 파일명을 붙여 쓴다) */
+async function reportLabel(reportId) {
+  const { rows } = await db.query(
+    `SELECT COALESCE(o.name, '소속 없음') AS org_name, w.label AS week_label
+       FROM wr.reports r
+       JOIN wr.report_weeks w ON w.id = r.week_id
+       LEFT JOIN wr.organizations o ON o.id = r.org_id
+      WHERE r.id = $1`,
+    [reportId]
+  );
+  return rows[0] ? `${rows[0].org_name} ${rows[0].week_label}` : '';
+}
+
 const router = express.Router();
 
 // ---------------------------------------------------------------------
@@ -115,7 +128,8 @@ router.post('/reports/:id(\\d+)/attachments', auth.requireAuth, async (req, res,
       }
 
       await audit.log(req, 'FILE_UPLOAD', {
-        targetType: 'report', targetId: reportId, detail: saved.map((s) => s.original_name).join(', '),
+        targetType: 'report', targetId: reportId,
+        detail: `${await reportLabel(reportId)} ${saved.map((s) => s.original_name).join(', ')}`.trim(),
       });
       res.status(201).json({ attachments: saved });
     } catch (e) { next(e); }
@@ -148,7 +162,8 @@ router.get('/attachments/:id(\\d+)/download', auth.requireAuth, async (req, res,
     if (!fs.existsSync(abs)) return res.status(404).json({ error: '파일이 서버에 존재하지 않습니다.' });
 
     await audit.log(req, 'FILE_DOWNLOAD', {
-      targetType: 'report', targetId: att.report_id, detail: att.original_name,
+      targetType: 'report', targetId: att.report_id,
+      detail: `${await reportLabel(att.report_id)} ${att.original_name}`.trim(),
     });
 
     // 브라우저에서 실행되지 않도록 항상 다운로드로 강제
@@ -182,7 +197,8 @@ router.delete('/attachments/:id(\\d+)', auth.requireAuth, async (req, res, next)
     }
 
     await audit.log(req, 'FILE_DELETE', {
-      targetType: 'report', targetId: att.report_id, detail: att.original_name,
+      targetType: 'report', targetId: att.report_id,
+      detail: `${await reportLabel(att.report_id)} ${att.original_name}`.trim(),
     });
     res.json({ ok: true });
   } catch (err) { next(err); }
