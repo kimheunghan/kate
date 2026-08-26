@@ -1149,10 +1149,14 @@ router.get('/:id(\\d+)/export-hwpx', requireExport, async (req, res, next) => {
       [0.12, 0.08, 0.25, 0.275, 0.275]
     );
 
-    const name = safeFileName(
-      `${report.org_name || '소속 없음'}_${report.author_name || '-'}_주간보고_${report.week_label}`
-    ) + '.hwpx';
-    await audit.log(req, 'REPORT_EXPORT_HWPX', { targetType: 'report', targetId: report.id, detail: name });
+    const dl = dlNames(
+      `${report.org_name || '소속 없음'}_${report.author_name || '-'}_주간보고_${labelDot(report.week_label)}`,
+      '.hwpx'
+    );
+    const name = dl.file;
+    await audit.log(req, 'REPORT_EXPORT_HWPX', {
+      targetType: 'report', targetId: report.id, detail: dl.shown,
+    });
 
     res.setHeader('Content-Type', 'application/hwp+zip');
     res.setHeader('Cache-Control', 'no-store, must-revalidate');
@@ -1223,6 +1227,23 @@ async function renderWeekHwpx(user, week, orgId) {
 
 /** safeFileName 이 '/' 를 지워 날짜가 붙어 읽히므로 미리 '.' 로 바꾼다 */
 /**
+ * 주차 이름표의 요일 앞에 점을 넣는다.
+ *   18주차 (2026/08/20목~08/26수) → 18주차 (2026/08/20.목~08/26.수)
+ */
+function labelDot(label) {
+  return String(label || '').replace(/(\d)([일월화수목금토])/g, '$1.$2');
+}
+
+/**
+ * 내려받는 이름은 두 가지로 쓴다.
+ *   보이는 이름 : 활동 로그에 적는다. 날짜 구분을 '/' 그대로 둔다.
+ *   파일 이름   : '/' 는 폴더 구분자라 파일 이름에 넣을 수 없다. '.' 으로 바꾼다.
+ */
+function dlNames(shown, ext) {
+  return { shown: shown + ext, file: safeFileName(shown.replace(/\//g, '.')) + ext };
+}
+
+/**
  * 여러 주차를 묶었을 때 쓰는 이름.
  *   주간보고_18주차 ~23주차 (2026.08.20목~10.26수)
  *   해가 같으면 끝 날짜의 연도는 뺀다. 주차 이름표와 같은 규칙이다.
@@ -1233,7 +1254,7 @@ function ymdDow(iso, withYear) {
   if (!y) return '';
   const dow = KOR_DOW_SHORT[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
   const p = (n) => String(n).padStart(2, '0');
-  return (withYear ? `${y}.` : '') + `${p(m)}.${p(d)}${dow}`;
+  return (withYear ? `${y}/` : '') + `${p(m)}/${p(d)}.${dow}`;
 }
 function weekRangeBase(weeks) {
   if (!weeks.length) return '주간보고';
@@ -1293,9 +1314,10 @@ router.get('/export-hwpx-week', requireExport, async (req, res, next) => {
     if (weekId) {
       const made = await renderWeekHwpx(req.user, weeks[0], orgId);
       if (!made) return res.status(404).json({ error: '해당 주차에 등록된 보고서가 없습니다.' });
-      const name = weekFileBase(weeks[0].label) + '.hwpx';
+      const dl = dlNames(`주간보고_${labelDot(weeks[0].label)}`, '.hwpx');
+      const name = dl.file;
       await audit.log(req, 'REPORT_EXPORT_HWPX', {
-        targetType: 'week', targetId: weeks[0].id, detail: name,
+        targetType: 'week', targetId: weeks[0].id, detail: dl.shown,
       });
       res.setHeader('Content-Type', 'application/hwp+zip');
       res.setHeader('Cache-Control', 'no-store, must-revalidate');
@@ -1323,9 +1345,11 @@ router.get('/export-hwpx-week', requireExport, async (req, res, next) => {
     if (!madeWeeks) return res.status(404).json({ error: '내려받을 보고서가 없습니다.' });
 
     const zipBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-    const name = safeFileName(weekRangeBase(made)) + '.zip';
+    const dl = dlNames(weekRangeBase(made), '.zip');
+    const name = dl.file;
     await audit.log(req, 'REPORT_EXPORT_HWPX_ALL', {
-      targetType: 'week', targetId: null, detail: `${name} (주차 ${madeWeeks}개 / 보고서 ${total}건)`,
+      targetType: 'week', targetId: null,
+      detail: `${dl.shown} (주차 ${madeWeeks}개 / 보고서 ${total}건)`,
     });
 
     res.setHeader('Content-Type', 'application/zip');
