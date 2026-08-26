@@ -44,7 +44,12 @@ const SAMPLE = {
 function cellText(v) {
   if (v == null) return '';
   if (typeof v === 'string' || typeof v === 'number') return String(v);
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (v instanceof Date) {
+    // toISOString() 은 UTC 로 바꾼다. 한국은 아홉 시간 빠르므로 자정에 적힌
+    //  날짜가 전날로 읽힌다. 셀에 보이는 그대로 쓰려면 현지 날짜를 쓴다.
+    const p = (n) => String(n).padStart(2, '0');
+    return `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`;
+  }
   if (Array.isArray(v.richText)) return v.richText.map((t) => t.text || '').join('');
   if (v.text != null) return String(v.text);
   if (v.result != null) return String(v.result);

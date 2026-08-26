@@ -77,7 +77,12 @@
     $('#f-week').innerHTML = '<option value="">전체</option>' + opts;
 
     // 오늘 기준 주차를 기본 선택
-    const today = new Date().toISOString().slice(0, 10);
+    //  toISOString() 은 UTC 로 바꾼다. 한국은 아홉 시간 빠르므로 밤 9시부터
+    //  자정까지 전날로 계산돼, 주차가 바뀌는 밤에 지난 주차가 잡혔다.
+    //  보는 사람의 달력 날짜를 그대로 쓴다. (admin.js 의 ymd 와 같은 방식)
+    const now = new Date();
+    const p2 = (n) => String(n).padStart(2, '0');
+    const today = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}`;
     const cur = state.weeks.find((w) => w.start_date <= today && today <= w.end_date) || state.weeks[0];
     if (cur) $('#sel-week').value = cur.id;
   }
