@@ -394,7 +394,7 @@ router.post('/', async (req, res, next) => {
     // 무엇을 저장했는지 알아볼 수 있게 기관·주차를 남긴다. (삭제 기록과 같은 모양)
     await audit.log(req, 'REPORT_SAVE', {
       targetType: 'report', targetId: reportId,
-      detail: `${report.org_name || '소속 없음'}_${report.week_label}`,
+      detail: `${report.org_name || '소속 없음'}_${labelDot(report.week_label)}`,
     });
 
     report.items = await loadItems(reportId);
@@ -452,7 +452,7 @@ router.put('/:id(\\d+)', async (req, res, next) => {
 
     await audit.log(req, 'REPORT_UPDATE', {
       targetType: 'report', targetId: id,
-      detail: `${report.org_name || '소속 없음'}_${report.week_label}`,
+      detail: `${report.org_name || '소속 없음'}_${labelDot(report.week_label)}`,
     });
 
     report.items = await loadItems(id);
@@ -479,7 +479,7 @@ router.delete('/:id(\\d+)', async (req, res, next) => {
     await db.query(`DELETE FROM wr.reports WHERE id = $1`, [id]);
     await audit.log(req, 'REPORT_DELETE', {
       targetType: 'report', targetId: id,
-      detail: `${existing.org_name || '소속 없음'}_${existing.week_label}`,
+      detail: `${existing.org_name || '소속 없음'}_${labelDot(existing.week_label)}`,
     });
     res.json({ ok: true });
   } catch (err) { next(err); }

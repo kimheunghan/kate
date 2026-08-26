@@ -22,7 +22,13 @@ async function reportLabel(reportId) {
       WHERE r.id = $1`,
     [reportId]
   );
-  return rows[0] ? `${rows[0].org_name}_${rows[0].week_label}` : '';
+  if (!rows[0]) return '';
+  // 주차 이름표를 파일 이름과 같은 모양으로. (routes/reports.js 의 labelDot 과 같은 규칙)
+  const label = String(rows[0].week_label)
+    .replace(/(\d)([일월화수목금토])/g, '$1.$2')
+    .replace(/\s+\(/, '(')
+    .replace(/([~/])0(\d)/g, '$1$2');
+  return `${rows[0].org_name}_${label}`;
 }
 
 const router = express.Router();
