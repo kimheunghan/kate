@@ -22,7 +22,7 @@ async function reportLabel(reportId) {
       WHERE r.id = $1`,
     [reportId]
   );
-  return rows[0] ? `${rows[0].org_name} ${rows[0].week_label}` : '';
+  return rows[0] ? `${rows[0].org_name}_${rows[0].week_label}` : '';
 }
 
 const router = express.Router();
