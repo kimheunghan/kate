@@ -389,9 +389,14 @@ router.post('/', async (req, res, next) => {
       return id;
     });
 
-    await audit.log(req, 'REPORT_SAVE', { targetType: 'report', targetId: reportId, detail: `status=${status}` });
-
     const report = await loadReport(reportId);
+
+    // 무엇을 저장했는지 알아볼 수 있게 기관·주차를 남긴다. (삭제 기록과 같은 모양)
+    await audit.log(req, 'REPORT_SAVE', {
+      targetType: 'report', targetId: reportId,
+      detail: `${report.org_name || '소속 없음'} / ${report.week_label}`,
+    });
+
     report.items = await loadItems(reportId);
     report.attachments = await loadAttachments(reportId);
     report.can_edit = true;
@@ -439,9 +444,13 @@ router.put('/:id(\\d+)', async (req, res, next) => {
       await saveItems(client, id, items);
     });
 
-    await audit.log(req, 'REPORT_UPDATE', { targetType: 'report', targetId: id, detail: `status=${status}` });
-
     const report = await loadReport(id);
+
+    await audit.log(req, 'REPORT_UPDATE', {
+      targetType: 'report', targetId: id,
+      detail: `${report.org_name || '소속 없음'} / ${report.week_label}`,
+    });
+
     report.items = await loadItems(id);
     report.attachments = await loadAttachments(id);
     report.can_edit = true;
