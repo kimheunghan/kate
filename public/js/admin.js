@@ -813,45 +813,37 @@
   };
 
   /**
-   * 행위를 성격끼리 묶어 고르기 쉽게 한다.
-   *   같은 한글 다운로드라도 한 건짜리와 주차 묶음이 뒤섞여 있어 찾기 어려웠다.
-   *   여기 없는 코드는 '기타' 로 맨 뒤에 붙는다.
+   * 행위를 고를 때 나오는 차례.
+   *   코드 순서로 두면 같은 한글 다운로드가 목록 여기저기 흩어진다.
+   *   성격이 같은 것끼리 붙여 두되, 묶음으로 나누지는 않는다.
+   *   여기 없는 코드는 맨 뒤에 붙는다. 새 행위가 생겨도 목록에서 빠지지 않는다.
    */
-  const ACTION_GROUPS = [
-    ['접속', ['LOGIN', 'LOGOUT', 'LOGIN_FAIL']],
-    ['계정', ['SIGNUP', 'FIND_ID', 'PASSWORD_CHANGE', 'RESET_REQUEST', 'RESET_DIRECT',
-              'RESET_COMPLETE', 'RESET_DONE', 'RESET_REJECT',
-              'RESET_MAIL_SENT', 'RESET_MAIL_FAIL']],
-    ['보고서', ['REPORT_SAVE', 'REPORT_UPDATE', 'REPORT_DELETE', 'REPORT_STATUS',
-                'REPORT_ORG_CHANGE', 'REPORT_MOVE_ORG']],
-    ['보고서 내려받기', ['REPORT_EXPORT_HWPX', 'REPORT_EXPORT_HWPX_WEEK',
-                        'REPORT_EXPORT_HWPX_ALL', 'REPORT_EXPORT']],
-    ['증적자료', ['FILE_UPLOAD', 'FILE_DOWNLOAD', 'FILE_DELETE', 'FILE_EXPORT_ZIP']],
-    ['엑셀 업로드', ['EXCEL_PREVIEW', 'EXCEL_IMPORT']],
-    ['사용자·기관 관리', ['USER_CREATE', 'USER_UPDATE', 'USER_DELETE',
-                          'USER_PASSWORD_RESET', 'ORG_CREATE', 'ORG_UPDATE', 'ORG_DELETE',
-                          'WEEK_TOGGLE']],
-    ['엑셀 내려받기', ['EXPORT_STATUS', 'EXPORT_MATRIX', 'EXPORT_USERS', 'EXPORT_AUDIT']],
+  const ACTION_ORDER = [
+    'LOGIN', 'LOGOUT', 'LOGIN_FAIL',
+    'SIGNUP', 'FIND_ID', 'PASSWORD_CHANGE',
+    'RESET_REQUEST', 'RESET_DIRECT', 'RESET_COMPLETE', 'RESET_DONE', 'RESET_REJECT',
+    'RESET_MAIL_SENT', 'RESET_MAIL_FAIL',
+    'REPORT_SAVE', 'REPORT_UPDATE', 'REPORT_DELETE', 'REPORT_STATUS',
+    'REPORT_ORG_CHANGE', 'REPORT_MOVE_ORG',
+    'REPORT_EXPORT_HWPX', 'REPORT_EXPORT_HWPX_WEEK', 'REPORT_EXPORT_HWPX_ALL', 'REPORT_EXPORT',
+    'FILE_UPLOAD', 'FILE_DOWNLOAD', 'FILE_DELETE', 'FILE_EXPORT_ZIP',
+    'EXCEL_PREVIEW', 'EXCEL_IMPORT',
+    'USER_CREATE', 'USER_UPDATE', 'USER_DELETE', 'USER_PASSWORD_RESET',
+    'ORG_CREATE', 'ORG_UPDATE', 'ORG_DELETE', 'WEEK_TOGGLE',
+    'EXPORT_STATUS', 'EXPORT_MATRIX', 'EXPORT_USERS', 'EXPORT_AUDIT',
   ];
 
-  /** 쌓여 있는 행위만 골라 묶음별 <optgroup> 으로 그린다 */
+  /** 쌓여 있는 행위를 정해진 차례로 늘어놓는다 */
   function actionOptions(actions, picked) {
-    const have = new Set(actions);
-    const used = new Set();
-    const opt = (code) => {
-      used.add(code);
-      return `<option value="${esc(code)}" ${picked === code ? 'selected' : ''}>${
-        esc(ACTION_TEXT[code] || code)}</option>`;
+    const rank = (c) => {
+      const i = ACTION_ORDER.indexOf(c);
+      return i === -1 ? ACTION_ORDER.length : i;
     };
-    let html = '';
-    for (const [label, codes] of ACTION_GROUPS) {
-      const mine = codes.filter((c) => have.has(c));
-      if (!mine.length) continue;
-      html += `<optgroup label="${esc(label)}">${mine.map(opt).join('')}</optgroup>`;
-    }
-    const rest = actions.filter((c) => !used.has(c));
-    if (rest.length) html += `<optgroup label="기타">${rest.map(opt).join('')}</optgroup>`;
-    return html;
+    return [...actions]
+      .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+      .map((code) => `<option value="${esc(code)}" ${picked === code ? 'selected' : ''}>${
+        esc(ACTION_TEXT[code] || code)}</option>`)
+      .join('');
   }
 
   // ===================================================================
