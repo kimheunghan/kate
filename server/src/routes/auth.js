@@ -68,6 +68,22 @@ function maskUsername(u) {
   return u.slice(0, at) + '**' + u.slice(at + 2);
 }
 
+/** 활동 로그에 남길 사용자 표기 — 기관명 / 아이디 / 이름 (admin.js 와 같은 모양) */
+function userLabel(u) {
+  return `${u.org_name || '소속 없음'} / ${u.username} / ${u.name}`;
+}
+
+/** 손에 든 값에 기관·이름이 없을 때 아이디로 찾아 표기를 만든다 */
+async function userLabelById(id) {
+  const { rows } = await db.query(
+    `SELECT u.username, u.name, o.name AS org_name
+       FROM wr.users u LEFT JOIN wr.organizations o ON o.id = u.org_id
+      WHERE u.id = $1`,
+    [id]
+  );
+  return rows[0] ? userLabel(rows[0]) : '';
+}
+
 // ---------------------------------------------------------------------
 // POST /api/auth/login
 // ---------------------------------------------------------------------
@@ -95,7 +111,11 @@ router.post('/login', async (req, res, next) => {
 
     if (!user || !auth.verifyPassword(password, user.password_hash)) {
       noteFailure(username);
-      await audit.log(req, 'LOGIN_FAIL', { detail: username, actorName: username });
+      await audit.log(req, 'LOGIN_FAIL', {
+        // 계정이 있으면 누구인지까지, 없으면 시도한 아이디만 남긴다
+        detail: user ? userLabel(user) : `없는 아이디 / ${username} / -`,
+        actorName: username,
+      });
       return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
     }
 
@@ -119,7 +139,9 @@ router.post('/login', async (req, res, next) => {
     );
 
     req.user = user;
-    await audit.log(req, 'LOGIN', { targetType: 'user', targetId: user.id });
+    await audit.log(req, 'LOGIN', {
+      targetType: 'user', targetId: user.id, detail: userLabel(user),
+    });
 
     res.json({
       user: {
@@ -134,7 +156,11 @@ router.post('/login', async (req, res, next) => {
 // POST /api/auth/logout
 // ---------------------------------------------------------------------
 router.post('/logout', async (req, res) => {
-  if (req.user) await audit.log(req, 'LOGOUT', { targetType: 'user', targetId: req.user.id });
+  if (req.user) {
+    await audit.log(req, 'LOGOUT', {
+      targetType: 'user', targetId: req.user.id, detail: userLabel(req.user),
+    });
+  }
   auth.clearSessionCookie(res);
   res.json({ ok: true });
 });
@@ -168,7 +194,9 @@ router.post('/password', auth.requireAuth, async (req, res, next) => {
       `UPDATE wr.users SET password_hash = $1, must_change_pw = FALSE WHERE id = $2`,
       [auth.hashPassword(next_), req.user.id]
     );
-    await audit.log(req, 'PASSWORD_CHANGE', { targetType: 'user', targetId: req.user.id });
+    await audit.log(req, 'PASSWORD_CHANGE', {
+      targetType: 'user', targetId: req.user.id, detail: userLabel(req.user),
+    });
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -537,8 +565,10 @@ router.post('/reset-request', rateLimit(5, 10 * 60 * 1000), async (req, res, nex
         );
       });
 
-      await audit.log(req, 'RESET_DIRECT', { targetType: 'user', targetId: user.id, detail: username,
-        actorId: user.id, actorName: user.username });
+      await audit.log(req, 'RESET_DIRECT', {
+        targetType: 'user', targetId: user.id, detail: await userLabelById(user.id),
+        actorId: user.id, actorName: user.username,
+      });
       return res.json({
         ok: true, delivery: 'DIRECT',
         temp_password: tempPassword,
@@ -643,8 +673,10 @@ router.post('/reset-complete', rateLimit(10, 10 * 60 * 1000), async (req, res, n
       );
     });
 
-    await audit.log(req, 'RESET_COMPLETE', { targetType: 'user', targetId: row.user_id, detail: row.username,
-      actorId: row.user_id, actorName: row.username });
+    await audit.log(req, 'RESET_COMPLETE', {
+      targetType: 'user', targetId: row.user_id, detail: await userLabelById(row.user_id),
+      actorId: row.user_id, actorName: row.username,
+    });
     res.json({ ok: true, username: row.username, message: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인하세요.' });
   } catch (err) { next(err); }
 });
