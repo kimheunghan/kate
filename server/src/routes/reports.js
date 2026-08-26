@@ -1149,7 +1149,9 @@ router.get('/:id(\\d+)/export-hwpx', requireExport, async (req, res, next) => {
       [0.12, 0.08, 0.25, 0.275, 0.275]
     );
 
-    const name = safeFileName(`${report.org_name}_주간보고_${report.week_label}`) + '.hwpx';
+    const name = safeFileName(
+      `${report.org_name || '소속 없음'}_${report.author_name || '-'}_주간보고_${report.week_label}`
+    ) + '.hwpx';
     await audit.log(req, 'REPORT_EXPORT_HWPX', { targetType: 'report', targetId: report.id, detail: name });
 
     res.setHeader('Content-Type', 'application/hwp+zip');
@@ -1220,6 +1222,30 @@ async function renderWeekHwpx(user, week, orgId) {
 }
 
 /** safeFileName 이 '/' 를 지워 날짜가 붙어 읽히므로 미리 '.' 로 바꾼다 */
+/**
+ * 여러 주차를 묶었을 때 쓰는 이름.
+ *   주간보고_18주차 ~23주차 (2026.08.20목~10.26수)
+ *   해가 같으면 끝 날짜의 연도는 뺀다. 주차 이름표와 같은 규칙이다.
+ */
+const KOR_DOW_SHORT = ['일', '월', '화', '수', '목', '금', '토'];
+function ymdDow(iso, withYear) {
+  const [y, m, d] = String(iso || '').split('-').map(Number);
+  if (!y) return '';
+  const dow = KOR_DOW_SHORT[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  const p = (n) => String(n).padStart(2, '0');
+  return (withYear ? `${y}.` : '') + `${p(m)}.${p(d)}${dow}`;
+}
+function weekRangeBase(weeks) {
+  if (!weeks.length) return '주간보고';
+  const sorted = [...weeks].sort((a, b) => (a.start_date < b.start_date ? -1 : 1));
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  if (first.id === last.id) return weekFileBase(first.label);
+  const sameYear = String(first.start_date).slice(0, 4) === String(last.end_date).slice(0, 4);
+  return `주간보고_${first.week_no}주차 ~${last.week_no}주차`
+       + ` (${ymdDow(first.start_date, true)}~${ymdDow(last.end_date, !sameYear)})`;
+}
+
 function weekFileBase(label) {
   return safeFileName(`주간보고_${String(label).replace(/\//g, '.')}`);
 }
@@ -1251,7 +1277,7 @@ router.get('/export-hwpx-week', requireExport, async (req, res, next) => {
     if (weekId) { params.push(weekId); where.push(`r.week_id = $${params.length}`); }
 
     const { rows: weeks } = await db.query(
-      `SELECT DISTINCT w.id, w.label, w.start_date, w.end_date
+      `SELECT DISTINCT w.id, w.week_no, w.label, w.start_date, w.end_date
          FROM wr.reports r JOIN wr.report_weeks w ON w.id = r.week_id
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
         ORDER BY w.start_date DESC`,
@@ -1285,18 +1311,19 @@ router.get('/export-hwpx-week', requireExport, async (req, res, next) => {
     // 주차 목록은 "보고서가 하나라도 있는 주차" 로 뽑지만, 문서는 참여 인력의
     //  것만 담는다. 그래서 담을 것이 없어 건너뛰는 주차가 생긴다.
     //  weeks.length 로 이름을 지으면 "2개 주차" 라 해놓고 한 개만 든 묶음이 나간다.
-    let madeWeeks = 0;
+    const made = [];
     for (const w of weeks) {
-      const made = await renderWeekHwpx(req.user, w, orgId);
-      if (!made) continue;
-      zip.file(weekFileBase(w.label) + '.hwpx', made.buf);
-      total += made.count;
-      madeWeeks += 1;
+      const one = await renderWeekHwpx(req.user, w, orgId);
+      if (!one) continue;
+      zip.file(weekFileBase(w.label) + '.hwpx', one.buf);
+      total += one.count;
+      made.push(w);
     }
+    const madeWeeks = made.length;
     if (!madeWeeks) return res.status(404).json({ error: '내려받을 보고서가 없습니다.' });
 
     const zipBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-    const name = safeFileName(`주간보고_전체(${madeWeeks}개 주차)`) + '.zip';
+    const name = safeFileName(weekRangeBase(made)) + '.zip';
     await audit.log(req, 'REPORT_EXPORT_HWPX_ALL', {
       targetType: 'week', targetId: null, detail: `${name} (주차 ${madeWeeks}개 / 보고서 ${total}건)`,
     });
