@@ -17,6 +17,17 @@ const userManager = auth.requireUserManager;
 
 const ROLES = ['ADMIN', 'SUPERVISOR', 'ORG_ADMIN', 'USER'];
 
+/** 활동 로그에 남길 사용자 표기 — 기관명 / 아이디 / 이름 */
+async function userLabel(u) {
+  if (!u) return '';
+  let org = u.org_name;
+  if (org === undefined && u.org_id) {
+    const { rows } = await db.query(`SELECT name FROM wr.organizations WHERE id = $1`, [u.org_id]);
+    org = rows[0]?.name;
+  }
+  return `${org || '소속 없음'} / ${u.username} / ${u.name}`;
+}
+
 /** 감독 기관(회원가입에 안 나오는 기관)인가. 이 기관 소속은 감독관리자로 둔다. */
 async function isSupervisorOrg(orgId) {
   if (!orgId) return false;
@@ -489,7 +500,9 @@ router.post('/users', userManager, async (req, res, next) => {
     );
     if (!rows[0]) return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
 
-    await audit.log(req, 'USER_CREATE', { targetType: 'user', targetId: rows[0].id, detail: username });
+    await audit.log(req, 'USER_CREATE', {
+      targetType: 'user', targetId: rows[0].id, detail: await userLabel(rows[0]),
+    });
     res.status(201).json({ user: rows[0] });
   } catch (err) { next(err); }
 });
@@ -611,7 +624,8 @@ router.put('/users/:id(\\d+)', userManager, async (req, res, next) => {
     if (!rows[0]) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
     await audit.log(req, 'USER_UPDATE', {
       targetType: 'user', targetId: id,
-      detail: rows[0].username + (movedReports ? ` / 보고서 ${movedReports}건 기관 이동` : ''),
+      detail: await userLabel(rows[0])
+            + (movedReports ? ` · 보고서 ${movedReports}건 기관 이동` : ''),
     });
     res.json({ user: rows[0], moved_reports: movedReports });
   } catch (err) { next(err); }
@@ -648,7 +662,9 @@ router.delete('/users/:id(\\d+)', userManager, async (req, res, next) => {
     if (id === req.user.id) return res.status(400).json({ error: '본인 계정은 삭제할 수 없습니다.' });
 
     const { rows: urows } = await db.query(
-      `SELECT username, name, role, org_id FROM wr.users WHERE id = $1`, [id]
+      `SELECT u.username, u.name, u.role, u.org_id, o.name AS org_name
+         FROM wr.users u LEFT JOIN wr.organizations o ON o.id = u.org_id
+        WHERE u.id = $1`, [id]
     );
     if (!urows[0]) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
 
@@ -682,7 +698,8 @@ router.delete('/users/:id(\\d+)', userManager, async (req, res, next) => {
 
     await audit.log(req, 'USER_DELETE', {
       targetType: 'user', targetId: id,
-      detail: `${urows[0].username}(${urows[0].name}) · 보고서 ${reps.length}건 · 증적자료 ${fileCount}건 함께 삭제`,
+      detail: `${await userLabel(urows[0])}`
+            + ` · 보고서 ${reps.length}건 · 증적자료 ${fileCount}건 함께 삭제`,
     });
     res.json({ ok: true, reports: reps.length, files: fileCount });
   } catch (err) { next(err); }
