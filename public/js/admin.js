@@ -812,6 +812,48 @@
     WEEK_TOGGLE: '주차 마감 전환',
   };
 
+  /**
+   * 행위를 성격끼리 묶어 고르기 쉽게 한다.
+   *   같은 한글 다운로드라도 한 건짜리와 주차 묶음이 뒤섞여 있어 찾기 어려웠다.
+   *   여기 없는 코드는 '기타' 로 맨 뒤에 붙는다.
+   */
+  const ACTION_GROUPS = [
+    ['접속', ['LOGIN', 'LOGOUT', 'LOGIN_FAIL']],
+    ['계정', ['SIGNUP', 'FIND_ID', 'PASSWORD_CHANGE', 'RESET_REQUEST', 'RESET_DIRECT',
+              'RESET_COMPLETE', 'RESET_DONE', 'RESET_REJECT',
+              'RESET_MAIL_SENT', 'RESET_MAIL_FAIL']],
+    ['보고서', ['REPORT_SAVE', 'REPORT_UPDATE', 'REPORT_DELETE', 'REPORT_STATUS',
+                'REPORT_ORG_CHANGE', 'REPORT_MOVE_ORG']],
+    ['보고서 내려받기', ['REPORT_EXPORT_HWPX', 'REPORT_EXPORT_HWPX_WEEK',
+                        'REPORT_EXPORT_HWPX_ALL', 'REPORT_EXPORT']],
+    ['증적자료', ['FILE_UPLOAD', 'FILE_DOWNLOAD', 'FILE_DELETE', 'FILE_EXPORT_ZIP']],
+    ['엑셀 업로드', ['EXCEL_PREVIEW', 'EXCEL_IMPORT']],
+    ['사용자·기관 관리', ['USER_CREATE', 'USER_UPDATE', 'USER_DELETE',
+                          'USER_PASSWORD_RESET', 'ORG_CREATE', 'ORG_UPDATE', 'ORG_DELETE',
+                          'WEEK_TOGGLE']],
+    ['엑셀 내려받기', ['EXPORT_STATUS', 'EXPORT_MATRIX', 'EXPORT_USERS', 'EXPORT_AUDIT']],
+  ];
+
+  /** 쌓여 있는 행위만 골라 묶음별 <optgroup> 으로 그린다 */
+  function actionOptions(actions, picked) {
+    const have = new Set(actions);
+    const used = new Set();
+    const opt = (code) => {
+      used.add(code);
+      return `<option value="${esc(code)}" ${picked === code ? 'selected' : ''}>${
+        esc(ACTION_TEXT[code] || code)}</option>`;
+    };
+    let html = '';
+    for (const [label, codes] of ACTION_GROUPS) {
+      const mine = codes.filter((c) => have.has(c));
+      if (!mine.length) continue;
+      html += `<optgroup label="${esc(label)}">${mine.map(opt).join('')}</optgroup>`;
+    }
+    const rest = actions.filter((c) => !used.has(c));
+    if (rest.length) html += `<optgroup label="기타">${rest.map(opt).join('')}</optgroup>`;
+    return html;
+  }
+
   // ===================================================================
   //  기간 고르기 — 달력 하나에서 시작일과 종료일을 집는다
   //  (숙박·항공 예약 사이트에서 쓰는 방식. 타자 없이 클릭만으로)
@@ -1174,9 +1216,7 @@
           <span>행위</span>
           <select id="al-action">
             <option value="">전체</option>
-            ${res.actions.map((code) =>
-              `<option value="${esc(code)}" ${auditFilter.action === code ? 'selected' : ''}>${
-                esc(ACTION_TEXT[code] || code)}</option>`).join('')}
+            ${actionOptions(res.actions, auditFilter.action)}
           </select>
         </label>
         <label class="sb-field" style="flex:1 1 200px">
