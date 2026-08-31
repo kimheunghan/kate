@@ -460,6 +460,47 @@ const today = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate()
 
 ---
 
+## 등록 내역 조회의 두 시각 열 (2026-08-31 변경)
+
+목록에 **등록일시** 를 더하고, 옆의 **최종수정** 을 **수정일시** 로 바꿨습니다.
+`수정일시` 만으로는 "언제 처음 냈는지" 를 알 수 없어 지각 제출을 가릴 수 없었습니다.
+
+| 화면의 이름 | 실제 값 | 언제 채워지나 |
+|---|---|---|
+| 등록일시 | `wr.reports.submitted_at` | **첫 제출 때 한 번.** 이후 수정해도 그대로입니다. |
+| 수정일시 | `wr.reports.updated_at` | 저장할 때마다 트리거가 자동으로 갱신합니다. |
+
+등록일시가 첫 제출 시각으로 남는 것은 저장 SQL 이 `COALESCE` 로 기존 값을
+지키기 때문입니다. 덮어쓰지 않도록 주의하세요.
+
+```sql
+-- server/src/routes/reports.js
+submitted_at = CASE WHEN $2::varchar = 'SUBMITTED'
+                    THEN COALESCE(submitted_at, now()) ELSE NULL END
+```
+
+**DB 는 바뀌지 않았습니다. 마이그레이션이 없습니다.** `submitted_at` 은 원래
+있던 열이고 목록 API 가 이미 내려주고 있어서, 화면만 고쳤습니다. 그래서 **예전
+보고서도 과거의 제출 시각이 그대로 보입니다.** (`014_drop_draft.sql` 이 값이 없던
+옛 행을 `updated_at`·`created_at` 으로 채워 둔 덕입니다.)
+
+미등록(`NONE`) 행은 두 칸 모두 `-` 입니다.
+
+이름을 바꾼 곳은 네 군데입니다. **한 곳만 고치면 같은 값이 화면마다 다른 이름으로
+보입니다.**
+
+```
+public/app.html                     주간보고 > 등록 내역 조회 표 머리
+public/js/app.js                    같은 표의 각 줄 + 작성 화면의 "등록된 보고서입니다" 안내
+public/js/admin.js                  관리화면 > 등록 내역 조회, 작성자 제출 현황
+server/src/routes/admin-export.js   제출 현황 엑셀 내려받기 머리글
+```
+
+좁은 화면(820px 이하)에서는 두 열이 **함께** 접힙니다 (`style.css` 의
+`.col-submitted`·`.col-updated`). 한쪽만 접으면 표가 어긋납니다.
+
+---
+
 ## 하지 말아야 할 것
 
 실제로 서비스를 내렸던 것들입니다. 같은 실수를 막기 위해 적어 둡니다.
