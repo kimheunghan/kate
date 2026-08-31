@@ -1105,8 +1105,8 @@
             <th class="col-summary">내용 요약</th>
             <th class="center col-state" style="width:7%">상태</th>
             <th class="center col-files" style="width:5%">첨부</th>
-            <th class="col-submitted" style="width:9%">최초제출시각</th>
-            <th class="col-updated" style="width:9%">최종수정</th>
+            <th class="col-submitted" style="width:9%">등록일시</th>
+            <th class="col-updated" style="width:9%">수정일시</th>
             <th class="center col-actions" style="width:11%">상세보기 / 다운로드</th>
           </tr></thead>
           <tbody>
