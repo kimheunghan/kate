@@ -321,7 +321,7 @@ router.get('/export/status', auth.requireStatusView, async (req, res, next) => {
     at = putSectionTitle(ws, at, `작성자 제출 현황 (${people.length}명)`);
     const pHeadAt = at;
     ws.getRow(at).values =
-      ['기관', '이름', '아이디', '상태', '첨부', '제출시각', '최종수정', '접속IP'];
+      ['기관', '이름', '아이디', '상태', '첨부', '등록일시', '수정일시', '접속IP'];
     styleHeader(ws, at);
     at += 1;
 

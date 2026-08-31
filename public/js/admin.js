@@ -290,8 +290,8 @@
               <th style="width:13%">아이디</th>
               <th class="center" style="width:10%">상태</th>
               <th class="center" style="width:6%">첨부</th>
-              <th style="width:14%">제출시각</th>
-              <th style="width:14%">최종수정</th>
+              <th style="width:14%">등록일시</th>
+              <th style="width:14%">수정일시</th>
               <th style="width:12%">접속IP</th>
             </tr>
           </thead>

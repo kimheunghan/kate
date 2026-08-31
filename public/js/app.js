@@ -278,7 +278,7 @@
         + ' 작성한 보고서는 본인만 내려받을 수 있습니다.</span>'
       : '';
     const mainMsg = report
-      ? `등록된 보고서입니다. (작성자 ${esc(report.author_name || '-')} · 최종수정 ${fmtDateTime(report.updated_at)})`
+      ? `등록된 보고서입니다. (작성자 ${esc(report.author_name || '-')} · 수정일시 ${fmtDateTime(report.updated_at)})`
       : '해당 주차에 등록된 보고서가 없습니다. 아래에서 새로 작성하세요.';
 
     $('#write-status').innerHTML =
