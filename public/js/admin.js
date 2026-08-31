@@ -1105,7 +1105,8 @@
             <th class="col-summary">내용 요약</th>
             <th class="center col-state" style="width:7%">상태</th>
             <th class="center col-files" style="width:5%">첨부</th>
-            <th class="col-updated" style="width:10%">최종수정</th>
+            <th class="col-submitted" style="width:9%">최초제출시각</th>
+            <th class="col-updated" style="width:9%">최종수정</th>
             <th class="center col-actions" style="width:11%">상세보기 / 다운로드</th>
           </tr></thead>
           <tbody>
@@ -1123,13 +1124,14 @@
                 }</td>
                 <td class="center col-state">${statusBadge(r.status)}</td>
                 <td class="center col-files">${r.id ? r.file_count : '-'}</td>
+                <td class="small col-submitted">${r.submitted_at ? fmtDateTime(r.submitted_at) : '-'}</td>
                 <td class="small col-updated">${r.id ? fmtDateTime(r.updated_at) : '-'}</td>
                 <td class="center nowrap col-actions">${r.id ? `
                   <button class="btn sm" data-rg-open="${r.id}">열기</button>
                   ${canDl ? `<button class="btn sm" data-rg-hwpx="${r.id}" title="아래한글 문서(HWPX)로 내려받기">한글</button>` : ''}`
                   : '<span class="muted small">-</span>'}</td>
               </tr>`).join('')
-              : '<tr><td colspan="8" class="empty">조회된 보고서가 없습니다.</td></tr>'}
+              : '<tr><td colspan="9" class="empty">조회된 보고서가 없습니다.</td></tr>'}
           </tbody>
         </table>
       </div>

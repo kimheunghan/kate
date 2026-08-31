@@ -779,6 +779,7 @@
         }</td>
         <td class="center col-state">${statusBadge(r.status)}</td>
         <td class="center col-files">${r.id ? r.file_count : '-'}</td>
+        <td class="small col-submitted">${r.submitted_at ? fmtDateTime(r.submitted_at) : '-'}</td>
         <td class="small col-updated">${r.id ? fmtDateTime(r.updated_at) : '-'}</td>
         <td class="center nowrap col-actions">${r.id ? `
           <button class="btn sm" data-open="${r.id}">열기</button>

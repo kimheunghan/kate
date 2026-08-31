@@ -930,6 +930,7 @@ table.grid.fixed td.col-org, table.grid.fixed td.col-author { word-break: keep-a
 }
 @media (max-width: 820px) {
   #tab-list .col-files { display: none; }
+  #tab-list .col-submitted { display: none; }
   #tab-list .col-updated { display: none; }
   #tab-list .col-week { width: 34%; }
   #tab-list .col-actions { width: 22%; }
